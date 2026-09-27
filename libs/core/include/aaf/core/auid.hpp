@@ -24,6 +24,8 @@ struct Auid
     /// Parses `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`, with optional braces or `urn:uuid:` prefix.
     [[nodiscard]] static auto parse(std::string_view text) -> Result<Auid>;
 
+    /// Encodes in stored form; the inverse of `fromStored`.
+    [[nodiscard]] auto toStored(bool bigEndian = false) const noexcept -> std::array<std::byte, 16>;
     [[nodiscard]] auto isNull() const noexcept -> bool { return *this == Auid{}; }
     [[nodiscard]] auto toString() const -> std::string;
     auto operator<=>(const Auid&) const = default;
@@ -35,6 +37,7 @@ struct MobId
     std::array<std::byte, 32> bytes{};
 
     [[nodiscard]] static auto fromStored(std::span<const std::byte, 32> data, bool bigEndian = false) noexcept -> MobId;
+    [[nodiscard]] auto toStored(bool bigEndian = false) const noexcept -> std::array<std::byte, 32>;
     /// Formats as `urn:smpte:umid:...`, matching the representation used by pyaaf2.
     [[nodiscard]] auto toString() const -> std::string;
     auto operator<=>(const MobId&) const = default;

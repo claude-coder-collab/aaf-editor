@@ -157,7 +157,7 @@ public:
             return r;
         }
         buildModel();
-        buildWeakIndex();
+        doc_.rebuildIndexes();
         return {};
     }
 
@@ -165,6 +165,11 @@ private:
     void warn(ObjectId object, std::uint16_t pid, std::string message)
     {
         doc_.loadDiagnostics_.push_back({ Diagnostic::Severity::warning, object, pid, std::move(message) });
+    }
+
+    void note(ObjectId object, std::uint16_t pid, std::string message)
+    {
+        doc_.loadDiagnostics_.push_back({ Diagnostic::Severity::info, object, pid, std::move(message) });
     }
 
     auto readStream(cfb::EntryId storage, std::u16string_view name, std::uint64_t limit) -> Result<std::vector<std::byte>>
@@ -688,7 +693,14 @@ private:
             }
             if (auto type = auidOf(prop(po, "PropertyDefinition", "Type"), po.bigEndian()))
             {
-                p.type = *type;
+                if (known != nullptr && known->type != *type)
+                {
+                    note(po.id, 0, std::format("{}.{} is declared as type {}; using baseline type {}", def.name, p.name, type->toString(), known->type.toString()));
+                }
+                else
+                {
+                    p.type = *type;
+                }
             }
             p.optional = boolOf(po, "PropertyDefinition", "IsOptional", p.optional);
             p.uniqueId = boolOf(po, "PropertyDefinition", "IsUniqueIdentifier", p.uniqueId);
@@ -831,48 +843,80 @@ private:
         model.addType(std::move(t), existing != nullptr ? DefinitionSource::both : DefinitionSource::file);
     }
 
-    void buildWeakIndex()
-    {
-        for (std::size_t tag = 0; tag < doc_.referencedProperties_.size(); ++tag)
-        {
-            const auto& path = doc_.referencedProperties_[tag];
-            ObjectId current = Document::root();
-            const Property* target = nullptr;
-            for (std::size_t i = 0; i < path.size() && current != kNoObject; ++i)
-            {
-                target = doc_.object(current).find(path[i]);
-                if (target == nullptr)
-                {
-                    current = kNoObject;
-                    break;
-                }
-                if (i + 1 < path.size())
-                {
-                    const auto* strong = std::get_if<StrongRefProperty>(&target->payload);
-                    current = strong == nullptr ? kNoObject : strong->object;
-                }
-            }
-            if (current == kNoObject || target == nullptr)
-            {
-                continue;
-            }
-            auto& index = doc_.weakIndex_[static_cast<std::uint16_t>(tag)];
-            if (const auto* set = std::get_if<StrongRefSetProperty>(&target->payload))
-            {
-                for (std::size_t i = 0; i < set->objects.size(); ++i)
-                {
-                    index.emplace(keyString(set->entries[i].key), set->objects[i]);
-                }
-            }
-        }
-    }
-
     Document& doc_;
     const cfb::Container& c_;
     std::deque<ObjectId> pending_;
     std::set<cfb::EntryId> claimed_;
     std::map<ObjectId, std::set<cfb::EntryId>> referenced_;
 };
+
+auto Object::find(std::uint16_t pid) -> Property*
+{
+    const auto it = std::ranges::find(properties, pid, &Property::pid);
+    return it == properties.end() ? nullptr : &*it;
+}
+
+auto Document::addObject(Object object) -> ObjectId
+{
+    object.id = objects_.size();
+    objects_.push_back(std::move(object));
+    return objects_.back().id;
+}
+
+auto Document::isAttached(ObjectId id) const -> bool
+{
+    std::size_t steps = 0;
+    while (id != root())
+    {
+        if (id == kNoObject || id >= objects_.size() || ++steps > objects_.size())
+        {
+            return false;
+        }
+        id = objects_[static_cast<std::size_t>(id)].parent;
+    }
+    return true;
+}
+
+auto Document::tagTarget(std::uint16_t tag) const -> std::optional<std::pair<ObjectId, std::uint16_t>>
+{
+    if (tag >= referencedProperties_.size() || referencedProperties_[tag].empty())
+    {
+        return std::nullopt;
+    }
+    const auto& path = referencedProperties_[tag];
+    ObjectId current = root();
+    for (std::size_t i = 0; i + 1 < path.size(); ++i)
+    {
+        const auto* p = object(current).find(path[i]);
+        const auto* strong = p == nullptr ? nullptr : std::get_if<StrongRefProperty>(&p->payload);
+        if (strong == nullptr)
+        {
+            return std::nullopt;
+        }
+        current = strong->object;
+    }
+    return std::pair{ current, path.back() };
+}
+
+void Document::rebuildIndexes()
+{
+    weakIndex_.clear();
+    for (std::size_t tag = 0; tag < referencedProperties_.size(); ++tag)
+    {
+        const auto target = tagTarget(static_cast<std::uint16_t>(tag));
+        const auto* p = target ? object(target->first).find(target->second) : nullptr;
+        const auto* set = p == nullptr ? nullptr : std::get_if<StrongRefSetProperty>(&p->payload);
+        if (set == nullptr)
+        {
+            continue;
+        }
+        auto& index = weakIndex_[static_cast<std::uint16_t>(tag)];
+        for (std::size_t i = 0; i < set->objects.size() && i < set->entries.size(); ++i)
+        {
+            index.emplace(keyString(set->entries[i].key), set->objects[i]);
+        }
+    }
+}
 
 auto Object::find(std::uint16_t pid) const -> const Property*
 {

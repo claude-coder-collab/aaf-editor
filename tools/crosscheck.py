@@ -35,6 +35,14 @@ FIXTURE_DIRS = (REPO_ROOT / "tests" / "fixtures" / "aafsdk", REPO_ROOT / "tests"
 Json = Any
 
 
+def load_ext_enum_names(path: Path = REPO_ROOT / "model" / "baseline.json") -> dict[str, str]:
+    model = json.loads(path.read_text(encoding="utf-8"))
+    return {value: name for t in model["types"] if t["kind"] == "ext_enum" for value, name in t["values"]}
+
+
+EXT_ENUM_NAMES = load_ext_enum_names()
+
+
 def reference_files(dirs: Iterable[Path]) -> list[Path]:
     return sorted(p for d in dirs if d.is_dir() for p in d.rglob("*") if p.suffix.lower() == ".aaf")
 
@@ -119,6 +127,8 @@ def diff(a: Json, b: Json, path: str, out: list[str], ignore_stream_names: bool 
             a, b = sorted(a, key=sort_key), sorted(b, key=sort_key)
         for i, (x, y) in enumerate(zip(a, b)):
             diff(x, y, f"{path}[{i}]", out, ignore_stream_names)
+        return
+    if isinstance(a, str) and isinstance(b, str) and EXT_ENUM_NAMES.get(b) == a:
         return
     if a != b and not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and a == b):
         out.append(f"{path}: {json.dumps(a)[:80]} vs {json.dumps(b)[:80]}")

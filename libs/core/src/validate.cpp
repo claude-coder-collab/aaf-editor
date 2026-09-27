@@ -9,7 +9,9 @@ namespace aaf
 namespace
 {
 
-auto expectedForm(const MetaModel& model, const Auid& typeId) -> std::optional<StoredForm>
+}
+
+auto expectedStoredForm(const MetaModel& model, const Auid& typeId) -> std::optional<StoredForm>
 {
     const auto* t = model.resolve(typeId);
     if (t == nullptr)
@@ -44,6 +46,9 @@ auto expectedForm(const MetaModel& model, const Auid& typeId) -> std::optional<S
     }
 }
 
+namespace
+{
+
 auto collectionQuirk(StoredForm expected, std::uint16_t actual) -> bool
 {
     const auto a = static_cast<StoredForm>(actual);
@@ -51,7 +56,9 @@ auto collectionQuirk(StoredForm expected, std::uint16_t actual) -> bool
     return pair(StoredForm::strongRefVector, StoredForm::strongRefSet) || pair(StoredForm::weakRefVector, StoredForm::weakRefSet);
 }
 
-auto isKnownDefinition(const MetaModel& model, std::span<const std::byte> key, bool bigEndian) -> bool
+}
+
+auto isKnownDefinitionKey(const MetaModel& model, std::span<const std::byte> key, bool bigEndian) -> bool
 {
     if (key.size() != 16)
     {
@@ -60,6 +67,9 @@ auto isKnownDefinition(const MetaModel& model, std::span<const std::byte> key, b
     const auto id = Auid::fromStored(key.first<16>(), bigEndian);
     return model.findClass(id) != nullptr || model.findType(id) != nullptr || model.findProperty(id) != nullptr;
 }
+
+namespace
+{
 
 class Validator
 {
@@ -75,8 +85,17 @@ public:
         out_ = doc_.loadDiagnostics();
         for (std::size_t i = 1; i < doc_.objectCount(); ++i)
         {
-            checkObject(doc_.object(i));
+            if (doc_.isAttached(i))
+            {
+                checkObject(doc_.object(i));
+            }
         }
+        return std::move(out_);
+    }
+
+    auto runOne(ObjectId id) -> std::vector<Diagnostic>
+    {
+        checkObject(doc_.object(id));
         return std::move(out_);
     }
 
@@ -127,7 +146,7 @@ private:
         {
             report(Diagnostic::Severity::warning, o, p.pid, std::format("{} has property {} which its class does not define", cls.name, def->name));
         }
-        if (const auto expected = expectedForm(model_, def->type); expected && static_cast<std::uint16_t>(*expected) != p.storedForm)
+        if (const auto expected = expectedStoredForm(model_, def->type); expected && static_cast<std::uint16_t>(*expected) != p.storedForm)
         {
             const auto severity = collectionQuirk(*expected, p.storedForm) ? Diagnostic::Severity::info : Diagnostic::Severity::error;
             report(severity, o, p.pid, std::format("{}.{} has stored form {:#04x}, expected {:#04x}", cls.name, def->name, p.storedForm, static_cast<std::uint16_t>(*expected)));
@@ -162,7 +181,7 @@ private:
 
     void checkWeak(const Object& o, const PropertyDef& def, std::uint16_t tag, std::span<const std::byte> key)
     {
-        if (doc_.resolveWeak(tag, key) || isKnownDefinition(model_, key, o.bigEndian()))
+        if (doc_.resolveWeak(tag, key) || isKnownDefinitionKey(model_, key, o.bigEndian()))
         {
             return;
         }
@@ -179,6 +198,15 @@ private:
 auto validate(const Document& document) -> std::vector<Diagnostic>
 {
     return Validator(document).run();
+}
+
+auto validateObject(const Document& document, ObjectId id) -> std::vector<Diagnostic>
+{
+    if (id == Document::root())
+    {
+        return {};
+    }
+    return Validator(document).runOne(id);
 }
 
 }

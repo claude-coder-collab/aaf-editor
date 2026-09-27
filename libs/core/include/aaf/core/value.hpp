@@ -21,16 +21,19 @@ public:
         std::int64_t value = 0;
         /// Element name, empty if the value is not a defined element.
         std::string name;
+        auto operator==(const Enum&) const -> bool = default;
     };
     struct ExtEnum
     {
         Auid value;
         std::string name;
+        auto operator==(const ExtEnum&) const -> bool = default;
     };
     struct Record
     {
         std::vector<std::string> names;
         std::vector<Value> values;
+        auto operator==(const Record&) const -> bool = default;
     };
     using Array = std::vector<Value>;
     struct Indirect
@@ -38,11 +41,13 @@ public:
         Auid type;
         /// Exactly one element: the contained value.
         std::vector<Value> value;
+        auto operator==(const Indirect&) const -> bool = default;
     };
     struct Opaque
     {
         Auid type;
         std::vector<std::byte> bytes;
+        auto operator==(const Opaque&) const -> bool = default;
     };
     using Bytes = std::vector<std::byte>;
 
@@ -68,11 +73,16 @@ public:
     }
     /// Human-readable single-line representation.
     [[nodiscard]] auto toString() const -> std::string;
+    auto operator==(const Value&) const -> bool = default;
 
     Storage data;
 };
 
 /// Decodes stored bytes of type `type` in the given byte order.
 [[nodiscard]] auto decodeValue(const MetaModel& model, const Auid& type, std::span<const std::byte> bytes, bool bigEndian) -> Result<Value>;
+
+/// Encodes a value as stored bytes of type `type`; the inverse of `decodeValue`.
+/// Integers accept either signedness if the value is in range; enumerations may be given by name only.
+[[nodiscard]] auto encodeValue(const MetaModel& model, const Auid& type, const Value& value, bool bigEndian) -> Result<std::vector<std::byte>>;
 
 }

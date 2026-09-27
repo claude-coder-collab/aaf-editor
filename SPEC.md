@@ -171,7 +171,7 @@ This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core
   - Header: `u8 byteOrder` (`0x4C` 'L' little-endian, `0x42` 'B' big-endian), `u8 formatVersion`, `u16 entryCount`.
   - Index: `entryCount` × `{u16 pid, u16 storedForm, u16 length}`.
   - Values: concatenated in index order.
-- Both byte orders must be readable. The byte order applies to the header, index and values. The writer keeps each loaded object's byte order, so its raw data bytes stay valid. The `referenced properties` stream keeps its byte order too. New objects (M4) are written little-endian.
+- Both byte orders must be readable. The byte order applies to the header, index and values. The writer keeps each loaded object's byte order, so its raw data bytes stay valid. The `referenced properties` stream keeps its byte order too. New objects are created little-endian, with `formatVersion` `0x20` (the only value in the reference files). Edited values are encoded in their object's byte order.
 - Values are contiguous (there is no offset field). Index entries with an unknown stored form **must be skipped** using `length`, and are preserved verbatim.
 - **File signature**: `{42464141-000d-4d4f-060e-2b34010101ff}` (512-byte sectors) or `{0d010201-0200-0000-060e-2b3403020101}` (4096-byte sectors). **Discrepancy with the stored-format spec**, which says the signature is the root storage's CLSID. In every reference file, and in pyaaf2, the signature is in the **CFB header CLSID** (offset 8), and the root storage's CLSID is the Root class AUID `{b3b398a5-1c90-11d4-8053-080036210804}`. We follow the files. The writer sets the signature that matches the sector size it writes.
 - The root storage holds the root object, which has PID `0x0001` for the MetaDictionary and PID `0x0002` for the Header.
@@ -235,7 +235,7 @@ This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core
   - **Class definitions**: `Identification`, `Name`, `ParentClass` (a parent equal to itself means none), `IsConcrete`, and the `Properties` set.
   - **Property definitions**: `Identification`, `Name`, `Type`, `IsOptional`, `LocalIdentification` and `IsUniqueIdentifier`. `Type` may be stored either as AUID data or as a weak reference; both are accepted.
   - **Type definitions** are interpreted per `TypeDefinition*` class.
-  - **Merge rule**: file definitions replace baseline fields where both exist. Extendible enumerations take the union of their elements. A file PID that differs from a fixed baseline PID is a load warning. Every definition records its source (`baseline`, `file` or `both`).
+  - **Merge rule**: file definitions replace baseline fields where both exist, with one exception: the **baseline property type wins**. A conflicting file type is recorded as a load note. This matters because AAF SDK files declare `MemberNames` and `ElementNames` as `aafString` but store NUL-separated string arrays, which is what the baseline type `aafStringArray` describes. Extendible enumerations take the union of their elements. A file PID that differs from a fixed baseline PID is a load warning. Every definition records its source (`baseline`, `file` or `both`).
 - Type categories to support: Integer (1/2/4/8, signed and unsigned), Character, String, Enum, ExtEnum, Record, FixedArray, VarArray, Set, Rename, StrongObjRef, WeakObjRef, Stream, Indirect, Opaque.
 - If a property cannot be decoded (unknown PID and no definition), it is kept as **opaque bytes with its stored form** and written back unchanged.
 
@@ -263,7 +263,15 @@ Decoding (`decodeValue(model, type, bytes, bigEndian)`):
 - Strings are UTF-16 up to the first NUL. Strings of 1-byte generic characters are treated as Latin-1.
 - `Indirect` and `Opaque` start with `u8 byteOrder` and a 16-byte type AUID.
 - Every size mismatch, unknown type, or nesting deeper than 32 is an error, never a crash.
-- Encoding (the inverse) arrives with M3/M4, together with codec round-trip tests.
+- **Encoding** (`encodeValue`, M4) is the inverse:
+  - Integers accept either signedness, with range checks.
+  - Enumerations accept `Enum` (the name wins if set), a number, or a name string.
+  - Extendible enumerations accept an AUID, an `ExtEnum`, or a name.
+  - Records need every field, matched by name.
+  - Strings are encoded as UTF-16 followed by a NUL.
+  - `Bytes` is accepted as a raw value for any type.
+  - **Test**: for every decoded data property in the 58 reference files (235k values), `encode(decode(b)) == b`. The only exception is strings stored with extra trailing NUL padding, which must still round-trip at the value level. Unedited properties keep their raw bytes, so the padding is preserved anyway.
+  - `Value` and all stored payload types have `operator==`.
 
 `MobId::toString()` produces `urn:smpte:umid:…` using the same algorithm as pyaaf2, including its special case for half-swapped material numbers.
 
@@ -287,8 +295,9 @@ Decoding (`decodeValue(model, type, bytes, bigEndian)`):
 
   Everything the file stores is kept, so that the M3 writer can reproduce it.
 - Weak refs keep their raw `{tag, keyPid, key}` and are resolved through the load-time index. Dangling refs are flagged by validation.
-- On save, weak references are written from their stored `{tag, keyPid, key}`, and `referenced properties` is regenerated from the loaded paths. Re-deriving keys from edited targets arrives with M4 edits.
-- Stream properties currently reference their source entry, which is copied lazily on save. New in-memory or file-backed stream data arrives with M4.
+- On save, weak references are written from their stored `{tag, keyPid, key}`, and `referenced properties` is regenerated from its current paths. Edits keep keys consistent (§7): changing a set element's unique identifier rewrites the set index entry and every weak reference to it.
+- Stream properties reference their source entry, which is copied lazily on save, unless an edit has attached new contents (`StreamProperty::data`, a shared immutable buffer).
+- **Editing hooks** (M4): `Document::mutableObject`, `addObject`, `mutableReferencedProperties`, `rebuildIndexes`, `isAttached` and `tagTarget`. They are low-level: only `aaf::edit` uses them, and it maintains the invariants. Detached objects stay in the object table so that ids remain stable for undo. They are not validated and not written.
 - Loading is eager for objects and properties and lazy for streams. Target: open a 50k-object file in under 2 s.
 
 ### 5.6 Validation (`validate()`)
@@ -336,12 +345,55 @@ Adjacent Fillers are merged after every op. Transitions adjacent to an edited po
 
 ## 7. Layer 4: Edit session (`libaafedit`)
 
-- `Session` = `Document` + undo stack + dirty flag + change notifications.
-- A `Command` is an object with `apply(Document&) → expected<ChangeSet>` and `revert`. Low-level primitives are setProperty, removeProperty, createObject, deleteObjectTree, insertIntoCollection, removeFromCollection and moveInCollection. Higher-level ops (inspector edits, §6.1) are composed from them as `CompositeCommand`s.
-- A `ChangeSet` lists the changed objects and properties. The UI uses it to refresh only affected nodes and tracks.
-- Every command is validated before commit. Commands that would violate type or ownership rules are rejected with an error, and nothing is applied.
-- Unlimited undo/redo in memory. Save does not clear history.
-- Deleting an object that is a weak-ref target requires an explicit "delete anyway" flag. The dangling refs are then reported.
+Status: **implemented (M4)** in `libs/edit/` (namespace `aaf::edit`, headers `aaf/edit/{transaction,operations,session}.hpp`).
+
+- **Transactions**: every change runs inside a `Transaction`.
+  - `touch(id)` snapshots an object the first time it is handed out for mutation.
+  - `create(class)` appends a detached object, with a blank snapshot.
+  - `referencedProperties()` snapshots the tag table.
+  - `rollback()` restores every snapshot. `commit()` produces a `Journal`: the before and after states of every object that actually changed, the created ids, and the before and after tag tables.
+  - Undo applies the before states and redo applies the after states. Commands therefore need no hand-written revert logic, and composite commands are simply functions that call several primitives in one transaction.
+- **Primitives** (`operations.hpp`, all taking a `Transaction&`):
+
+  | Operation | Rules |
+  |---|---|
+  | `setProperty(id, pid, Value)` | The property must be defined for the class and stored as data. The value is encoded with the property type in the object's byte order, and must be at most 65535 bytes. If the property is the key of the set the object belongs to, the set entry key is updated (and must stay unique), and **every weak reference with that set's tag and the old key is rewritten**. |
+  | `removeProperty(id, pid)` | Required properties cannot be removed. Strongly referenced children are detached, but only if nothing weakly references them. |
+  | `createObject(class)` | The class must be known and concrete. The object is created detached. |
+  | `setStrongRef(parent, pid, child)` | The child must be detached, not the root, and not an ancestor of the parent (no cycles). Its class must match the reference's class. The previous child, which must be unreferenced, is detached. The storage name is kept, or generated for a new property. |
+  | `ensureCollection(parent, pid)` | Creates an empty strong vector or set, as required for mandatory collections such as `Mob.Slots`. For sets, the key PID and size come from the element class's unique-identifier property. |
+  | `insertIntoCollection(parent, pid, index, child)` | Vectors insert at `index` and take the local key `firstFreeKey++`. Sets append an entry `{firstFreeKey++, refCount 1, key}`: the child's unique-identifier bytes, which must be set and unique. |
+  | `removeFromCollection(parent, pid, index)` | Returns the detached child, so it can be reinserted in the same transaction to move it. |
+  | `moveInCollection(parent, pid, from, to)` | Vectors only. Local keys move with their elements. |
+  | `deleteObject(id, force)` | Detaches the object from its parent, whether a singleton, vector or set. Without `force`, fails if any weak reference points into the subtree. With `force`, dangling references are allowed. |
+  | `setWeakRef(id, pid, target)` | The target must be attached, an element of a strong set, and of the referenced class. Its tag is found from the path of `parentPid`s from the root, or appended to `referenced properties`. The key is the target's set entry key. |
+  | `setStreamData(id, pid, bytes)` | Replaces or adds stream contents. |
+  | `pidOf(doc, id, name)` | Looks up a property PID by name, including superclasses. |
+
+  Weak-reference collections (vectors and sets of weak references) are not yet editable.
+- **Session** (`Session`): owns the `Document`, the undo history and a listener.
+  - **`execute(description, command)`**:
+    1. Runs the command in a transaction.
+    2. Rebuilds the indexes.
+    3. **Validates** every touched object that is attached: any error from `validateObject` rejects the command.
+    4. Unless the command was forced, rejects it if the number of unresolved weak references increased.
+    5. On any failure, rolls back, so **the document is unchanged**.
+    6. On success, commits, truncates the redo history, pushes the step and notifies the listener.
+
+    Commands that change nothing are not recorded.
+  - **`undo()` and `redo()`** apply journals. `history()` and `position()` expose the history.
+  - **`dirty()`** is true when the position differs from the saved one. After truncating past the saved position, the document stays dirty until it is saved.
+  - **`save(path, options)`** keeps the history.
+- **`ChangeSet`**: the objects that changed, the created ids, the individual `{object, pid}` property changes, and whether the tag table changed. The UI uses it to refresh only what is affected.
+- **Tests** (`tests/edit/`):
+  - every primitive, including rejection cases and atomic rollback;
+  - building a complete new CompositionMob: a slot, a sequence, a filler and weak references to a DataDefinition;
+  - re-identifying a DataDefinition that is weakly referenced, with all references still resolving;
+  - forced and unforced deletion;
+  - vector moves;
+  - stream replacement;
+  - save and dirty tracking;
+  - **random edit sequences on two fixtures**: 60 steps each, validating with 0 errors after every step. Undoing everything restores every object exactly, and a save then gives a container tree identical to the original file's. Redoing everything restores the edited state exactly.
 
 ## 8. Applications
 
@@ -473,7 +525,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | M1 ✅ | `libaafcfb` read + write, `aaftool cfb` / `cfb-roundtrip`, fixture fetch script + manifest, fuzz target, CI | All 58 reference files round-trip at the CFB level (v3 and v4) and pass the pyaaf2 cross-check; fuzz target running |
 | M2 ✅ | Stored-format reader, baseline metamodel, `aaftool dump/validate` | All 58 reference files load and validate with 0 errors, and their Header trees match pyaaf2 exactly |
 | M3 ✅ | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
-| M4 | Edit session + primitive commands | Undo/redo symmetry tests pass |
+| M4 ✅ | Edit session + primitive commands | Undo/redo symmetry tests pass |
 | M5 | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
 | M6 | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
 | M7 | Timeline editing ops (§6.1) | Op tests pass; edited files open in Resolve and Pro Tools |
@@ -500,6 +552,9 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | 2026-09-27 | Load errors are fatal for structural damage (missing storages or indexes, malformed streams), and warnings for missing data streams |
 | 2026-09-27 | The writer keeps each object's byte order instead of forcing little-endian, so unmodified data is written back exactly as read |
 | 2026-09-27 | Windows source files are opened with delete sharing so that saving over the open source works |
+| 2026-09-27 | Baseline property types win over conflicting file declarations |
+| 2026-09-27 | Undo/redo uses object snapshots (before and after journals) instead of per-command inverse operations |
+| 2026-09-27 | Changing a set element's key rewrites all weak references to it within the same command |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 
