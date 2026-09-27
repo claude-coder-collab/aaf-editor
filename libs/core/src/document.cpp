@@ -491,7 +491,7 @@ private:
         auto tag = r.read<std::uint16_t>();
         auto keyPid = r.read<std::uint16_t>();
         auto keySize = r.read<std::uint8_t>();
-        if (!count || !tag || !keyPid || !keySize || std::uint64_t{ *count } * *keySize > r.remaining())
+        if (!count || !tag || !keyPid || !keySize || *keySize == 0 || std::uint64_t{ *count } * *keySize > r.remaining())
         {
             return fail(Errc::format, "malformed weak reference index");
         }

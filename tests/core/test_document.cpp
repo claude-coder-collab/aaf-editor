@@ -178,3 +178,59 @@ TEST_CASE("Corrupted AAF files fail cleanly", "[core][document][corruption]")
     }
     SUCCEED();
 }
+
+TEST_CASE("Weak reference indexes with zero-size keys are rejected", "[core][document][corruption]")
+{
+    const auto path = fixturesDir() / "aafsdk/test/com/OpenExistingModify/AAFHeaderTest_v102.aaf";
+    const auto opened = Document::open(path);
+    REQUIRE(opened);
+    const auto& doc = *opened;
+
+    std::vector<std::u16string> storagePath;
+    std::u16string indexName;
+    for (std::size_t i = 0; i < doc.objectCount() && indexName.empty(); ++i)
+    {
+        for (const auto& p : doc.object(i).properties)
+        {
+            if (const auto* weak = std::get_if<WeakRefCollectionProperty>(&p.payload))
+            {
+                indexName = weak->name + u" index";
+                for (auto id = static_cast<ObjectId>(i); id != Document::root(); id = doc.object(id).parent)
+                {
+                    storagePath.insert(storagePath.begin(), doc.object(id).storageName);
+                }
+                break;
+            }
+        }
+    }
+    REQUIRE_FALSE(indexName.empty());
+
+    auto container = cfb::Container::openFile(path);
+    REQUIRE(container);
+    auto builder = cfb::Builder::fromContainer(*container);
+    REQUIRE(builder);
+    auto findChild = [&](cfb::NodeId parent, std::u16string_view name) {
+        for (const auto child : builder->node(parent).children)
+        {
+            if (builder->node(child).name == name)
+            {
+                return child;
+            }
+        }
+        FAIL("missing node");
+        return parent;
+    };
+    cfb::NodeId node = cfb::Builder::root();
+    for (const auto& name : storagePath)
+    {
+        node = findChild(node, name);
+    }
+    builder->node(findChild(node, indexName)).data = std::vector<std::byte>{
+        std::byte{ 0xFF }, std::byte{ 0xFF }, std::byte{ 0xFF }, std::byte{ 0xFF }, std::byte{ 0 }, std::byte{ 0 }, std::byte{ 5 }, std::byte{ 0 }, std::byte{ 0 }
+    };
+    auto broken = openMemory(writeToMemory(*builder).value());
+    REQUIRE(broken);
+    const auto result = Document::load(std::move(*broken));
+    REQUIRE_FALSE(result);
+    CHECK(result.error().message.find("malformed weak reference index") != std::string::npos);
+}

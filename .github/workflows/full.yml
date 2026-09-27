@@ -104,4 +104,8 @@ jobs:
         if: failure()
         with:
           name: fuzz-crashes
-          path: crash-*
+          path: |
+            crash-*
+            oom-*
+            timeout-*
+            leak-*
