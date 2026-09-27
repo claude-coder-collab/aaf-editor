@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-llvm
+      - name: clang-format
+        run: find libs apps tests -name '*.cpp' -o -name '*.hpp' | xargs clang-format-22 --dry-run --Werror
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python tests
+        run: |
+          pip install pytest pyaaf2
+          pytest -q tools/tests
+
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cxx: g++-14
+            config: Debug
+          - compiler: clang
+            cxx: clang++-22
+            config: Release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-llvm
+        if: matrix.compiler == 'clang'
+      - name: Install Ninja
+        run: sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake --preset ${{ matrix.compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DAAF_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build/${{ matrix.compiler }} --config ${{ matrix.config }}
+      - name: Test
+        run: ctest --test-dir build/${{ matrix.compiler }} -C ${{ matrix.config }} --output-on-failure
+      - name: clang-tidy
+        if: matrix.compiler == 'clang'
+        run: run-clang-tidy-22 -p build/clang -quiet -warnings-as-errors='*' 'libs/.*\.cpp' 'apps/.*\.cpp'
