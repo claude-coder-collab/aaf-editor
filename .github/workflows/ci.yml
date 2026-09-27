@@ -60,7 +60,9 @@ jobs:
           cache: npm
           cache-dependency-path: ui/package-lock.json
       - name: Install Ninja and WebKitGTK
-        run: sudo apt-get install -y ninja-build libwebkit2gtk-4.1-dev xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libwebkit2gtk-4.1-dev xvfb
       - name: Configure
         run: cmake --preset ${{ matrix.compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DAAF_WARNINGS_AS_ERRORS=ON
       - name: Build

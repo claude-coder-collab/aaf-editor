@@ -56,7 +56,7 @@ auto findChild(Client& c, std::int64_t parent, std::string_view cls) -> Json
     const auto children = c.result("tree.children", { { "id", parent } });
     for (const auto& item : children["items"])
     {
-        if (item["class"] == cls)
+        if (item["class"].get<std::string>() == cls)
         {
             return item;
         }
@@ -69,7 +69,7 @@ auto findProperty(const Json& object, std::string_view name) -> Json
 {
     for (const auto& p : object["properties"])
     {
-        if (p["name"] == name)
+        if (p["name"].get<std::string>() == name)
         {
             return p;
         }

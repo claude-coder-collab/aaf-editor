@@ -25,6 +25,7 @@ jobs:
           python-version: "3.12"
       - name: Install tools
         run: |
+          sudo apt-get update
           sudo apt-get install -y ninja-build
           pip install -r tools/requirements.txt
       - uses: actions/cache@v4
@@ -55,6 +56,7 @@ jobs:
       - uses: ./.github/actions/setup-llvm
       - name: Build (TSan)
         run: |
+          sudo apt-get update
           sudo apt-get install -y ninja-build
           cmake --preset clang-tsan -DCMAKE_CXX_COMPILER=clang++-22 -DAAF_BUILD_EDITOR=OFF
           cmake --build build/clang-tsan --config Debug
@@ -68,6 +70,7 @@ jobs:
       - uses: ./.github/actions/setup-llvm
       - name: Build fuzzers
         run: |
+          sudo apt-get update
           sudo apt-get install -y ninja-build
           cmake --preset clang-fuzz -DCMAKE_CXX_COMPILER=clang++-22
           cmake --build build/clang-fuzz --config Debug
