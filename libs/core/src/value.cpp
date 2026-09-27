@@ -523,7 +523,15 @@ auto encodeImpl(const MetaModel& model, const Auid& typeId, const Value& v, bool
             }
             else
             {
-                const std::string name = v.is<Value::ExtEnum>() ? v.as<Value::ExtEnum>().name : v.is<std::string>() ? v.as<std::string>() : std::string{};
+                std::string name;
+                if (v.is<Value::ExtEnum>())
+                {
+                    name = v.as<Value::ExtEnum>().name;
+                }
+                else if (v.is<std::string>())
+                {
+                    name = v.as<std::string>();
+                }
                 const auto it = std::ranges::find(t->extElements, name, &ExtEnumElement::name);
                 if (name.empty() || it == t->extElements.end())
                 {

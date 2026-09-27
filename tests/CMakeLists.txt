@@ -20,9 +20,10 @@ add_executable(aaf_tests
     core/test_metamodel.cpp
     core/test_value.cpp
     core/test_writer.cpp
+    edit/test_session.cpp
     support/fixtures.cpp
 )
 target_include_directories(aaf_tests PRIVATE support)
-target_link_libraries(aaf_tests PRIVATE aaf::core aaf::project_options Catch2::Catch2WithMain)
+target_link_libraries(aaf_tests PRIVATE aaf::edit aaf::project_options Catch2::Catch2WithMain)
 target_compile_definitions(aaf_tests PRIVATE AAF_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 catch_discover_tests(aaf_tests)

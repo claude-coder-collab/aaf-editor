@@ -35,12 +35,14 @@ enum class StoredForm : std::uint16_t {
 struct DataProperty
 {
     std::vector<std::byte> bytes;
+    auto operator==(const DataProperty&) const -> bool = default;
 };
 
 struct StrongRefProperty
 {
     std::u16string name;
     ObjectId object = kNoObject;
+    auto operator==(const StrongRefProperty&) const -> bool = default;
 };
 
 struct SetEntry
@@ -48,6 +50,7 @@ struct SetEntry
     std::uint32_t localKey = 0;
     std::uint32_t referenceCount = 0;
     std::vector<std::byte> key;
+    auto operator==(const SetEntry&) const -> bool = default;
 };
 
 struct StrongRefVectorProperty
@@ -57,6 +60,7 @@ struct StrongRefVectorProperty
     std::vector<std::uint32_t> localKeys;
     std::uint32_t firstFreeKey = 0;
     std::uint32_t lastFreeKey = 0;
+    auto operator==(const StrongRefVectorProperty&) const -> bool = default;
 };
 
 struct StrongRefSetProperty
@@ -68,6 +72,7 @@ struct StrongRefSetProperty
     std::uint32_t lastFreeKey = 0;
     std::uint16_t keyPid = 0;
     std::uint8_t keySize = 0;
+    auto operator==(const StrongRefSetProperty&) const -> bool = default;
 };
 
 struct WeakRefProperty
@@ -75,6 +80,7 @@ struct WeakRefProperty
     std::uint16_t tag = 0;
     std::uint16_t keyPid = 0;
     std::vector<std::byte> key;
+    auto operator==(const WeakRefProperty&) const -> bool = default;
 };
 
 struct WeakRefCollectionProperty
@@ -84,6 +90,7 @@ struct WeakRefCollectionProperty
     std::uint16_t keyPid = 0;
     std::uint8_t keySize = 0;
     std::vector<std::vector<std::byte>> keys;
+    auto operator==(const WeakRefCollectionProperty&) const -> bool = default;
 };
 
 struct StreamProperty
@@ -92,12 +99,16 @@ struct StreamProperty
     std::uint8_t byteOrder = 0x4C;
     cfb::EntryId entry = cfb::kNoStream;
     std::uint64_t size = 0;
+    /// New contents set by an edit; when present it replaces the source entry's data.
+    std::shared_ptr<const std::vector<std::byte>> data;
+    auto operator==(const StreamProperty&) const -> bool = default;
 };
 
 /// A property whose stored form is not understood; preserved verbatim.
 struct UnknownProperty
 {
     std::vector<std::byte> bytes;
+    auto operator==(const UnknownProperty&) const -> bool = default;
 };
 
 using PropertyPayload = std::variant<DataProperty, StrongRefProperty, StrongRefVectorProperty, StrongRefSetProperty, WeakRefProperty, WeakRefCollectionProperty, StreamProperty, UnknownProperty>;
@@ -107,6 +118,7 @@ struct Property
     std::uint16_t pid = 0;
     std::uint16_t storedForm = 0;
     PropertyPayload payload;
+    auto operator==(const Property&) const -> bool = default;
 };
 
 struct Object
@@ -124,7 +136,9 @@ struct Object
     std::vector<cfb::EntryId> extraEntries;
 
     [[nodiscard]] auto find(std::uint16_t pid) const -> const Property*;
+    [[nodiscard]] auto find(std::uint16_t pid) -> Property*;
     [[nodiscard]] auto bigEndian() const noexcept -> bool { return byteOrder == 0x42; }
+    auto operator==(const Object&) const -> bool = default;
 };
 
 /// A problem found while loading (non-fatal) or validating a document.
@@ -172,6 +186,17 @@ public:
     [[nodiscard]] auto resolveWeak(std::uint16_t tag, std::span<const std::byte> key) const -> std::optional<ObjectId>;
     /// Reads a data property by owning class and property name, e.g. ("Mob", "Name").
     [[nodiscard]] auto value(ObjectId id, std::string_view className, std::string_view propertyName) const -> std::optional<Value>;
+    /// True if the object is reachable from the root through strong references.
+    [[nodiscard]] auto isAttached(ObjectId id) const -> bool;
+    /// The object and strong-reference property holding the targets of a weak-reference tag.
+    [[nodiscard]] auto tagTarget(std::uint16_t tag) const -> std::optional<std::pair<ObjectId, std::uint16_t>>;
+
+    /// Low-level mutation, used by the edit layer (`aaf::edit`), which maintains the invariants.
+    [[nodiscard]] auto mutableObject(ObjectId id) -> Object& { return objects_.at(static_cast<std::size_t>(id)); }
+    [[nodiscard]] auto addObject(Object object) -> ObjectId;
+    [[nodiscard]] auto mutableReferencedProperties() noexcept -> std::vector<std::vector<std::uint16_t>>& { return referencedProperties_; }
+    /// Rebuilds the weak-reference index after mutations.
+    void rebuildIndexes();
 
 private:
     Document() = default;
@@ -186,8 +211,14 @@ private:
     std::map<std::uint16_t, std::map<std::string, ObjectId, std::less<>>> weakIndex_;
 };
 
-/// Checks a document against its metamodel and returns all problems found.
+/// Checks a document against its metamodel and returns all problems found. Detached objects are skipped.
 [[nodiscard]] auto validate(const Document& document) -> std::vector<Diagnostic>;
+/// Checks a single object (not its descendants).
+[[nodiscard]] auto validateObject(const Document& document, ObjectId id) -> std::vector<Diagnostic>;
+/// Stored form required by a property type, or nullopt if the type is unknown.
+[[nodiscard]] auto expectedStoredForm(const MetaModel& model, const Auid& typeId) -> std::optional<StoredForm>;
+/// True if an unresolved weak-reference key names a definition known to the model (valid in SDK files).
+[[nodiscard]] auto isKnownDefinitionKey(const MetaModel& model, std::span<const std::byte> key, bool bigEndian) -> bool;
 
 /// Formats a key of a weak reference or set entry: 16 bytes as an AUID, 32 bytes as a MobID, else hex.
 [[nodiscard]] auto formatKey(std::span<const std::byte> key, bool bigEndian = false) -> std::string;

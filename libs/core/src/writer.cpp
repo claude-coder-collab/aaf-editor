@@ -286,6 +286,10 @@ private:
                     const auto name = storageName(p, payload.name);
                     e.put(payload.byteOrder);
                     e.putName(name);
+                    if (payload.data)
+                    {
+                        return addStream(node, name, *payload.data, options_.preserveLayout ? o.storage : cfb::kNoStream);
+                    }
                     if (payload.entry == cfb::kNoStream)
                     {
                         return {};
