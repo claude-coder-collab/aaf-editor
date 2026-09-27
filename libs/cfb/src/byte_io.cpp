@@ -85,13 +85,7 @@ public:
         file_(file)
     {
     }
-    ~FileSink() override
-    {
-        if (file_ != nullptr)
-        {
-            (void) std::fclose(file_);
-        }
-    }
+    ~FileSink() override { close(); }
     FileSink(const FileSink&) = delete;
     FileSink(FileSink&&) = delete;
     auto operator=(const FileSink&) -> FileSink& = delete;
@@ -116,6 +110,15 @@ public:
             return fail(Errc::io, std::format("flush failed: {}", errnoMessage(errno)));
         }
         return {};
+    }
+
+    void close() noexcept
+    {
+        if (file_ != nullptr)
+        {
+            (void) std::fclose(file_);
+            file_ = nullptr;
+        }
     }
 
 private:
@@ -210,13 +213,13 @@ auto writeFileAtomic(const std::filesystem::path& target, const std::function<Re
     {
         return fail(Errc::io, std::format("cannot create {}: {}", temp.string(), errnoMessage(errno)));
     }
-    auto discard = [&temp](Error error) -> Result<void> {
+    FileSink sink(file);
+    auto discard = [&temp, &sink](Error error) -> Result<void> {
+        sink.close();
         std::error_code ignored;
         std::filesystem::remove(temp, ignored);
         return std::unexpected(std::move(error));
     };
-
-    FileSink sink(file);
     if (auto r = producer(sink); !r)
     {
         return discard(r.error());
