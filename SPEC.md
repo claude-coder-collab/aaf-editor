@@ -45,9 +45,10 @@ aaf-editor/
     timeline/   libaaftl      timeline projection + editorial operations
     edit/       libaafedit    command/undo engine, document session
   apps/
-    aaftool/    CLI: cfb, cfb-roundtrip (M1); dump, validate, roundtrip, json, extract (later)
-    editor/     webview host application + RPC bridge
-  ui/           TypeScript frontend (Vite), bundled into the editor binary
+    aaftool/    CLI: cfb, cfb-roundtrip, dump, validate, roundtrip, extract, set-essence
+    rpc/        aaf::rpc JSON-RPC server over an edit session (nlohmann/json)
+    editor/     aafedit: webview host (C API wrapper, worker thread, native dialogs)
+  ui/           Svelte 5 + TypeScript frontend (Vite), built to one HTML file embedded in aafedit
   tests/        Catch2 unit tests (tests/<lib>/), helpers (tests/support/), fixtures, fuzz targets (tests/fuzz/)
   tools/        Python scripts (fixture generation, spec checks)
   docs/reference/  AAF specification PDFs (local only, gitignored; fetched by tools/fetch_specs.py)
@@ -428,36 +429,135 @@ The JSON output schema is the same one the RPC bridge uses (§8.3). **Canonical 
 - **Opaque and undecodable data:** opaque values are `{"opaque": type, "bytes": hex}`; undecodable data is `{"error": message, "bytes": hex}`; unknown stored forms are `{"storedForm": n, "bytes": hex}`.
 - The text dump shows the same tree, indented, with set elements labelled by their key.
 
-### 8.2 Editor host (`apps/editor`)
+### 8.2 Editor host (`apps/editor`, executable `aafedit`)
 
-- Uses the [webview/webview](https://github.com/webview/webview) library (WebKitGTK on Linux, WKWebView on macOS, WebView2 on Windows).
-- The UI assets are built by Vite and embedded into the binary at build time (a CMake step generates a resource table). No network access; the content security policy allows only the embedded origin.
-- The native file open/save dialogs and the menu are provided by the host, with thin per-OS code behind one interface.
-- All model work runs on a worker thread. The UI thread never blocks on I/O.
+Status: **implemented (M5)**.
 
-### 8.3 RPC bridge
+- **Command line**: `aafedit [file.aaf] [--debug] [--smoke-test file.aaf]`. `--debug` enables the web inspector.
+- **Webview**: [webview/webview](https://github.com/webview/webview) 0.12.0 (WebKitGTK 4.1 on Linux, WKWebView on macOS, WebView2 on Windows, using its built-in loader, so no extra DLL is needed).
+  - It is built as webview's **static library**, compiled as C++17: its header-only C++ implementation does not compile under Clang in C++26 mode.
+  - The host uses only webview's **C API**, through a small RAII wrapper (`view.hpp`: `View` with `setTitle`, `setSize`, `setHtml`, `init`, `eval`, `bind`, `resolve`, `dispatch`, `run` and `terminate`).
+  - On Linux the editor is built only when `pkg-config` finds `webkit2gtk-4.1`, and otherwise skipped with a warning. The option `AAF_BUILD_EDITOR` (default ON) controls it.
+- **UI embedding**:
+  - CMake runs `npm ci && npm run build` in `ui/` (Vite and `vite-plugin-singlefile`), producing one self-contained `index.html` of about 85 KB.
+  - `tools/embed_file.py` turns it into `generated/ui_html.cpp`, which exposes `aaf::embedded::indexHtml() -> std::string_view` and is marked NOLINT.
+  - The host loads the page with `setHtml`. `AAF_UI_DIST=<dir>` uses a prebuilt `index.html` instead, for machines without npm.
+  - The page's CSP is `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'`: no network access at all.
+- **Threads**:
+  - The JSON-RPC server runs on a single worker thread (`Worker`, a task queue on a `std::jthread`), so the UI thread never blocks on file I/O.
+  - `aafRpc` calls are posted to the worker, and `webview_return` (which is thread-safe) completes them.
+  - Server events are pushed with `dispatch(eval("window.__aafEvent(...)"))`.
+  - A file given on the command line is opened by the first worker task, before any UI request is served.
+- **Host commands** (`aafHost(command, options)`, run on the UI thread):
+  - `openDialog({data?})` and `saveDialog({suggested?, data?})` use [portable-file-dialogs](https://github.com/samhocevar/portable-file-dialogs), pinned by commit, which is native on Windows and macOS and uses zenity or kdialog on Linux. They return a path or `null`.
+  - `setTitle({title})`.
+  - `quit({code, message?})`.
+  - There are no native menus: the UI toolbar and keyboard shortcuts cover every action.
+- **Smoke test** (`--smoke-test file`):
+  - The host injects `window.__aafSmoke = {file}` with `init`.
+  - The UI then runs `ui/src/lib/smoke.ts` over the real bridge: open, list the root's children, search for mobs, rename a named mob and check the rename, undo, and validate with 0 errors.
+  - It reports through `quit`, and the process exit code is the result.
+  - A 60-second watchdog exits with code 3 if the page never reports.
+  - CI runs it on Linux (under `xvfb-run`), Windows and macOS.
+- **Not yet handled**: a prompt for unsaved changes when the window is closed (webview has no close hook), and native menus.
 
-- JSON-RPC 2.0 over `webview_bind` (UI → host) and `webview_eval` dispatching events (host → UI).
-- Methods (initial set):
-  - `doc.open(path)`, `doc.save()`, `doc.saveAs(path)`, `doc.close()`, `doc.validate()`
-  - `tree.children(objectId, offset, limit)` (paged; large collections must not flood the bridge)
-  - `object.get(objectId)` returns class, properties with type info, and decoded values
-  - `object.setProperty(objectId, pid, value)`, `object.removeProperty`, `object.create(parentId, pid, classAuid, init)`, `object.delete(objectId, force)`
-  - `timeline.mobs()`, `timeline.get(mobId)`, `timeline.op(op)` (§6.1 ops)
-  - `edit.undo()`, `edit.redo()`, `edit.history()`
-  - `search.query({text?, class?, property?})`
-- Events: `doc.changed{changeSet}`, `doc.dirty{bool}`, `diag.updated`, `progress{task, fraction}`.
-- Values are encoded in JSON as tagged objects, e.g. `{"t":"Rational","n":25,"d":1}` or `{"t":"MobID","v":"060a2b34…"}`. 64-bit integers are strings. The schema lives in `ui/src/rpc/schema.ts` and `libs/…/json_schema.hpp` and is checked by a round-trip test.
+### 8.3 RPC bridge (`apps/rpc`, library `aaf::rpc`)
+
+Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tested without any window. It depends on nlohmann/json, so it lives under `apps/`.
+
+- **Protocol**: JSON-RPC 2.0. Requests without an `id` are notifications and get no response. Error codes are:
+  - `-32700`: parse error;
+  - `-32600`: invalid request;
+  - `-32601`: unknown method (checked before anything else);
+  - `-32602`: missing parameter;
+  - `-32000`: application error, with the message and `data.kind` (the `aaf::Errc` name).
+- **Transport**: the page calls `window.aafRpc(requestText)`, and the promise resolves with the response object. Object IDs and PIDs are JSON numbers, because they are always far below 2⁵³.
+- **Methods** (parameters are objects; results are described after the arrow):
+
+  | Method | Parameters → result |
+  |---|---|
+  | `doc.info` | → `{open, path, name, dirty, canUndo, canRedo, undo, redo, objectCount, version, root, header, metaDictionary}` |
+  | `doc.open` | `{path}` → info |
+  | `doc.close` | → info |
+  | `doc.save` | → info |
+  | `doc.saveAs` | `{path, regenerateLayout?, version? (3 or 4)}` → info. Later saves go to the new path. |
+  | `doc.validate` | → `[{severity, object, pid, property, message}]` |
+  | `tree.children` | `{id, offset=0, limit=500}` → `{total, items:[{id, class, label, pid, property, index, key, childCount}]}`. Children are the strongly referenced objects in property order. `key` is the set key. |
+  | `tree.path` | `{id}` → object IDs from the root to `id` |
+  | `object.get` | `{id}` → `{id, class, classId, concrete, label, parent, parentPid, attached, properties, available, types}` (see below) |
+  | `object.setProperty` | `{id, pid, value}` → change set |
+  | `object.removeProperty` | `{id, pid}` → change set |
+  | `object.create` | `{parent, pid, class (name or AUID), index?}` → `{id, changes}`. Creates the object with `createWithDefaults`, then sets or inserts it (appends if no index). |
+  | `object.delete` | `{id, force?}` → change set |
+  | `object.move` | `{parent, pid, from, to}` → change set |
+  | `object.setWeakRef` | `{id, pid, target}` → change set |
+  | `object.candidates` | `{id, pid}` → the objects a weak reference may target |
+  | `model.subclasses` | `{class}` → the concrete subclasses |
+  | `edit.undo`, `edit.redo` | → change set |
+  | `edit.history` | → `{items, position}` |
+  | `search.query` | `{text?, class?, limit=200}` → `[{id, class, label}]`. Matches the label or any string, AUID or MobID data value, case-insensitively, among attached objects. |
+  | `essence.extract` | `{id, path}` → `{size}` |
+  | `essence.replace` | `{id, path}` → change set (file-backed) |
+
+  - Each property in `object.get` is `{pid, name, kind, storedForm, type, optional, uniqueId, …}`, plus a kind-specific payload:
+    - `data`: `value` (a tagged value), or `error` together with the raw bytes;
+    - `strongRef`: `children`;
+    - vectors and sets: `count`;
+    - `weakRef`: `target {id|null, key, label, resolved?}`;
+    - weak collections: `targets`;
+    - `stream`: `size`.
+  - `available` lists defined properties that are absent. `types` holds every referenced type descriptor (`{id, name, kind, element?, className?, size?, signed?, count?, fields?, elements?}`), so the UI can build editors without further calls.
+  - The timeline methods (`timeline.*`) come with M6/M7.
+- **Events**: `doc.opened` (info), `doc.changed` (`{changes, info}`, from the session listener) and `doc.state` (info, after a save).
+- **Tagged values** (`toJson` and `valueFromJson`): `{"t":…}` with one of these tags:
+  - `null`; `bool`;
+  - `int` and `uint` (decimal **strings**);
+  - `string`, `auid`, `mobid` (the URN);
+  - `enum` (`v` as a string, plus `name`) and `extenum` (`v` as an AUID, plus `name`);
+  - `record` (`fields:[{name, value}]`) and `array` (`items`);
+  - `indirect` (`type`, `value`) and `opaque` (`type`, `bytes` in hex);
+  - `bytes` (`v` in hex).
+
+  A round-trip test covers every tag. The TypeScript mirror is `ui/src/lib/rpc.ts`.
+- `labelOf(doc, id)` gives the `Name` property if it is set, else the unique identifier, else the class name.
 
 ### 8.4 UI (`ui/`)
 
-TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
+Status: **tree and inspector implemented (M5)**; the timeline arrives with M6/M7.
 
-- **Layout**: left, object tree (virtualised); centre, a tabbed timeline per CompositionMob; right, a property panel; bottom, diagnostics and the undo history.
-- **Property panel**: a type-aware editor per value kind (numeric with range checks, enum dropdown, rational, timestamp, AUID/MobID with copy and paste, string, record fields, arrays with add/remove/reorder). Read-only and required markers come from the metamodel. There is a raw hex view for opaque values.
-- **Timeline**: tracks with headers (kind, name, edit rate); zoom and scroll; a timecode ruler (from the timecode track if present, else from 0); clip selection syncs with the tree and property panel; drag to move and trim; keyboard shortcuts for split, delete (lift) and shift+delete (ripple); markers lane; clips whose source is missing or offline are highlighted.
-- **Cross-view sync**: selecting a clip reveals its object in the tree and vice versa.
-- Light and dark themes. Every action is reachable from the keyboard.
+- **Stack**: TypeScript 5.9 (svelte-check does not support TypeScript 7 yet), Svelte 5 (runes), Vite 8 with `vite-plugin-singlefile`, and Vitest 5 on jsdom. Versions are pinned in `ui/package.json` and the lockfile. `npm run check` runs `svelte-check --fail-on-warnings`, and `npm test` runs Vitest.
+- **Modules**:
+  - `lib/rpc.ts`: `RpcClient` with typed methods and an injectable transport, `hostCommand`, and the protocol types.
+  - `lib/values.ts`: editor kind per type, formatting, parsing with range checks (BigInt for 64-bit values), client-side defaults that mirror the server's, and immutable record and array updates.
+  - `lib/tree.ts`: `TreeModel`, a lazy, paged tree (200 per page) with `expand`, `collapse`, `loadMore`, `reveal(path)` and `refresh(changed)`. A refresh reloads changed objects and their parents' child lists, keeping expansion state.
+  - `lib/smoke.ts`.
+  - `lib/components/`: `TreeView`, `PropertyPanel`, `ValueEditor` and `BottomPanel`.
+- **Layout**:
+  - A toolbar: Open, Save, Save As, Undo and Redo (whose tooltips name the step), search, and the file name with a dirty marker, object count and version.
+  - The object tree on the left, virtualised (24 px rows, only visible rows rendered), with search results above it.
+  - The property panel on the right.
+  - A bottom panel with tabs for Diagnostics (Validate, with each entry linking to its object) and History (click an entry to undo or redo to that point).
+  - A single column below 700 px width.
+- **Property panel**:
+  - Header actions: Parent, Move up and Move down (vectors only), and Delete. Delete offers "delete anyway" when weak references would dangle.
+  - Type-aware editors:
+    - checkbox for booleans;
+    - dropdowns for enumerations and extendible enumerations, showing undefined values explicitly;
+    - text inputs for integers (range-checked) and strings;
+    - monospace inputs with a copy button for AUIDs and MobIDs;
+    - nested editors for records;
+    - element editing and add/remove for variable arrays;
+    - read-only display for opaque, indirect and undecodable values.
+  - References: strong references are links, and collections have an Add button that asks for a concrete subclass when there are several. Weak references show a link plus a "Change…" dropdown of candidates.
+  - Streams show their size, with Extract and Replace buttons for essence.
+  - Optional properties can be removed, and missing ones added. Missing required properties are flagged.
+  - Edits commit on Enter or blur; Escape reverts.
+- **Keyboard**:
+  - Ctrl/Cmd+O, S, Shift+S;
+  - Z and Shift+Z or Y (except inside text fields);
+  - F for search;
+  - arrow keys, Enter, Left and Right in the tree.
+- **Themes**: CSS custom properties with light and dark themes that follow `prefers-color-scheme`.
 
 ## 9. Fidelity requirements (acceptance criteria)
 
@@ -501,9 +601,11 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 ## 11. CI/CD (GitHub Actions, frugal)
 
 - **`ci.yml`** (every PR and push to main):
-  - lint: clang-format 22 check and pytest for `tools/`;
+  - lint: clang-format 22 check, pytest for `tools/`, the generated-model check, and the UI's `svelte-check` and Vitest (Node 24);
   - Linux GCC 14 Debug and Clang 22 Release, with `-Werror`, unit tests, and clang-tidy (`.clang-tidy`, warnings as errors) on the Clang job;
-  - Windows MSVC and macOS AppleClang Release builds and tests.
+  - Windows MSVC and macOS AppleClang Release builds and tests;
+  - every build job (both Linux jobs, Windows and macOS) builds `aafedit` and runs its `--smoke-test` (Linux under `xvfb-run`).
+- The sanitizer, TSan and fuzz jobs build without the editor (`AAF_BUILD_EDITOR=OFF`).
   - LLVM 22 comes from apt.llvm.org (`.github/actions/setup-llvm`).
 - **`full.yml`** (push to main, nightly at 03:17 UTC, manual, or PRs that change it):
   - ASan/UBSan tests with the external fixtures (cached by manifest hash), and the pyaaf2 cross-checks (object, round-trip and essence);
@@ -532,7 +634,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | M2 ✅ | Stored-format reader, baseline metamodel, `aaftool dump/validate` | All 58 reference files load and validate with 0 errors, and their Header trees match pyaaf2 exactly |
 | M3 ✅ | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
 | M4 ✅ | Edit session + primitive commands | Undo/redo symmetry tests pass |
-| M5 | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
+| M5 ✅ | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
 | M6 | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
 | M7 | Timeline editing ops (§6.1) | Op tests pass; edited files open in Resolve and Pro Tools |
 | M8 | Packaging, release pipeline, docs | A tagged release publishes unsigned binaries for Linux, macOS and Windows (§11) |
@@ -563,6 +665,10 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | 2026-09-27 | Changing a set element's key rewrites all weak references to it within the same command |
 | 2026-09-27 | Windows and macOS builds run on every PR; sanitizers, external fixtures and fuzzing stay nightly |
 | 2026-09-27 | Edited stream data is a shared `ByteSource`, so large essence can be replaced from a file without loading it |
+| 2026-09-27 | webview is used through its C API, built as a C++17 static library; its header-only C++ implementation does not compile in C++26 |
+| 2026-09-27 | The UI is built to a single inline HTML file loaded with `set_html`: no local server, no network |
+| 2026-09-27 | The RPC server is a separate library (`apps/rpc`), tested headlessly; the host only relays calls |
+| 2026-09-27 | UI actions live in a toolbar and keyboard shortcuts instead of native menus |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

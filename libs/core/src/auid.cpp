@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <format>
+#include <random>
 
 namespace aaf
 {
@@ -131,6 +132,92 @@ auto MobId::toStored(bool bigEndian) const noexcept -> std::array<std::byte, 32>
         swapGuidFields(std::span<std::byte, 16>(out.data() + 16, 16));
     }
     return out;
+}
+
+auto Auid::generate() -> Auid
+{
+    static thread_local std::mt19937_64 engine(std::random_device{}() ^ (std::uint64_t{ std::random_device{}() } << 32U));
+    Auid id;
+    for (std::size_t i = 0; i < id.bytes.size(); i += 8)
+    {
+        const auto v = engine();
+        for (std::size_t k = 0; k < 8; ++k)
+        {
+            id.bytes[i + k] = static_cast<std::byte>((v >> (k * 8)) & 0xFFU);
+        }
+    }
+    id.bytes[7] = (id.bytes[7] & std::byte{ 0x0F }) | std::byte{ 0x40 };
+    id.bytes[8] = (id.bytes[8] & std::byte{ 0x3F }) | std::byte{ 0x80 };
+    return id;
+}
+
+auto MobId::generate() -> MobId
+{
+    constexpr std::array<std::uint8_t, 12> kLabel = { 0x06, 0x0a, 0x2b, 0x34, 0x01, 0x01, 0x01, 0x05, 0x01, 0x01, 0x0f, 0x20 };
+    MobId id;
+    for (std::size_t i = 0; i < kLabel.size(); ++i)
+    {
+        id.bytes[i] = std::byte{ kLabel[i] };
+    }
+    id.bytes[12] = std::byte{ 0x13 };
+    const auto material = Auid::generate();
+    std::ranges::copy(material.bytes, id.bytes.begin() + 16);
+    return id;
+}
+
+auto MobId::parse(std::string_view text) -> Result<MobId>
+{
+    constexpr std::string_view kPrefix = "urn:smpte:umid:";
+    if (text.starts_with(kPrefix))
+    {
+        text.remove_prefix(kPrefix.size());
+    }
+    std::string hex;
+    for (const char c : text)
+    {
+        if (c != '.' && c != '-')
+        {
+            hex.push_back(c);
+        }
+    }
+    if (hex.size() != 64 || std::ranges::any_of(hex, [](char c) -> bool { return hexValue(c) < 0; }))
+    {
+        return fail(Errc::invalid_argument, std::format("malformed MobID '{}'", text));
+    }
+    auto byteAt = [&hex](std::size_t i) -> std::byte { return static_cast<std::byte>(hexValue(hex[i * 2]) * 16 + hexValue(hex[i * 2 + 1])); };
+    MobId id;
+    for (std::size_t i = 0; i < 16; ++i)
+    {
+        id.bytes[i] = byteAt(i);
+    }
+    std::array<std::byte, 16> text16{};
+    for (std::size_t i = 0; i < 16; ++i)
+    {
+        text16[i] = byteAt(16 + i);
+    }
+    const bool swappedMaterial = id.bytes[11] == std::byte{ 0 } && text16[0] == std::byte{ 0x06 } && text16[1] == std::byte{ 0x0E } && text16[2] == std::byte{ 0x2B } && text16[3] == std::byte{ 0x34 } && text16[4] == std::byte{ 0x7F } && text16[5] == std::byte{ 0x7F };
+    std::array<std::byte, 8> data4{};
+    std::array<std::byte, 8> fields{};
+    if (swappedMaterial)
+    {
+        std::copy_n(text16.begin(), 8, data4.begin());
+        std::copy_n(text16.begin() + 8, 8, fields.begin());
+    }
+    else
+    {
+        std::copy_n(text16.begin(), 8, fields.begin());
+        std::copy_n(text16.begin() + 8, 8, data4.begin());
+    }
+    id.bytes[16] = fields[3];
+    id.bytes[17] = fields[2];
+    id.bytes[18] = fields[1];
+    id.bytes[19] = fields[0];
+    id.bytes[20] = fields[5];
+    id.bytes[21] = fields[4];
+    id.bytes[22] = fields[7];
+    id.bytes[23] = fields[6];
+    std::ranges::copy(data4, id.bytes.begin() + 24);
+    return id;
 }
 
 auto MobId::toString() const -> std::string

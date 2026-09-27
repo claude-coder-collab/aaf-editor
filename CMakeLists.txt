@@ -14,12 +14,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 include(cmake/ProjectOptions.cmake)
+include(cmake/Dependencies.cmake)
 
 add_subdirectory(libs/common)
 add_subdirectory(libs/cfb)
 add_subdirectory(libs/core)
 add_subdirectory(libs/edit)
+add_subdirectory(apps/rpc)
 add_subdirectory(apps/aaftool)
+if(AAF_BUILD_EDITOR)
+    add_subdirectory(apps/editor)
+endif()
 
 if(AAF_BUILD_TESTS)
     enable_testing()

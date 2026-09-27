@@ -2,6 +2,7 @@ option(AAF_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(AAF_ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(AAF_ENABLE_TSAN "Build with ThreadSanitizer" OFF)
 option(AAF_BUILD_TESTS "Build unit tests" ON)
+option(AAF_BUILD_EDITOR "Build the desktop editor (needs npm and a webview backend such as WebKitGTK)" ON)
 option(AAF_BUILD_FUZZERS "Build libFuzzer targets (Clang only)" OFF)
 
 add_library(aaf_project_options INTERFACE)

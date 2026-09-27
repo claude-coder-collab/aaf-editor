@@ -28,6 +28,8 @@ struct Auid
     [[nodiscard]] auto toStored(bool bigEndian = false) const noexcept -> std::array<std::byte, 16>;
     [[nodiscard]] auto isNull() const noexcept -> bool { return *this == Auid{}; }
     [[nodiscard]] auto toString() const -> std::string;
+    /// Generates a random (version 4) UUID.
+    [[nodiscard]] static auto generate() -> Auid;
     auto operator<=>(const Auid&) const = default;
 };
 
@@ -40,6 +42,10 @@ struct MobId
     [[nodiscard]] auto toStored(bool bigEndian = false) const noexcept -> std::array<std::byte, 32>;
     /// Formats as `urn:smpte:umid:...`, matching the representation used by pyaaf2.
     [[nodiscard]] auto toString() const -> std::string;
+    /// Parses the `urn:smpte:umid:` form produced by `toString` (dots optional).
+    [[nodiscard]] static auto parse(std::string_view text) -> Result<MobId>;
+    /// Generates a new SMPTE UMID with a random (version 4 UUID) material number.
+    [[nodiscard]] static auto generate() -> MobId;
     auto operator<=>(const MobId&) const = default;
 };
 
