@@ -4,7 +4,9 @@
 #include <aaf/cfb/container.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+
 #include <catch2/generators/catch_generators.hpp>
+#include <compare>
 
 #include <algorithm>
 #include <format>
@@ -117,7 +119,7 @@ TEST_CASE("Deep and wide trees round-trip in sorted order", "[cfb][container]")
     REQUIRE(children.size() == 500);
     for (std::size_t i = 1; i < children.size(); ++i)
     {
-        CHECK(compareNames(c->entry(children[i - 1]).name, c->entry(children[i]).name) < 0);
+        CHECK(std::is_lt(compareNames(c->entry(children[i - 1]).name, c->entry(children[i]).name)));
     }
     CHECK(streamContents(*c, path + "ITEM42") == bytesOf("value 42"));
     CHECK_FALSE(c->findPath(path + "missing"));

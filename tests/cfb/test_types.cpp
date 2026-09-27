@@ -2,6 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <compare>
+
 using namespace aaf::cfb;
 
 TEST_CASE("CLSID formats and parses in registry form", "[cfb][types]")
@@ -33,12 +35,12 @@ TEST_CASE("UTF-16 and UTF-8 conversion round-trips", "[cfb][types]")
 
 TEST_CASE("Names are ordered by length, then case-insensitively", "[cfb][types]")
 {
-    CHECK(compareNames(u"b", u"aa") < 0);
-    CHECK(compareNames(u"abc", u"ABC") == 0);
-    CHECK(compareNames(u"abc", u"abd") < 0);
-    CHECK(compareNames(u"é", u"É") == 0);
-    CHECK(compareNames(u"ā", u"Ā") == 0);
-    CHECK(compareNames(u"я", u"Я") == 0);
+    CHECK(std::is_lt(compareNames(u"b", u"aa")));
+    CHECK(std::is_eq(compareNames(u"abc", u"ABC")));
+    CHECK(std::is_lt(compareNames(u"abc", u"abd")));
+    CHECK(std::is_eq(compareNames(u"é", u"É")));
+    CHECK(std::is_eq(compareNames(u"ā", u"Ā")));
+    CHECK(std::is_eq(compareNames(u"я", u"Я")));
     CHECK(upperCase(u'z') == u'Z');
     CHECK(upperCase(u'_') == u'_');
     CHECK(upperCase(u'ÿ') == u'Ÿ');
