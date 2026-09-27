@@ -11,6 +11,7 @@
     #ifndef NOMINMAX
         #define NOMINMAX
     #endif
+    #include <fcntl.h>
     #include <io.h>
     #include <windows.h>
 #else
@@ -40,8 +41,28 @@ auto seek(std::FILE* file, std::uint64_t offset) -> bool
 auto openFile(const std::filesystem::path& path, bool write) -> std::FILE*
 {
 #ifdef _WIN32
-    std::FILE* file = nullptr;
-    return _wfopen_s(&file, path.c_str(), write ? L"wb" : L"rb") == 0 ? file : nullptr;
+    if (write)
+    {
+        std::FILE* file = nullptr;
+        return _wfopen_s(&file, path.c_str(), L"wb") == 0 ? file : nullptr;
+    }
+    HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        return nullptr;
+    }
+    const int fd = _open_osfhandle(reinterpret_cast<intptr_t>(handle), _O_RDONLY | _O_BINARY);
+    if (fd < 0)
+    {
+        CloseHandle(handle);
+        return nullptr;
+    }
+    std::FILE* file = _fdopen(fd, "rb");
+    if (file == nullptr)
+    {
+        _close(fd);
+    }
+    return file;
 #else
     return std::fopen(path.c_str(), write ? "wb" : "rb");
 #endif

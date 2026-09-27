@@ -5,6 +5,7 @@ add_library(aaf_core
     src/metamodel.cpp
     src/validate.cpp
     src/value.cpp
+    src/writer.cpp
 )
 add_library(aaf::core ALIAS aaf_core)
 target_include_directories(aaf_core PUBLIC include)

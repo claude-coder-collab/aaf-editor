@@ -114,7 +114,10 @@ Implements [MS-CFB] v3 (512-byte sectors) and v4 (4096-byte sectors). Status: **
   - fsync (`fsync` on POSIX, `_commit` on Windows);
   - rename over the target (`std::filesystem::rename` on POSIX, `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)` on Windows);
   - on failure, delete the temporary file and leave the target untouched.
-  - Open issue for M3: saving over a file that is still open as the source needs verifying on Windows.
+  - **Saving over the source file** while the document still reads streams from it is supported:
+    - On POSIX, the rename leaves the old inode readable through the open handle.
+    - On Windows, `FileSource` opens files with `CreateFileW(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)`, so `MoveFileExW` can replace them while they are still open.
+    - A test saves a document over its own source twice (M3).
 - **Version**: inherited from the source by default (`Builder::setVersion` overrides it). New builders default to v4. v3 streams are limited to 2 GiB.
 - **Layout**: sectors are laid out in this order:
   1. regular streams, in directory order;
@@ -168,7 +171,7 @@ This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core
   - Header: `u8 byteOrder` (`0x4C` 'L' little-endian, `0x42` 'B' big-endian), `u8 formatVersion`, `u16 entryCount`.
   - Index: `entryCount` × `{u16 pid, u16 storedForm, u16 length}`.
   - Values: concatenated in index order.
-- Both byte orders must be readable. The byte order applies to the header, index and values. The writer always writes little-endian.
+- Both byte orders must be readable. The byte order applies to the header, index and values. The writer keeps each loaded object's byte order, so its raw data bytes stay valid. The `referenced properties` stream keeps its byte order too. New objects (M4) are written little-endian.
 - Values are contiguous (there is no offset field). Index entries with an unknown stored form **must be skipped** using `length`, and are preserved verbatim.
 - **File signature**: `{42464141-000d-4d4f-060e-2b34010101ff}` (512-byte sectors) or `{0d010201-0200-0000-060e-2b3403020101}` (4096-byte sectors). **Discrepancy with the stored-format spec**, which says the signature is the root storage's CLSID. In every reference file, and in pyaaf2, the signature is in the **CFB header CLSID** (offset 8), and the root storage's CLSID is the Root class AUID `{b3b398a5-1c90-11d4-8053-080036210804}`. We follow the files. The writer sets the signature that matches the sector size it writes.
 - The root storage holds the root object, which has PID `0x0001` for the MetaDictionary and PID `0x0002` for the Header.
@@ -197,7 +200,25 @@ This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core
   - Limits: a `properties` stream may be at most 64 MiB, and an index stream at most 256 MiB. Counts are checked against stream sizes before allocation. Weak-reference collection indexes with `keySize == 0` are rejected; otherwise any count would pass the size check. This was found by fuzzing.
   - Storage children not referenced by any property (for example extra vendor streams) are recorded in `Object::extraEntries`, so they can be preserved on save.
 - **Weak references** are resolved through an index built at load time: for every tag, its path is walked from the root to the target strong-ref set, and each element is keyed by the raw key bytes in that set's index. `Document::resolveWeak(tag, key)` is const and thread-safe.
-- Storage names are not semantically significant on read, because they are always resolved via the parent's property value. On write, **preserve by default** the original storage names, sibling order, `formatVersion` and local keys of objects loaded from the source file, to minimise structural diffs against it. This is controlled by `WriteOptions::preserveLayout` (default `true`). For new objects, or when `preserveLayout=false`, generate `<PropertyName>-<pid hex>` (with a `{<key hex>}` suffix for elements), truncated or hashed to stay within the 31-UTF-16-unit CFB name limit. Names must be unique among siblings.
+- Storage names are not semantically significant on read, because they are always resolved via the parent's property value.
+- **Writer** (M3, `aaf/core/writer.hpp`: `buildContainer`, `write`, `save`, with `WriteOptions{preserveLayout = true, version}`):
+  - **Output**: the writer turns the `Document` into a `cfb::Builder`. It writes:
+    - each object's `properties` stream (header, index, then values, in the object's stored property order);
+    - child storages;
+    - index streams (vector: count, free keys and local keys; set: also the key PID, key size and entries with reference counts and keys; weak collections: count, tag, key PID, key size and keys);
+    - data streams, copied lazily from the source container;
+    - `extraEntries` subtrees, copied verbatim;
+    - the regenerated `referenced properties` stream.
+  - **Preserved per entry**: storage CLSIDs are the object class AUIDs. Entry state bits and timestamps are copied from the matching source entries.
+  - **Header signature**: the header CLSID is reset to the AAF signature that matches the output sector size. Any other header CLSID is kept.
+  - **`preserveLayout = true`** (the default) keeps storage and index names, local keys, free-key ranges, `formatVersion` and byte orders. The container tree of an unmodified document is then **identical** to its source, including every stream's bytes and entry metadata. This is verified for all 58 reference files at both sector sizes.
+  - **`preserveLayout = false`** changes names and keys:
+    - names are generated as `<PropertyName>-<pid hex>` (`generatedStorageName`);
+    - characters outside printable ASCII, and `/ \ : ! { }`, become `_`;
+    - the base is truncated so that the longest element name, with its `{ffffffff}` suffix, fits in 31 units; the PID suffix keeps names unique;
+    - local keys are renumbered from 0, with `firstFreeKey = count` and `lastFreeKey = 0xFFFFFFFF`;
+    - set keys and reference counts are kept.
+  - A property value longer than 65535 bytes is an error.
 
 ### 5.3 Metamodel
 
@@ -266,8 +287,8 @@ Decoding (`decodeValue(model, type, bytes, bigEndian)`):
 
   Everything the file stores is kept, so that the M3 writer can reproduce it.
 - Weak refs keep their raw `{tag, keyPid, key}` and are resolved through the load-time index. Dangling refs are flagged by validation.
-- On save, weak-ref keys are re-derived from each target's current unique identifier, and `referenced properties` is regenerated.
-- Stream properties hold a `StreamHandle`, which is either a reference into the source file (lazy) or new in-memory or file-backed data.
+- On save, weak references are written from their stored `{tag, keyPid, key}`, and `referenced properties` is regenerated from the loaded paths. Re-deriving keys from edited targets arrives with M4 edits.
+- Stream properties currently reference their source entry, which is copied lazily on save. New in-memory or file-backed stream data arrives with M4.
 - Loading is eager for objects and properties and lazy for streams. Target: open a 50k-object file in under 2 s.
 
 ### 5.6 Validation (`validate()`)
@@ -332,7 +353,8 @@ aaftool dump <file> [--json] [--depth N] [--header|--metadict]
 aaftool cfb <file>                            raw CFB directory listing (header info + tree)
 aaftool cfb-roundtrip <in> <out> [--v3|--v4]  rewrite the CFB container only (no AAF parsing)
 aaftool validate <file> [--json]              diagnostics; exit 1 on errors (M2)
-aaftool roundtrip <in> <out>                  read + write, no edits
+aaftool roundtrip <in> <out> [--v3|--v4] [--regenerate-layout]
+                                              load and save without edits (M3)
 aaftool timeline <file> [--mob NAME|ID]       text timeline
 aaftool extract <file> <mobid> <out>          dump embedded essence stream
 ```
@@ -382,9 +404,9 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 
 ## 9. Fidelity requirements (acceptance criteria)
 
-1. **Lossless round-trip**: for every fixture, `open → save` without edits yields a file that re-opens to a semantically identical graph: the same classes, property values, collection order, weak-ref targets and stream bytes. Byte-identical output is *not* required.
-2. Unknown classes, properties and opaque data survive round-trip.
-3. Files written by us open in: pyaaf2 (automated in CI), the AAF SDK InfoDumper (automated if feasible), and Avid Media Composer, Pro Tools and DaVinci Resolve (manual release checklist).
+1. **Lossless round-trip**: for every fixture, `open → save` without edits yields a file that re-opens to a semantically identical graph: the same classes, property values, collection order, weak-ref targets and stream bytes. Byte-identical output is *not* required. ✅ M3: with the default layout preservation, the container tree is identical to the source for all 58 reference files at both sector sizes. With regenerated layout, the graph is semantically identical and validates with 0 errors.
+2. Unknown classes, properties and opaque data survive round-trip. ✅ M3: a test adds an unknown stored form, a vendor storage and a root `SummaryInformation` stream, and all of them survive.
+3. Files written by us open in: pyaaf2 (automated in CI), the AAF SDK InfoDumper (automated if feasible), and Avid Media Composer, Pro Tools and DaVinci Resolve (manual release checklist). ✅ pyaaf2 (M3): `tools/crosscheck.py --roundtrip` passes for all 58 files in both layout modes. InfoDumper is not automated: it would require building the SDK, which is not worth the CI cost.
 4. Editing only touches the objects in the command's ChangeSet. Diffing the graph before and after an edit shows no other changes.
 5. Malformed input never crashes: every fuzz target runs with no findings in the nightly job (10 minutes per target, under ASan/UBSan).
 
@@ -413,8 +435,9 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
     - Python sets map to sorted lists; `datetime` values map back to the `TimeStamp` record, with microseconds as `fraction`.
     - One pyaaf2 quirk is accepted: it normalises a stored 0/0 rational to 0/1.
     - All 58 reference files match.
+  - Round-trip (M3): `tools/crosscheck.py --roundtrip <aaftool>` rewrites each file with `aaftool roundtrip`, both preserving the layout (as v3) and regenerating it (as v4). It then compares pyaaf2's reading of the output with aaftool's reading of the original. Stream names are ignored for regenerated layouts.
 - Python tool versions are pinned in `tools/requirements.txt` (pyaaf2 1.7.1, pytest).
-- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
+- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
 - **UI**: Vitest for the frontend logic and the RPC codec. Playwright smoke test against a headless build of the UI with a mock bridge.
 
 ## 11. CI/CD (GitHub Actions, frugal)
@@ -449,7 +472,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 |---|---|---|
 | M1 ✅ | `libaafcfb` read + write, `aaftool cfb` / `cfb-roundtrip`, fixture fetch script + manifest, fuzz target, CI | All 58 reference files round-trip at the CFB level (v3 and v4) and pass the pyaaf2 cross-check; fuzz target running |
 | M2 ✅ | Stored-format reader, baseline metamodel, `aaftool dump/validate` | All 58 reference files load and validate with 0 errors, and their Header trees match pyaaf2 exactly |
-| M3 | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
+| M3 ✅ | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
 | M4 | Edit session + primitive commands | Undo/redo symmetry tests pass |
 | M5 | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
 | M6 | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
@@ -475,6 +498,8 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | 2026-09-27 | Baseline excludes pyaaf2's Avid extension tables; dynamic-PID properties have PID 0 in the baseline |
 | 2026-09-27 | `ObjClass` is implicit; strong vector and set swaps are info-level quirks; weak refs to baseline definitions missing from the file are valid |
 | 2026-09-27 | Load errors are fatal for structural damage (missing storages or indexes, malformed streams), and warnings for missing data streams |
+| 2026-09-27 | The writer keeps each object's byte order instead of forcing little-endian, so unmodified data is written back exactly as read |
+| 2026-09-27 | Windows source files are opened with delete sharing so that saving over the open source works |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

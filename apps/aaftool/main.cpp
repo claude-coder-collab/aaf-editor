@@ -1,6 +1,7 @@
 #include <aaf/cfb/builder.hpp>
 #include <aaf/cfb/container.hpp>
 #include <aaf/core/document.hpp>
+#include <aaf/core/writer.hpp>
 
 #include "dump.hpp"
 
@@ -26,6 +27,8 @@ commands:
   dump <file> [--json] [--depth N] [--header|--metadict]
                                    print the object tree (default: from the root)
   validate <file> [--json]         check the file; exit 1 if there are errors
+  roundtrip <in> <out> [--v3|--v4] [--regenerate-layout]
+                                   load the AAF file and save it again unchanged
   --version                        print the version
 )";
 
@@ -225,6 +228,46 @@ auto cmdValidate(std::span<const std::string_view> args) -> int
     return errors > 0 ? 1 : 0;
 }
 
+auto cmdRoundtrip(std::span<const std::string_view> args) -> int
+{
+    if (args.size() < 2)
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    aaf::WriteOptions options;
+    for (const auto arg : args.subspan(2))
+    {
+        if (arg == "--v3")
+        {
+            options.version = aaf::cfb::Version::v3;
+        }
+        else if (arg == "--v4")
+        {
+            options.version = aaf::cfb::Version::v4;
+        }
+        else if (arg == "--regenerate-layout")
+        {
+            options.preserveLayout = false;
+        }
+        else
+        {
+            std::print(stderr, "{}", kUsage);
+            return 2;
+        }
+    }
+    auto doc = aaf::Document::open(args[0]);
+    if (!doc)
+    {
+        return reportError(doc.error());
+    }
+    if (auto r = aaf::save(*doc, args[1], options); !r)
+    {
+        return reportError(r.error());
+    }
+    return 0;
+}
+
 auto run(std::span<char*> argv) -> int
 {
     const std::vector<std::string_view> args(argv.begin() + 1, argv.end());
@@ -254,6 +297,10 @@ auto run(std::span<char*> argv) -> int
     if (args[0] == "validate")
     {
         return cmdValidate(rest);
+    }
+    if (args[0] == "roundtrip")
+    {
+        return cmdRoundtrip(rest);
     }
     std::println(stderr, "aaftool: unknown command '{}'", args[0]);
     std::print(stderr, "{}", kUsage);

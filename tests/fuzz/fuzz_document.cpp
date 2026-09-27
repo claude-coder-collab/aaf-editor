@@ -1,4 +1,5 @@
 #include <aaf/core/document.hpp>
+#include <aaf/core/writer.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -38,5 +39,14 @@ extern "C" auto LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t siz
         }
     }
     (void) aaf::validate(*doc);
+    aaf::cfb::MemorySink sink;
+    if (aaf::write(*doc, sink))
+    {
+        auto reopened = aaf::cfb::Container::open(std::make_unique<aaf::cfb::MemorySource>(sink.take()));
+        if (!reopened || !aaf::Document::load(std::move(*reopened)))
+        {
+            __builtin_trap();
+        }
+    }
     return 0;
 }

@@ -68,6 +68,8 @@ jobs:
         run: python tools/crosscheck_cfb.py build/clang-asan/apps/aaftool/Debug/aaftool
       - name: Cross-check objects with pyaaf2
         run: python tools/crosscheck.py build/clang-asan/apps/aaftool/Debug/aaftool
+      - name: Cross-check round-tripped files with pyaaf2
+        run: python tools/crosscheck.py --roundtrip build/clang-asan/apps/aaftool/Debug/aaftool
 
   tsan:
     runs-on: ubuntu-24.04
