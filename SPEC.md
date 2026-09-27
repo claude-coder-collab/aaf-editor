@@ -63,7 +63,7 @@ Dependency direction: `cfb ← core ← timeline ← edit ← apps`. The librari
 - CMake ≥ 3.28, Ninja Multi-Config, presets for `gcc`, `clang` and `msvc`.
 - Strict warnings (`-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror` in CI; `/W4 /WX` on MSVC).
 - clang-format using the `~/.clang-format` style (copied into the repo as `.clang-format`), clang-tidy in CI.
-- Sanitizers (ASan/UBSan) in a debug CI job. libFuzzer targets for the CFB and stored-format readers.
+- Sanitizers: ASan/UBSan and TSan in separate debug CI jobs (presets `clang-asan` and `clang-tsan`). libFuzzer targets for the CFB and stored-format readers.
 - Tests use Catch2 v3. Python scripts in `tools/` (with type hints and pytest tests in `tools/tests/`) use pyaaf2 for fixture generation and cross-checks, **test-time only**.
 
 ## 4. Layer 1: CFB container (`libaafcfb`)
@@ -350,6 +350,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 - **`full.yml`** (push to main, nightly at 03:17 UTC, manual, or PRs that change it):
   - Windows MSVC and macOS AppleClang builds and tests;
   - ASan/UBSan tests with the external fixtures (cached by manifest hash) and the pyaaf2 cross-check;
+  - TSan tests (including concurrent stream reads through one `FileSource`);
   - 10-minute fuzzing.
 - UI lint and tests are added with M5.
 - **Tags `v*`**: a release workflow builds on a three-OS matrix and publishes a GitHub Release with these assets:

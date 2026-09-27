@@ -30,6 +30,11 @@
             "cacheVariables": { "AAF_ENABLE_SANITIZERS": "ON" }
         },
         {
+            "name": "clang-tsan",
+            "inherits": "clang",
+            "cacheVariables": { "AAF_ENABLE_TSAN": "ON" }
+        },
+        {
             "name": "clang-fuzz",
             "inherits": "clang",
             "cacheVariables": { "AAF_BUILD_FUZZERS": "ON", "AAF_BUILD_TESTS": "OFF" }
@@ -43,6 +48,7 @@
         { "name": "msvc-debug", "configurePreset": "msvc", "configuration": "Debug" },
         { "name": "msvc-release", "configurePreset": "msvc", "configuration": "Release" },
         { "name": "clang-asan", "configurePreset": "clang-asan", "configuration": "Debug" },
+        { "name": "clang-tsan", "configurePreset": "clang-tsan", "configuration": "Debug" },
         { "name": "clang-fuzz", "configurePreset": "clang-fuzz", "configuration": "Debug" }
     ],
     "testPresets": [
@@ -52,6 +58,7 @@
         { "name": "clang-release", "configurePreset": "clang", "configuration": "Release", "output": { "outputOnFailure": true } },
         { "name": "msvc-debug", "configurePreset": "msvc", "configuration": "Debug", "output": { "outputOnFailure": true } },
         { "name": "msvc-release", "configurePreset": "msvc", "configuration": "Release", "output": { "outputOnFailure": true } },
-        { "name": "clang-asan", "configurePreset": "clang-asan", "configuration": "Debug", "output": { "outputOnFailure": true } }
+        { "name": "clang-asan", "configurePreset": "clang-asan", "configuration": "Debug", "output": { "outputOnFailure": true } },
+        { "name": "clang-tsan", "configurePreset": "clang-tsan", "configuration": "Debug", "output": { "outputOnFailure": true } }
     ]
 }

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <format>
 #include <random>
+#include <thread>
 
 using namespace aaf::cfb;
 using namespace aaf::test;
@@ -171,9 +172,11 @@ TEST_CASE("writeFile replaces the target atomically", "[cfb][container]")
     REQUIRE(b.addStream(Builder::root(), u"two", bytesOf("22")));
     REQUIRE(writeFile(b, path));
 
-    auto c = Container::openFile(path);
-    REQUIRE(c);
-    CHECK(streamContents(*c, "two") == bytesOf("22"));
+    {
+        auto c = Container::openFile(path);
+        REQUIRE(c);
+        CHECK(streamContents(*c, "two") == bytesOf("22"));
+    }
     CHECK(std::distance(std::filesystem::directory_iterator(dir), std::filesystem::directory_iterator{}) == 1);
 
     Builder bad;
@@ -182,5 +185,47 @@ TEST_CASE("writeFile replaces the target atomically", "[cfb][container]")
     CHECK_FALSE(writeFileAtomic(path, failing));
     CHECK(Container::openFile(path));
     CHECK(std::distance(std::filesystem::directory_iterator(dir), std::filesystem::directory_iterator{}) == 1);
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Streams of a file can be read concurrently", "[cfb][container]")
+{
+    const auto dir = std::filesystem::temp_directory_path() / std::format("aaf-test-{}", std::random_device{}());
+    std::filesystem::create_directories(dir);
+    const auto path = dir / "concurrent.aaf";
+    constexpr int kStreams = 8;
+    Builder b(Version::v3);
+    for (int i = 0; i < kStreams; ++i)
+    {
+        REQUIRE(b.addStream(Builder::root(), toUtf16(std::format("s{}", i)).value(), patternBytes(std::size_t{ 3000 } + (std::size_t{ 7000 } * static_cast<std::size_t>(i)), static_cast<std::uint32_t>(i))));
+    }
+    REQUIRE(writeFile(b, path));
+
+    {
+        auto c = Container::openFile(path);
+        REQUIRE(c);
+        std::vector<int> ok(kStreams, 0);
+        {
+            std::vector<std::jthread> threads;
+            for (int i = 0; i < kStreams; ++i)
+            {
+                threads.emplace_back([&c, &ok, i] {
+                    const auto id = c->findPath(std::format("s{}", i));
+                    const auto expected = patternBytes(std::size_t{ 3000 } + (std::size_t{ 7000 } * static_cast<std::size_t>(i)), static_cast<std::uint32_t>(i));
+                    for (int round = 0; round < 20; ++round)
+                    {
+                        auto reader = c->openStream(id.value());
+                        auto data = reader ? reader->readAll() : aaf::Result<std::vector<std::byte>>{};
+                        if (!data || *data != expected)
+                        {
+                            return;
+                        }
+                    }
+                    ok[static_cast<std::size_t>(i)] = 1;
+                });
+            }
+        }
+        CHECK(std::ranges::count(ok, 1) == kStreams);
+    }
     std::filesystem::remove_all(dir);
 }

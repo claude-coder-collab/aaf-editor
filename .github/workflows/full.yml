@@ -67,6 +67,19 @@ jobs:
       - name: Cross-check with pyaaf2
         run: python tools/crosscheck_cfb.py build/clang-asan/apps/aaftool/Debug/aaftool
 
+  tsan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-llvm
+      - name: Build (TSan)
+        run: |
+          sudo apt-get install -y ninja-build
+          cmake --preset clang-tsan -DCMAKE_CXX_COMPILER=clang++-22
+          cmake --build build/clang-tsan --config Debug
+      - name: Test (TSan)
+        run: ctest --test-dir build/clang-tsan -C Debug --output-on-failure
+
   fuzz:
     runs-on: ubuntu-24.04
     steps:

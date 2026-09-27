@@ -1,5 +1,6 @@
 option(AAF_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(AAF_ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(AAF_ENABLE_TSAN "Build with ThreadSanitizer" OFF)
 option(AAF_BUILD_TESTS "Build unit tests" ON)
 option(AAF_BUILD_FUZZERS "Build libFuzzer targets (Clang only)" OFF)
 
@@ -23,6 +24,10 @@ else()
     if(AAF_ENABLE_SANITIZERS)
         target_compile_options(aaf_project_options INTERFACE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all)
         target_link_options(aaf_project_options INTERFACE -fsanitize=address,undefined)
+    endif()
+    if(AAF_ENABLE_TSAN)
+        target_compile_options(aaf_project_options INTERFACE -fsanitize=thread -fno-omit-frame-pointer)
+        target_link_options(aaf_project_options INTERFACE -fsanitize=thread)
     endif()
 endif()
 
