@@ -228,8 +228,12 @@ TEST_CASE("A document can be saved over its own source file", "[core][writer]")
     {
         auto doc = Document::open(path);
         REQUIRE(doc);
-        REQUIRE(save(*doc, path, { .preserveLayout = false, .version = cfb::Version::v4 }));
-        REQUIRE(save(*doc, path));
+        for (const auto& options : { WriteOptions{ .preserveLayout = false, .version = cfb::Version::v4 }, WriteOptions{} })
+        {
+            const auto saved = save(*doc, path, options);
+            INFO((saved ? std::string("ok") : to_string(saved.error())));
+            REQUIRE(saved);
+        }
         auto reopened = Document::open(path);
         REQUIRE(reopened);
         CHECK(diffTrees(doc->container(), reopened->container()) == "");

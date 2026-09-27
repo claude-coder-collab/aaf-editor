@@ -6,10 +6,14 @@
 #include <format>
 #include <random>
 #include <system_error>
+#include <vector>
 
 #ifdef _WIN32
     #ifndef NOMINMAX
         #define NOMINMAX
+    #endif
+    #ifndef _WIN32_WINNT
+        #define _WIN32_WINNT 0x0A00
     #endif
     #include <fcntl.h>
     #include <io.h>
@@ -81,9 +85,37 @@ auto syncFile(std::FILE* file) -> bool
 #endif
 }
 
+#ifdef _WIN32
+auto posixRename(const std::filesystem::path& from, const std::filesystem::path& to) -> bool
+{
+    constexpr DWORD kReplaceIfExists = 0x1;
+    constexpr DWORD kPosixSemantics = 0x2;
+    HANDLE handle = CreateFileW(from.c_str(), DELETE | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        return false;
+    }
+    const std::wstring target = std::filesystem::absolute(to).wstring();
+    const std::size_t nameBytes = target.size() * sizeof(wchar_t);
+    std::vector<std::byte> buffer(sizeof(FILE_RENAME_INFO) + nameBytes);
+    auto* info = reinterpret_cast<FILE_RENAME_INFO*>(buffer.data());
+    info->Flags = kReplaceIfExists | kPosixSemantics;
+    info->RootDirectory = nullptr;
+    info->FileNameLength = static_cast<DWORD>(nameBytes);
+    std::memcpy(info->FileName, target.data(), nameBytes);
+    const bool ok = SetFileInformationByHandle(handle, FileRenameInfoEx, info, static_cast<DWORD>(buffer.size())) != 0;
+    CloseHandle(handle);
+    return ok;
+}
+#endif
+
 auto replaceFile(const std::filesystem::path& from, const std::filesystem::path& to) -> Result<void>
 {
 #ifdef _WIN32
+    if (posixRename(from, to))
+    {
+        return {};
+    }
     if (MoveFileExW(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == 0)
     {
         return fail(Errc::io, std::format("cannot replace {} (Windows error {})", to.string(), GetLastError()));
