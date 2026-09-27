@@ -319,14 +319,43 @@ Later milestones: MobIDs unique; definitions referenced by components exist in t
 
 ## 6. Layer 3: Timeline projection (`libaaftl`)
 
-A read/write view derived from the object graph. It is recomputed incrementally after each command and **never stored separately**.
+Status: **projection implemented (M6)** in `libs/timeline/` (namespace `aaf::timeline`, headers `aaf/timeline/{rational,timeline}.hpp`); editing is M7. It is a read-only view derived from the object graph, **never stored separately**. `Projector` builds a MobID index (mobs and EssenceData) on construction, so a new one is constructed after each edit; that takes milliseconds.
 
-- **Mobs**: CompositionMob, MasterMob and SourceMob (with File/Tape/Film/Import/Recording descriptors).
-- **Slots**: TimelineMobSlot (edit rate, origin), EventMobSlot (markers), StaticMobSlot. Each has a track kind derived from the data definition (picture, sound, timecode, edgecode, descriptive metadata, other).
-- **Segments** are flattened into `TimelineItem{objectId, kind, start, length, edit rate, children}`, where kind is SourceClip, Filler, Transition, OperationGroup (effect, with inputs), EssenceGroup, Selector, NestedScope/ScopeReference, Timecode or DescriptiveMarker.
-- **Source resolution**: follows SourceClip → MasterMob → SourceMob chains to the physical essence (descriptor plus locators or embedded EssenceData). Cycles and missing mobs are reported, not fatal.
-- Time is exact rational arithmetic (`aaf::Rational`, 64-bit numerator and denominator with overflow checks). Display conversions (timecode, seconds, samples) happen only at the UI boundary.
-- Audio gain, pan and keyframes (OperationGroup parameters, VaryingValue/ControlPoints) are exposed read-only in v1.
+- **Time**: `Rational` is exact 64-bit arithmetic, always in lowest terms with a positive denominator.
+  - `add`, `subtract`, `multiply` and `divide` return `Result` and fail on overflow. The checks are portable: no `__int128` or compiler builtins, because MSVC has neither.
+  - Comparison is exact without overflow, using a continued-fraction (Euclid) method.
+  - `convertPosition(position, fromRate, toRate)` rounds toward negative infinity.
+  - Conversions to timecode, seconds or samples happen only in the UI.
+- **Mobs**: `mobs()` lists every attached mob as `{object, mobId, name, kind (composition, master, source or other), tracks, topLevel}`.
+  - A composition is top-level if its `UsageCode` is `Usage_TopLevel`; without a usage code, if no SourceClip references it.
+  - Sort order: top-level first, then by kind, then by name.
+- **Tracks** (`project(mob)`): one per slot, in slot order, with:
+  - `slotId`, `name`, `physicalNumber`;
+  - `kind`: picture, sound, timecode, edgecode, descriptive metadata, data or other. It comes from the segment's DataDefinition weak key, matched against the known SMPTE and legacy AUIDs (listed in `projection.cpp`); an unknown key falls back to the definition's `Name`.
+  - `slotKind`: timeline, event or static;
+  - `editRate` and `origin`;
+  - `length`: the segment's `Length`, else the end of the last item.
+  - A **track-level effect** (the slot's segment is an OperationGroup, for example Avid's "Audio Pan" on a whole track) is unwrapped: `effects` lists the group or groups, and `items` are the content of the first input. This matches how editors and OTIO present such tracks.
+- **Items**: `{object, kind, className, start, length, hasLength, label, source?, effect, timecode?, nested, comment}`.
+  - **Layout**: a Sequence is laid out with a cursor. A segment starts at the cursor and advances it by its length. A **Transition starts at `cursor − length` and moves the cursor back by its length**, so it overlaps the end of the previous segment and the start of the next. Events (markers) use their own `Position`.
+  - **Kinds**: sourceClip, filler, transition, operationGroup, essenceGroup, selector, nestedScope, scopeReference, pulldown, sequence, timecode, edgecode, marker (DescriptiveMarker or CommentMarker), event and other.
+  - **Nesting**: effect inputs, essence group choices, a selector's selected segment and its alternates, nested scope slots, and pulldown inputs become `nested` item lists, up to 16 levels deep; deeper nesting is reported as a warning.
+  - **Source clips** carry `SourceReference{mobId, slotId, startTime, mob?, mobName, mobKind, original}`. `original` is true for a null MobID, which ends a chain.
+  - **Labels**: clips show the referenced mob's name, or "Missing source" or "Original source". Effects and transitions show their OperationDefinition name, and markers show their comment.
+  - The mob's `timecode` is the first Timecode segment on a timecode track: start, fps and drop-frame flag.
+- **Source resolution** (`resolve(sourceClip)`):
+  - It follows SourceID and SourceMobSlotID through the mobs. StartTime plus the offset into the current clip is converted into the referenced slot's edit rate, the SourceClip covering that position is found, and the walk repeats. It ends at a null MobID or at a non-clip, and stops after 64 links.
+  - Each link is `{mob, mobId, name, kind, slotId, position, editRate, descriptor}`.
+  - Status is resolved, missingMob, missingSlot or cycle. Problems are reported, never fatal.
+  - `essence` describes the deepest SourceMob with a FileDescriptor: `{embedded (an EssenceData with the same MobID exists), essenceData, locators (NetworkLocator URLs), descriptor class}`.
+- **Tests**:
+  - rational arithmetic and overflow;
+  - contiguous layout for more than 100 tracks without transitions in the SDK sample;
+  - transition overlap on `transitions.aaf`;
+  - resolution through master to source mobs, with embedded and linked essence, and a deliberately broken reference reported as missingMob;
+  - **comparison with the OpenTimelineIO AAF adapter**: `tools/gen_otio_expectations.py` records, with `otio-aaf-adapter` 2.0.0 and OTIO 0.18.1, each OTIO sample's top-level timeline as `[type, start, duration]` per video or audio track, in `tests/fixtures/external/otio_expectations.json` (committed). Our projection must equal it for every compared track (32 at present). Excluded are tracks that are empty (OTIO drops filler-only tracks), files where a track references a nested composition or NestedScope (OTIO flattens those into extra tracks, while we keep them as single items on purpose), and tracks with OTIO transitions (OTIO does not overlap transitions).
+- **`aaftool timeline <file> [--mobs] [--mob NAME|ID] [--json]`** lists mobs, or prints a mob's tracks and items (by default the first composition).
+- Audio gain, pan and keyframes (OperationGroup parameters, VaryingValue/ControlPoints) can be inspected in the property panel. They have no dedicated timeline display yet.
 
 ### 6.1 Editorial operations
 
@@ -507,7 +536,11 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
     - weak collections: `targets`;
     - `stream`: `size`.
   - `available` lists defined properties that are absent. `types` holds every referenced type descriptor (`{id, name, kind, element?, className?, size?, signed?, count?, fields?, elements?}`), so the UI can build editors without further calls.
-  - The timeline methods (`timeline.*`) come with M6/M7.
+  - Timeline (M6):
+    - `timeline.mobs` returns the mob summaries.
+    - `timeline.get {mob}` returns `{mob, mobId, name, kind, timecode, warnings, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items}]}`, with each item's fields as in §6 (`nested` is a list of item lists).
+    - `timeline.resolve {clip}` returns `{status, links, essence}`.
+    - Timeline edits (`timeline.op`) come with M7.
 - **Events**: `doc.opened` (info), `doc.changed` (`{changes, info}`, from the session listener) and `doc.state` (info, after a save).
 - **Tagged values** (`toJson` and `valueFromJson`): `{"t":…}` with one of these tags:
   - `null`; `bool`;
@@ -523,7 +556,7 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
 
 ### 8.4 UI (`ui/`)
 
-Status: **tree and inspector implemented (M5)**; the timeline arrives with M6/M7.
+Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing is M7.
 
 - **Stack**: TypeScript 5.9 (svelte-check does not support TypeScript 7 yet), Svelte 5 (runes), Vite 8 with `vite-plugin-singlefile`, and Vitest 5 on jsdom. Versions are pinned in `ui/package.json` and the lockfile. `npm run check` runs `svelte-check --fail-on-warnings`, and `npm test` runs Vitest.
 - **Modules**:
@@ -552,6 +585,28 @@ Status: **tree and inspector implemented (M5)**; the timeline arrives with M6/M7
   - Streams show their size, with Extract and Replace buttons for essence.
   - Optional properties can be removed, and missing ones added. Missing required properties are flagged.
   - Edits commit on Enter or blur; Escape reverts.
+- **Timeline** (`TimelineView`, drawn on `<canvas>`, M6):
+  - **Opening**: a Timelines dropdown in the toolbar (top-level compositions are starred), a Timeline button on mob objects, and the first top-level composition opens with the file. Open timelines are tabs above the property panel. The panel is split roughly 50/50, and both views stay in sync.
+  - **Layout** (`timelineLayout.ts`):
+    - rows ordered picture, sound, events, then the rest;
+    - labels V1…, A1…, M1… for markers, TC/EC/DM/D for code and data tracks (ordinal numbers);
+    - heights of 38 px for media, 26 px for events and 18 px otherwise.
+    - Every track is scaled to the **base rate** (the first picture timeline track, else the first timeline track), so audio at 48 kHz lines up with 24 fps video.
+  - **Ruler**: timecode from the mob's timecode start, fps and drop-frame flag (`timecode.ts`: SMPTE drop-frame formatting and parsing, tested). Ticks are spaced at least 90 px apart, stepping through 1/2/5/10 frames, then 1 s … 1 h.
+  - **Drawing**:
+    - clips coloured by kind: video, audio, effect, code, and nested for NestedScope or clips of compositions;
+    - fillers as dashed outlines;
+    - transitions as orange boxes with an X;
+    - markers as diamonds;
+    - **clips with missing sources in red**;
+    - the selected object outlined;
+    - track headers showing name, rate or track effects.
+    - It scales for the device pixel ratio and reads colours from CSS variables, so both themes work.
+  - **Interaction**:
+    - Ctrl+wheel or +/− to zoom around the pointer, and Fit;
+    - wheel or Shift+wheel, and a range slider, to scroll;
+    - hover tooltips (kind, label, start and length, source reference, comment);
+    - click to select: the object is revealed in the tree and shown in the properties. For source clips the resolved chain appears in the header: mobs, status, and embedded or first locator.
 - **Keyboard**:
   - Ctrl/Cmd+O, S, Shift+S;
   - Z and Shift+Z or Y (except inside text fields);
@@ -635,7 +690,7 @@ Status: **tree and inspector implemented (M5)**; the timeline arrives with M6/M7
 | M3 ✅ | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
 | M4 ✅ | Edit session + primitive commands | Undo/redo symmetry tests pass |
 | M5 ✅ | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
-| M6 | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
+| M6 ✅ | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
 | M7 | Timeline editing ops (§6.1) | Op tests pass; edited files open in Resolve and Pro Tools |
 | M8 | Packaging, release pipeline, docs | A tagged release publishes unsigned binaries for Linux, macOS and Windows (§11) |
 | Later | Create-new-file templates, Edit Protocol conformance checks, OTIO import/export, keyframe editing, essence waveform/thumbnail previews | — |
@@ -669,6 +724,8 @@ Status: **tree and inspector implemented (M5)**; the timeline arrives with M6/M7
 | 2026-09-27 | The UI is built to a single inline HTML file loaded with `set_html`: no local server, no network |
 | 2026-09-27 | The RPC server is a separate library (`apps/rpc`), tested headlessly; the host only relays calls |
 | 2026-09-27 | UI actions live in a toolbar and keyboard shortcuts instead of native menus |
+| 2026-09-27 | Track-level effects are unwrapped in the timeline; nested compositions and scopes stay single items |
+| 2026-09-27 | The timeline projection is verified against the OpenTimelineIO AAF adapter's reading of its own sample files |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

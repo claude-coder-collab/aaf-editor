@@ -226,3 +226,32 @@ TEST_CASE("Embedded essence can be extracted and replaced through the RPC API", 
     CHECK(data["size"] == 5000);
     std::filesystem::remove_all(dir);
 }
+
+TEST_CASE("Timelines are available through the RPC API", "[rpc][timeline]")
+{
+    Client c;
+    c.result("doc.open", { { "path", sample() } });
+    const auto mobs = c.result("timeline.mobs");
+    REQUIRE(mobs.is_array());
+    const auto composition = std::ranges::find_if(mobs, [](const Json& m) { return m["kind"] == "composition"; });
+    REQUIRE(composition != mobs.end());
+    const auto t = c.result("timeline.get", { { "mob", (*composition)["id"] } });
+    REQUIRE_FALSE(t["tracks"].empty());
+    Json clip = nullptr;
+    for (const auto& track : t["tracks"])
+    {
+        CHECK(track["editRate"]["den"].get<int>() > 0);
+        for (const auto& item : track["items"])
+        {
+            if (item["kind"] == "sourceClip" && item["source"]["mob"].is_number() && clip.is_null())
+            {
+                clip = item;
+            }
+        }
+    }
+    REQUIRE_FALSE(clip.is_null());
+    const auto chain = c.result("timeline.resolve", { { "clip", clip["object"] } });
+    CHECK(chain["status"] == "resolved");
+    CHECK_FALSE(chain["links"].empty());
+    CHECK(c.request("timeline.get", { { "mob", 0 } })["error"]["code"] == -32000);
+}

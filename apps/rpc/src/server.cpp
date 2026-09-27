@@ -1,6 +1,7 @@
 #include <aaf/edit/defaults.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/rpc/server.hpp>
+#include <aaf/timeline/timeline.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -372,6 +373,85 @@ auto matches(const Document& doc, ObjectId id, const std::string& needle) -> boo
     return false;
 }
 
+auto timelineItemJson(const timeline::Item& item) -> Json
+{
+    Json j = { { "object", item.object }, { "kind", std::string(timeline::to_string(item.kind)) }, { "class", item.className }, { "start", item.start }, { "length", item.length }, { "hasLength", item.hasLength }, { "label", item.label } };
+    if (!item.effect.empty())
+    {
+        j["effect"] = item.effect;
+    }
+    if (!item.comment.empty())
+    {
+        j["comment"] = item.comment;
+    }
+    if (item.source)
+    {
+        j["source"] = {
+            { "mobId", item.source->mobId.toString() },
+            { "slotId", item.source->slotId },
+            { "startTime", item.source->startTime },
+            { "mob", item.source->mob ? Json(*item.source->mob) : Json(nullptr) },
+            { "mobName", item.source->mobName },
+            { "mobKind", std::string(timeline::to_string(item.source->mobKind)) },
+            { "original", item.source->original },
+        };
+    }
+    if (item.timecode)
+    {
+        j["timecode"] = { { "start", item.timecode->start }, { "fps", item.timecode->fps }, { "drop", item.timecode->drop } };
+    }
+    if (!item.nested.empty())
+    {
+        Json nested = Json::array();
+        for (const auto& track : item.nested)
+        {
+            Json list = Json::array();
+            for (const auto& child : track)
+            {
+                list.push_back(timelineItemJson(child));
+            }
+            nested.push_back(std::move(list));
+        }
+        j["nested"] = std::move(nested);
+    }
+    return j;
+}
+
+auto timelineJson(const timeline::MobTimeline& t) -> Json
+{
+    Json tracks = Json::array();
+    for (const auto& track : t.tracks)
+    {
+        Json items = Json::array();
+        for (const auto& item : track.items)
+        {
+            items.push_back(timelineItemJson(item));
+        }
+        Json effects = Json::array();
+        for (const auto& effect : track.effects)
+        {
+            effects.push_back({ { "object", effect.object }, { "name", effect.name } });
+        }
+        tracks.push_back({
+            { "slot", track.slot },
+            { "slotId", track.slotId },
+            { "name", track.name },
+            { "physicalNumber", track.physicalNumber.transform([](std::uint32_t n) -> Json { return n; }).value_or(Json(nullptr)) },
+            { "kind", std::string(timeline::to_string(track.kind)) },
+            { "slotKind", std::string(timeline::to_string(track.slotKind)) },
+            { "editRate", { { "num", track.editRate.numerator() }, { "den", track.editRate.denominator() } } },
+            { "origin", track.origin },
+            { "length", track.length },
+            { "segment", track.segment },
+            { "effects", std::move(effects) },
+            { "items", std::move(items) },
+        });
+    }
+    Json j = { { "mob", t.mob }, { "mobId", t.mobId.toString() }, { "name", t.name }, { "kind", std::string(timeline::to_string(t.kind)) }, { "tracks", std::move(tracks) }, { "warnings", t.warnings } };
+    j["timecode"] = t.timecode ? Json{ { "start", t.timecode->start }, { "fps", t.timecode->fps }, { "drop", t.timecode->drop } } : Json(nullptr);
+    return j;
+}
+
 }
 
 auto labelOf(const Document& document, ObjectId id) -> std::string
@@ -514,6 +594,9 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         "search.query",
         "essence.extract",
         "essence.replace",
+        "timeline.mobs",
+        "timeline.get",
+        "timeline.resolve",
     };
     if (!kMethods.contains(method))
     {
@@ -830,6 +913,65 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             out.push_back({ { "id", i }, { "class", className(doc, i) }, { "label", labelOf(doc, i) } });
         }
         return out;
+    }
+    if (method == "timeline.mobs")
+    {
+        const timeline::Projector projector(doc);
+        Json out = Json::array();
+        for (const auto& m : projector.mobs())
+        {
+            out.push_back({ { "id", m.object }, { "mobId", m.mobId.toString() }, { "name", m.name }, { "kind", std::string(timeline::to_string(m.kind)) }, { "tracks", m.tracks }, { "topLevel", m.topLevel } });
+        }
+        return out;
+    }
+    if (method == "timeline.get")
+    {
+        auto mob = objectParam("mob");
+        if (!mob)
+        {
+            return std::unexpected(mob.error());
+        }
+        const timeline::Projector projector(doc);
+        auto t = projector.project(*mob);
+        if (!t)
+        {
+            return std::unexpected(t.error());
+        }
+        return timelineJson(*t);
+    }
+    if (method == "timeline.resolve")
+    {
+        auto clip = objectParam("clip");
+        if (!clip)
+        {
+            return std::unexpected(clip.error());
+        }
+        const timeline::Projector projector(doc);
+        auto chain = projector.resolve(*clip);
+        if (!chain)
+        {
+            return std::unexpected(chain.error());
+        }
+        Json links = Json::array();
+        for (const auto& link : chain->links)
+        {
+            links.push_back({
+                { "mob", link.mob == kNoObject ? Json(nullptr) : Json(link.mob) },
+                { "mobId", link.mobId.toString() },
+                { "name", link.mobName },
+                { "kind", std::string(timeline::to_string(link.mobKind)) },
+                { "slotId", link.slotId },
+                { "position", link.position },
+                { "editRate", { { "num", link.editRate.numerator() }, { "den", link.editRate.denominator() } } },
+                { "descriptor", link.descriptor },
+            });
+        }
+        Json essence = nullptr;
+        if (chain->essence)
+        {
+            essence = { { "embedded", chain->essence->embedded }, { "essenceData", chain->essence->essenceData == kNoObject ? Json(nullptr) : Json(chain->essence->essenceData) }, { "locators", chain->essence->locators }, { "descriptor", chain->essence->descriptor } };
+        }
+        return Json{ { "status", std::string(timeline::to_string(chain->status)) }, { "links", std::move(links) }, { "essence", std::move(essence) } };
     }
     if (method == "essence.extract" || method == "essence.replace")
     {
