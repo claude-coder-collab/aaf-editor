@@ -159,6 +159,7 @@ public:
     [[nodiscard]] auto header() const -> ObjectId;
     [[nodiscard]] auto metaDictionary() const -> ObjectId;
     [[nodiscard]] auto referencedProperties() const noexcept -> const std::vector<std::vector<std::uint16_t>>& { return referencedProperties_; }
+    [[nodiscard]] auto referencedPropertiesByteOrder() const noexcept -> std::uint8_t { return referencedPropertiesByteOrder_; }
     /// Problems found while loading that did not prevent it.
     [[nodiscard]] auto loadDiagnostics() const noexcept -> const std::vector<Diagnostic>& { return loadDiagnostics_; }
 

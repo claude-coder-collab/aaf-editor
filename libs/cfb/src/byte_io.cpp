@@ -6,11 +6,16 @@
 #include <format>
 #include <random>
 #include <system_error>
+#include <vector>
 
 #ifdef _WIN32
     #ifndef NOMINMAX
         #define NOMINMAX
     #endif
+    #ifndef _WIN32_WINNT
+        #define _WIN32_WINNT 0x0A00
+    #endif
+    #include <fcntl.h>
     #include <io.h>
     #include <windows.h>
 #else
@@ -40,8 +45,28 @@ auto seek(std::FILE* file, std::uint64_t offset) -> bool
 auto openFile(const std::filesystem::path& path, bool write) -> std::FILE*
 {
 #ifdef _WIN32
-    std::FILE* file = nullptr;
-    return _wfopen_s(&file, path.c_str(), write ? L"wb" : L"rb") == 0 ? file : nullptr;
+    if (write)
+    {
+        std::FILE* file = nullptr;
+        return _wfopen_s(&file, path.c_str(), L"wb") == 0 ? file : nullptr;
+    }
+    HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        return nullptr;
+    }
+    const int fd = _open_osfhandle(reinterpret_cast<intptr_t>(handle), _O_RDONLY | _O_BINARY);
+    if (fd < 0)
+    {
+        CloseHandle(handle);
+        return nullptr;
+    }
+    std::FILE* file = _fdopen(fd, "rb");
+    if (file == nullptr)
+    {
+        _close(fd);
+    }
+    return file;
 #else
     return std::fopen(path.c_str(), write ? "wb" : "rb");
 #endif
@@ -60,9 +85,37 @@ auto syncFile(std::FILE* file) -> bool
 #endif
 }
 
+#ifdef _WIN32
+auto posixRename(const std::filesystem::path& from, const std::filesystem::path& to) -> bool
+{
+    constexpr DWORD kReplaceIfExists = 0x1;
+    constexpr DWORD kPosixSemantics = 0x2;
+    HANDLE handle = CreateFileW(from.c_str(), DELETE | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        return false;
+    }
+    const std::wstring target = std::filesystem::absolute(to).wstring();
+    const std::size_t nameBytes = target.size() * sizeof(wchar_t);
+    std::vector<std::byte> buffer(sizeof(FILE_RENAME_INFO) + nameBytes);
+    auto* info = reinterpret_cast<FILE_RENAME_INFO*>(buffer.data());
+    info->Flags = kReplaceIfExists | kPosixSemantics;
+    info->RootDirectory = nullptr;
+    info->FileNameLength = static_cast<DWORD>(nameBytes);
+    std::memcpy(info->FileName, target.data(), nameBytes);
+    const bool ok = SetFileInformationByHandle(handle, FileRenameInfoEx, info, static_cast<DWORD>(buffer.size())) != 0;
+    CloseHandle(handle);
+    return ok;
+}
+#endif
+
 auto replaceFile(const std::filesystem::path& from, const std::filesystem::path& to) -> Result<void>
 {
 #ifdef _WIN32
+    if (posixRename(from, to))
+    {
+        return {};
+    }
     if (MoveFileExW(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == 0)
     {
         return fail(Errc::io, std::format("cannot replace {} (Windows error {})", to.string(), GetLastError()));

@@ -37,3 +37,16 @@ def test_diff_reports_paths_and_ignores_set_order() -> None:
     assert out == []
     cc.diff({"only": 1}, {}, "", out)
     assert out == ["/only: only in aaftool"]
+
+
+def test_diff_can_ignore_stream_names() -> None:
+    out: list[str] = []
+    a = {"Data": {"stream": "Data-2702", "size": 10}}
+    b = {"Data": {"stream": "Data-2", "size": 10}}
+    cc.diff(a, b, "", out, ignore_stream_names=True)
+    assert out == []
+    cc.diff(a, b, "", out)
+    assert out == ['/Data/stream: "Data-2702" vs "Data-2"']
+    out.clear()
+    cc.diff({"Data": {"stream": "x", "size": 1}}, {"Data": {"stream": "y", "size": 2}}, "", out, ignore_stream_names=True)
+    assert out == ["/Data/size: 1 vs 2"]

@@ -19,6 +19,7 @@ add_executable(aaf_tests
     core/test_document.cpp
     core/test_metamodel.cpp
     core/test_value.cpp
+    core/test_writer.cpp
     support/fixtures.cpp
 )
 target_include_directories(aaf_tests PRIVATE support)

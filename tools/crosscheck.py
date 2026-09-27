@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Cross-check `aaftool dump --json --header` against pyaaf2's reading of the same file.
 
+With `--roundtrip`, each file is first rewritten by `aaftool roundtrip` (preserved layout as v3, and
+regenerated layout as v4), and pyaaf2's reading of the rewritten file is compared with aaftool's
+reading of the original.
+
 Both sides are reduced to the canonical JSON form described in SPEC §8.1; strong-reference sets are
 compared order-insensitively. Differences are printed as JSON paths.
 """
@@ -11,8 +15,10 @@ import argparse
 import datetime
 import json
 import logging
+import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -91,7 +97,7 @@ def is_zero_rational(v: Json) -> bool:
     return isinstance(v, dict) and set(v) == {"Numerator", "Denominator"} and v["Numerator"] == 0
 
 
-def diff(a: Json, b: Json, path: str, out: list[str], unordered: bool = False) -> None:
+def diff(a: Json, b: Json, path: str, out: list[str], ignore_stream_names: bool = False) -> None:
     if len(out) >= 20:
         return
     if is_zero_rational(a) and is_zero_rational(b):
@@ -101,7 +107,9 @@ def diff(a: Json, b: Json, path: str, out: list[str], unordered: bool = False) -
             if key not in a or key not in b:
                 out.append(f"{path}/{key}: only in {'aaftool' if key in a else 'pyaaf2'}")
                 continue
-            diff(a[key], b[key], f"{path}/{key}", out)
+            if ignore_stream_names and key == "stream" and "size" in a:
+                continue
+            diff(a[key], b[key], f"{path}/{key}", out, ignore_stream_names)
         return
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
@@ -110,21 +118,37 @@ def diff(a: Json, b: Json, path: str, out: list[str], unordered: bool = False) -
         if a and isinstance(a[0], dict) and "class" in a[0]:
             a, b = sorted(a, key=sort_key), sorted(b, key=sort_key)
         for i, (x, y) in enumerate(zip(a, b)):
-            diff(x, y, f"{path}[{i}]", out)
+            diff(x, y, f"{path}[{i}]", out, ignore_stream_names)
         return
     if a != b and not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and a == b):
         out.append(f"{path}: {json.dumps(a)[:80]} vs {json.dumps(b)[:80]}")
 
 
-def compare(aaftool: Path, path: Path) -> list[str]:
+ROUNDTRIP_MODES: tuple[tuple[str, ...], ...] = (("--v3",), ("--v4", "--regenerate-layout"))
+
+
+def compare(aaftool: Path, path: Path, pyaaf2_path: Path | None = None, ignore_stream_names: bool = False) -> list[str]:
     run = subprocess.run([str(aaftool), "dump", str(path), "--json", "--header"], capture_output=True, text=True)
     if run.returncode != 0:
         return [f"aaftool failed: {run.stderr.strip()}"]
     ours = json.loads(run.stdout)
-    with aaf2.open(str(path), "r") as f:
+    with aaf2.open(str(pyaaf2_path or path), "r") as f:
         theirs = canon_object(f.header)
     problems: list[str] = []
-    diff(ours, theirs, "", problems)
+    diff(ours, theirs, "", problems, ignore_stream_names)
+    return problems
+
+
+def compare_roundtrip(aaftool: Path, path: Path, workdir: Path) -> list[str]:
+    problems: list[str] = []
+    for mode in ROUNDTRIP_MODES:
+        out = workdir / "roundtrip.aaf"
+        run = subprocess.run([str(aaftool), "roundtrip", str(path), str(out), *mode], capture_output=True, text=True)
+        if run.returncode != 0:
+            problems.append(f"{' '.join(mode)}: aaftool roundtrip failed: {run.stderr.strip()}")
+            continue
+        regenerated = "--regenerate-layout" in mode
+        problems += [f"{' '.join(mode)}: {p}" for p in compare(aaftool, path, out, regenerated)]
     return problems
 
 
@@ -132,18 +156,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("aaftool", type=Path)
     parser.add_argument("files", nargs="*", type=Path)
+    parser.add_argument("--roundtrip", action="store_true", help="compare pyaaf2's reading of files rewritten by aaftool")
     args = parser.parse_args(argv)
     logging.disable(logging.WARNING)
 
     files = args.files or reference_files(FIXTURE_DIRS)
     failures = 0
+    workdir = Path(tempfile.mkdtemp())
     for path in files:
-        problems = compare(args.aaftool, path)
+        problems = compare_roundtrip(args.aaftool, path, workdir) if args.roundtrip else compare(args.aaftool, path)
         if problems:
             failures += 1
             print(f"FAIL {path}")
             for problem in problems:
                 print(f"  {problem}")
+    shutil.rmtree(workdir, ignore_errors=True)
     print(f"{len(files)} files, {failures} failures")
     return 1 if failures or not files else 0
 
