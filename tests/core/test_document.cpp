@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <map>
 
 using namespace aaf;
 using namespace aaf::test;
@@ -233,4 +234,76 @@ TEST_CASE("Weak reference indexes with zero-size keys are rejected", "[core][doc
     const auto result = Document::load(std::move(*broken));
     REQUIRE_FALSE(result);
     CHECK(result.error().message.find("malformed weak reference index") != std::string::npos);
+}
+
+namespace
+{
+
+struct EncodeStats
+{
+    std::size_t checked = 0;
+    std::map<std::string, std::size_t> mismatches;
+};
+
+void checkEncodeInverse(const Document& doc, EncodeStats& stats)
+{
+    for (std::size_t i = 0; i < doc.objectCount(); ++i)
+    {
+        const auto& o = doc.object(i);
+        for (const auto& p : o.properties)
+        {
+            const auto* data = std::get_if<DataProperty>(&p.payload);
+            const auto* def = doc.propertyDef(p);
+            if (data == nullptr || def == nullptr)
+            {
+                continue;
+            }
+            auto decoded = decodeValue(doc.model(), def->type, data->bytes, o.bigEndian());
+            if (!decoded)
+            {
+                continue;
+            }
+            ++stats.checked;
+            auto encoded = encodeValue(doc.model(), def->type, *decoded, o.bigEndian());
+            if (!encoded)
+            {
+                ++stats.mismatches[def->name + ": " + encoded.error().message];
+                continue;
+            }
+            if (*encoded == data->bytes)
+            {
+                continue;
+            }
+            const bool paddedString = decoded->is<std::string>() && data->bytes.size() > encoded->size() && std::equal(encoded->begin(), encoded->end(), data->bytes.begin())
+                && std::all_of(data->bytes.begin() + static_cast<std::ptrdiff_t>(encoded->size()), data->bytes.end(), [](std::byte b) { return b == std::byte{ 0 }; });
+            auto again = decodeValue(doc.model(), def->type, *encoded, o.bigEndian());
+            if (!paddedString || !again || *again != *decoded)
+            {
+                ++stats.mismatches[def->name];
+            }
+        }
+    }
+}
+
+}
+
+TEST_CASE("Encoding inverts decoding for every stored value", "[core][value][fixtures]")
+{
+    EncodeStats stats;
+    auto files = aafFilesIn("aafsdk");
+    const auto external = aafFilesIn("external");
+    files.insert(files.end(), external.begin(), external.end());
+    for (const auto& path : files)
+    {
+        auto doc = Document::open(path);
+        REQUIRE(doc);
+        checkEncodeInverse(*doc, stats);
+    }
+    INFO("checked " << stats.checked << " values");
+    for (const auto& [name, count] : stats.mismatches)
+    {
+        UNSCOPED_INFO(name << ": " << count);
+    }
+    CHECK(stats.mismatches.empty());
+    CHECK(stats.checked > 1000);
 }

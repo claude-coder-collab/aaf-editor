@@ -167,6 +167,11 @@ private:
         doc_.loadDiagnostics_.push_back({ Diagnostic::Severity::warning, object, pid, std::move(message) });
     }
 
+    void note(ObjectId object, std::uint16_t pid, std::string message)
+    {
+        doc_.loadDiagnostics_.push_back({ Diagnostic::Severity::info, object, pid, std::move(message) });
+    }
+
     auto readStream(cfb::EntryId storage, std::u16string_view name, std::uint64_t limit) -> Result<std::vector<std::byte>>
     {
         const auto id = c_.find(storage, name);
@@ -688,7 +693,14 @@ private:
             }
             if (auto type = auidOf(prop(po, "PropertyDefinition", "Type"), po.bigEndian()))
             {
-                p.type = *type;
+                if (known != nullptr && known->type != *type)
+                {
+                    note(po.id, 0, std::format("{}.{} is declared as type {}; using baseline type {}", def.name, p.name, type->toString(), known->type.toString()));
+                }
+                else
+                {
+                    p.type = *type;
+                }
             }
             p.optional = boolOf(po, "PropertyDefinition", "IsOptional", p.optional);
             p.uniqueId = boolOf(po, "PropertyDefinition", "IsUniqueIdentifier", p.uniqueId);

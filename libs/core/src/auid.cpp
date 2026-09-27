@@ -53,6 +53,16 @@ auto Auid::fromStored(std::span<const std::byte, 16> data, bool bigEndian) noexc
     return auid;
 }
 
+auto Auid::toStored(bool bigEndian) const noexcept -> std::array<std::byte, 16>
+{
+    auto out = bytes;
+    if (bigEndian)
+    {
+        swapGuidFields(out);
+    }
+    return out;
+}
+
 auto Auid::parse(std::string_view text) -> Result<Auid>
 {
     if (text.starts_with("urn:uuid:"))
@@ -111,6 +121,16 @@ auto MobId::fromStored(std::span<const std::byte, 32> data, bool bigEndian) noex
         swapGuidFields(std::span<std::byte, 16>(id.bytes.data() + 16, 16));
     }
     return id;
+}
+
+auto MobId::toStored(bool bigEndian) const noexcept -> std::array<std::byte, 32>
+{
+    auto out = bytes;
+    if (bigEndian)
+    {
+        swapGuidFields(std::span<std::byte, 16>(out.data() + 16, 16));
+    }
+    return out;
 }
 
 auto MobId::toString() const -> std::string

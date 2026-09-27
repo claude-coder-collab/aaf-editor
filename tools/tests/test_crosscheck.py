@@ -50,3 +50,11 @@ def test_diff_can_ignore_stream_names() -> None:
     out.clear()
     cc.diff({"Data": {"stream": "x", "size": 1}}, {"Data": {"stream": "y", "size": 2}}, "", out, ignore_stream_names=True)
     assert out == ["/Data/size: 1 vs 2"]
+
+
+def test_baseline_ext_enum_names_match_pyaaf2_auids() -> None:
+    out: list[str] = []
+    cc.diff("OperationCategory_Effect", "0d010102-0101-0100-060e-2b3404010101", "", out)
+    assert out == []
+    cc.diff("OperationCategory_Effect", "00000000-0000-0000-0000-000000000000", "", out)
+    assert len(out) == 1
