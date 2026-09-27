@@ -58,7 +58,7 @@ Dependency direction: `cfb ← core ← timeline ← edit ← apps`. The librari
 
 ### 3.1 Language and tooling
 
-- C++26 mode, restricted to features supported by current GCC, Clang and MSVC (in practice mostly C++23: `std::expected`, `std::span`, `std::byte`, `std::format`, ranges, `std::flat_map` only if all three ship it).
+- C++26 mode (on MSVC, `cxx_std_23`, which CMake maps to `/std:c++latest`, because CMake does not yet know `cxx_std_26` for MSVC; C++ module scanning is off), restricted to features supported by current GCC, Clang and MSVC (in practice mostly C++23: `std::expected`, `std::span`, `std::byte`, `std::format`, ranges, `std::flat_map` only if all three ship it).
 - Library errors use `std::expected<T, aaf::Error>`. No exceptions cross library API boundaries. `Error` carries a code, a message and a byte offset/path when relevant.
 - CMake ≥ 3.28, Ninja Multi-Config, presets for `gcc`, `clang` and `msvc`.
 - Strict warnings (`-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror` in CI; `/W4 /WX` on MSVC).

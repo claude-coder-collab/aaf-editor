@@ -5,7 +5,7 @@ option(AAF_BUILD_FUZZERS "Build libFuzzer targets (Clang only)" OFF)
 
 add_library(aaf_project_options INTERFACE)
 add_library(aaf::project_options ALIAS aaf_project_options)
-target_compile_features(aaf_project_options INTERFACE cxx_std_26)
+target_compile_features(aaf_project_options INTERFACE cxx_std_${AAF_CXX_STANDARD})
 
 if(MSVC)
     target_compile_options(aaf_project_options INTERFACE /W4 /permissive- /utf-8 /Zc:__cplusplus /EHsc)

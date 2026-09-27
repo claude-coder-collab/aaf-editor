@@ -2,10 +2,16 @@ cmake_minimum_required(VERSION 3.28)
 
 project(aaf_editor VERSION 0.1.0 DESCRIPTION "AAF library and editor" LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 26)
+if(MSVC)
+    set(AAF_CXX_STANDARD 23)
+else()
+    set(AAF_CXX_STANDARD 26)
+endif()
+set(CMAKE_CXX_STANDARD ${AAF_CXX_STANDARD})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 include(cmake/ProjectOptions.cmake)
 
