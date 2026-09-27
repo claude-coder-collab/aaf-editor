@@ -51,7 +51,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get install -y ninja-build
-          pip install pyaaf2
+          pip install -r tools/requirements.txt
       - uses: actions/cache@v4
         with:
           path: tests/fixtures/external
@@ -64,8 +64,10 @@ jobs:
           cmake --build build/clang-asan --config Debug
       - name: Test (ASan/UBSan, all fixtures)
         run: ctest --test-dir build/clang-asan -C Debug --output-on-failure
-      - name: Cross-check with pyaaf2
+      - name: Cross-check containers with pyaaf2
         run: python tools/crosscheck_cfb.py build/clang-asan/apps/aaftool/Debug/aaftool
+      - name: Cross-check objects with pyaaf2
+        run: python tools/crosscheck.py build/clang-asan/apps/aaftool/Debug/aaftool
 
   tsan:
     runs-on: ubuntu-24.04
@@ -90,13 +92,20 @@ jobs:
           sudo apt-get install -y ninja-build
           cmake --preset clang-fuzz -DCMAKE_CXX_COMPILER=clang++-22
           cmake --build build/clang-fuzz --config Debug
-      - name: Fuzz CFB reader (10 min)
+      - name: Seed corpus
         run: |
           mkdir corpus
           find tests/fixtures/aafsdk -name '*.aaf' -size -300k -exec cp {} corpus/ \;
-          build/clang-fuzz/tests/fuzz/Debug/fuzz_cfb corpus -max_total_time=600 -max_len=65536 -rss_limit_mb=2048
+      - name: Fuzz CFB reader (10 min)
+        run: build/clang-fuzz/tests/fuzz/Debug/fuzz_cfb corpus -max_total_time=600 -max_len=65536 -rss_limit_mb=2048
+      - name: Fuzz AAF document loader (10 min)
+        run: build/clang-fuzz/tests/fuzz/Debug/fuzz_document corpus -max_total_time=600 -max_len=300000 -rss_limit_mb=2048
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: fuzz-crashes
-          path: crash-*
+          path: |
+            crash-*
+            oom-*
+            timeout-*
+            leak-*

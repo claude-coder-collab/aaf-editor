@@ -1,5 +1,10 @@
 #include <aaf/cfb/builder.hpp>
 #include <aaf/cfb/container.hpp>
+#include <aaf/core/document.hpp>
+
+#include "dump.hpp"
+
+#include <charconv>
 
 #include <cstdio>
 #include <exception>
@@ -18,6 +23,9 @@ commands:
   cfb <file>                       list the compound file directory tree
   cfb-roundtrip <in> <out> [--v3|--v4]
                                    read and rewrite the compound file container
+  dump <file> [--json] [--depth N] [--header|--metadict]
+                                   print the object tree (default: from the root)
+  validate <file> [--json]         check the file; exit 1 if there are errors
   --version                        print the version
 )";
 
@@ -109,6 +117,114 @@ auto cmdCfbRoundtrip(std::span<const std::string_view> args) -> int
     return 0;
 }
 
+auto cmdDump(std::span<const std::string_view> args) -> int
+{
+    if (args.empty())
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    bool json = false;
+    int depth = aaftool::kUnlimitedDepth;
+    enum class Start {
+        root,
+        header,
+        metadict,
+    } start = Start::root;
+    for (std::size_t i = 1; i < args.size(); ++i)
+    {
+        if (args[i] == "--json")
+        {
+            json = true;
+        }
+        else if (args[i] == "--header")
+        {
+            start = Start::header;
+        }
+        else if (args[i] == "--metadict")
+        {
+            start = Start::metadict;
+        }
+        else if (args[i] == "--depth" && i + 1 < args.size())
+        {
+            const auto text = args[++i];
+            if (std::from_chars(text.data(), text.data() + text.size(), depth).ec != std::errc{} || depth < 0)
+            {
+                std::println(stderr, "aaftool: invalid depth '{}'", text);
+                return 2;
+            }
+        }
+        else
+        {
+            std::print(stderr, "{}", kUsage);
+            return 2;
+        }
+    }
+    auto doc = aaf::Document::open(args[0]);
+    if (!doc)
+    {
+        return reportError(doc.error());
+    }
+    aaf::ObjectId id = aaf::Document::root();
+    if (start == Start::header)
+    {
+        id = doc->header();
+    }
+    else if (start == Start::metadict)
+    {
+        id = doc->metaDictionary();
+    }
+    if (id == aaf::kNoObject)
+    {
+        std::println(stderr, "aaftool: requested object is missing");
+        return 1;
+    }
+    if (json)
+    {
+        std::println("{}", aaftool::toJson(*doc, id, depth).dump(1));
+    }
+    else
+    {
+        std::print("{}", aaftool::toText(*doc, id, depth));
+    }
+    return 0;
+}
+
+auto cmdValidate(std::span<const std::string_view> args) -> int
+{
+    if (args.empty() || args.size() > 2 || (args.size() == 2 && args[1] != "--json"))
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    auto doc = aaf::Document::open(args[0]);
+    if (!doc)
+    {
+        return reportError(doc.error());
+    }
+    const auto diagnostics = aaf::validate(*doc);
+    const auto errors = std::ranges::count(diagnostics, aaf::Diagnostic::Severity::error, &aaf::Diagnostic::severity);
+    if (args.size() == 2)
+    {
+        auto list = nlohmann::ordered_json::array();
+        for (const auto& d : diagnostics)
+        {
+            list.push_back({ { "severity", aaf::to_string(d.severity) }, { "object", d.object }, { "pid", d.pid }, { "message", d.message } });
+        }
+        std::println("{}", list.dump(1));
+    }
+    else
+    {
+        for (const auto& d : diagnostics)
+        {
+            std::println("{}: object {}: {}", aaf::to_string(d.severity), d.object, d.message);
+        }
+        const auto warnings = std::ranges::count(diagnostics, aaf::Diagnostic::Severity::warning, &aaf::Diagnostic::severity);
+        std::println("{}: {} objects, {} errors, {} warnings, {} notes", args[0], doc->objectCount(), errors, warnings, static_cast<std::ptrdiff_t>(diagnostics.size()) - errors - warnings);
+    }
+    return errors > 0 ? 1 : 0;
+}
+
 auto run(std::span<char*> argv) -> int
 {
     const std::vector<std::string_view> args(argv.begin() + 1, argv.end());
@@ -130,6 +246,14 @@ auto run(std::span<char*> argv) -> int
     if (args[0] == "cfb-roundtrip")
     {
         return cmdCfbRoundtrip(rest);
+    }
+    if (args[0] == "dump")
+    {
+        return cmdDump(rest);
+    }
+    if (args[0] == "validate")
+    {
+        return cmdValidate(rest);
     }
     std::println(stderr, "aaftool: unknown command '{}'", args[0]);
     std::print(stderr, "{}", kUsage);

@@ -17,6 +17,7 @@ include(cmake/ProjectOptions.cmake)
 
 add_subdirectory(libs/common)
 add_subdirectory(libs/cfb)
+add_subdirectory(libs/core)
 add_subdirectory(apps/aaftool)
 
 if(AAF_BUILD_TESTS)
