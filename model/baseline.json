@@ -1,0 +1,6071 @@
+{
+ "classes": [
+  {
+   "id": "0d010101-0101-0100-060e-2b3402060101",
+   "name": "InterchangeObject",
+   "parent": null,
+   "concrete": false,
+   "properties": [
+    {
+     "id": "06010104-0101-0000-060e-2b3401010102",
+     "name": "ObjClass",
+     "pid": 257,
+     "type": "05010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05200701-0800-0000-060e-2b3401010102",
+     "name": "Generation",
+     "pid": 258,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0200-060e-2b3402060101",
+   "name": "Component",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "04070100-0000-0000-060e-2b3401010102",
+     "name": "DataDefinition",
+     "pid": 513,
+     "type": "05010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020201-0103-0000-060e-2b3401010102",
+     "name": "Length",
+     "pid": 514,
+     "type": "01012002-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03010210-0400-0000-060e-2b3401010102",
+     "name": "KLVData",
+     "pid": 515,
+     "type": "05060900-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03020102-1600-0000-060e-2b3401010107",
+     "name": "UserComments",
+     "pid": 516,
+     "type": "05060800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03010210-0800-0000-060e-2b3401010107",
+     "name": "Attributes",
+     "pid": 517,
+     "type": "05060800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0300-060e-2b3402060101",
+   "name": "Segment",
+   "parent": "0d010101-0101-0200-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-0400-060e-2b3402060101",
+   "name": "EdgeCode",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01040901-0000-0000-060e-2b3401010102",
+     "name": "Start",
+     "pid": 1025,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04100103-0109-0000-060e-2b3401010102",
+     "name": "FilmKind",
+     "pid": 1026,
+     "type": "0201010d-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04100103-0102-0000-060e-2b3401010101",
+     "name": "CodeFormat",
+     "pid": 1027,
+     "type": "0201010c-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "01030201-0200-0000-060e-2b3401010102",
+     "name": "Header",
+     "pid": 1028,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0500-060e-2b3402060101",
+   "name": "EssenceGroup",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0601-0000-060e-2b3401010102",
+     "name": "Choices",
+     "pid": 1281,
+     "type": "05060700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0208-0000-060e-2b3401010102",
+     "name": "StillFrame",
+     "pid": 1282,
+     "type": "05020800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0600-060e-2b3402060101",
+   "name": "Event",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "07020103-0303-0000-060e-2b3401010102",
+     "name": "Position",
+     "pid": 1537,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05300404-0100-0000-060e-2b3401010102",
+     "name": "Comment",
+     "pid": 1538,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0700-060e-2b3402060101",
+   "name": "GPITrigger",
+   "parent": "0d010101-0101-0600-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300401-0000-0000-060e-2b3401010101",
+     "name": "ActiveState",
+     "pid": 2049,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0800-060e-2b3402060101",
+   "name": "CommentMarker",
+   "parent": "0d010101-0101-0600-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-020a-0000-060e-2b3401010102",
+     "name": "Annotation",
+     "pid": 2305,
+     "type": "05020800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0900-060e-2b3402060101",
+   "name": "Filler",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-0a00-060e-2b3402060101",
+   "name": "OperationGroup",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300506-0000-0000-060e-2b3401010102",
+     "name": "Operation",
+     "pid": 2817,
+     "type": "05010700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0602-0000-060e-2b3401010102",
+     "name": "InputSegments",
+     "pid": 2818,
+     "type": "05060600-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-060a-0000-060e-2b3401010102",
+     "name": "Parameters",
+     "pid": 2819,
+     "type": "05060a00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0530050c-0000-0000-060e-2b3401010102",
+     "name": "BypassOverride",
+     "pid": 2820,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0206-0000-060e-2b3401010102",
+     "name": "Rendering",
+     "pid": 2821,
+     "type": "05020800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0b00-060e-2b3402060101",
+   "name": "NestedScope",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0607-0000-060e-2b3401010102",
+     "name": "Slots",
+     "pid": 3073,
+     "type": "05060600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0c00-060e-2b3402060101",
+   "name": "Pulldown",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0207-0000-060e-2b3401010102",
+     "name": "InputSegment",
+     "pid": 3329,
+     "type": "05020600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05401001-0200-0000-060e-2b3401010102",
+     "name": "PulldownKind",
+     "pid": 3330,
+     "type": "0201010b-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05401001-0100-0000-060e-2b3401010102",
+     "name": "PulldownDirection",
+     "pid": 3331,
+     "type": "0201010a-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05401001-0300-0000-060e-2b3401010102",
+     "name": "PhaseFrame",
+     "pid": 3332,
+     "type": "01012300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0d00-060e-2b3402060101",
+   "name": "ScopeReference",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010103-0300-0000-060e-2b3401010102",
+     "name": "RelativeScope",
+     "pid": 3585,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010103-0400-0000-060e-2b3401010102",
+     "name": "RelativeSlot",
+     "pid": 3586,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0e00-060e-2b3402060101",
+   "name": "Selector",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0209-0000-060e-2b3401010102",
+     "name": "Selected",
+     "pid": 3841,
+     "type": "05020600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0608-0000-060e-2b3401010102",
+     "name": "Alternates",
+     "pid": 3842,
+     "type": "05060600-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-0f00-060e-2b3402060101",
+   "name": "Sequence",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0609-0000-060e-2b3401010102",
+     "name": "Components",
+     "pid": 4097,
+     "type": "05060100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1000-060e-2b3402060101",
+   "name": "SourceReference",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "06010103-0100-0000-060e-2b3401010102",
+     "name": "SourceID",
+     "pid": 4353,
+     "type": "01030200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010103-0200-0000-060e-2b3401010102",
+     "name": "SourceMobSlotID",
+     "pid": 4354,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010103-0700-0000-060e-2b3401010107",
+     "name": "ChannelIDs",
+     "pid": 4355,
+     "type": "04010900-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010103-0800-0000-060e-2b3401010108",
+     "name": "MonoSourceSlotIDs",
+     "pid": 4356,
+     "type": "04010900-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1100-060e-2b3402060101",
+   "name": "SourceClip",
+   "parent": "0d010101-0101-1000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "07020103-0104-0000-060e-2b3401010102",
+     "name": "StartTime",
+     "pid": 4609,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "07020201-0105-0200-060e-2b3401010102",
+     "name": "FadeInLength",
+     "pid": 4610,
+     "type": "01012002-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05300501-0000-0000-060e-2b3401010101",
+     "name": "FadeInType",
+     "pid": 4611,
+     "type": "02010107-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "07020201-0105-0300-060e-2b3401010102",
+     "name": "FadeOutLength",
+     "pid": 4612,
+     "type": "01012002-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05300502-0000-0000-060e-2b3401010101",
+     "name": "FadeOutType",
+     "pid": 4613,
+     "type": "02010107-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1200-060e-2b3402060101",
+   "name": "TextClip",
+   "parent": "0d010101-0101-1000-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-1300-060e-2b3402060101",
+   "name": "HTMLClip",
+   "parent": "0d010101-0101-1200-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300601-0100-0000-060e-2b3401010102",
+     "name": "BeginAnchor",
+     "pid": 5121,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05300602-0100-0000-060e-2b3401010102",
+     "name": "EndAnchor",
+     "pid": 5122,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1400-060e-2b3402060101",
+   "name": "Timecode",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "07020103-0105-0000-060e-2b3401010102",
+     "name": "Start",
+     "pid": 5377,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04040101-0206-0000-060e-2b3401010102",
+     "name": "FPS",
+     "pid": 5378,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04040101-0500-0000-060e-2b3401010101",
+     "name": "Drop",
+     "pid": 5379,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1500-060e-2b3402060101",
+   "name": "TimecodeStream",
+   "parent": "0d010101-0101-0300-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "04040101-0201-0000-060e-2b3401010102",
+     "name": "SampleRate",
+     "pid": 5633,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04070300-0000-0000-060e-2b3401010102",
+     "name": "Source",
+     "pid": 5634,
+     "type": "04100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04040201-0000-0000-060e-2b3401010101",
+     "name": "SourceType",
+     "pid": 5635,
+     "type": "02010109-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1600-060e-2b3402060101",
+   "name": "TimecodeStream12M",
+   "parent": "0d010101-0101-1500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04040101-0400-0000-060e-2b3401010101",
+     "name": "IncludeSync",
+     "pid": 5889,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1700-060e-2b3402060101",
+   "name": "Transition",
+   "parent": "0d010101-0101-0200-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0205-0000-060e-2b3401010102",
+     "name": "OperationGroup",
+     "pid": 6145,
+     "type": "05020500-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020103-0106-0000-060e-2b3401010102",
+     "name": "CutPoint",
+     "pid": 6146,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1800-060e-2b3402060101",
+   "name": "ContentStorage",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0501-0000-060e-2b3401010102",
+     "name": "Mobs",
+     "pid": 6401,
+     "type": "05050700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0502-0000-060e-2b3401010102",
+     "name": "EssenceData",
+     "pid": 6402,
+     "type": "05050500-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1900-060e-2b3402060101",
+   "name": "ControlPoint",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "0530050d-0000-0000-060e-2b3401010102",
+     "name": "Value",
+     "pid": 6658,
+     "type": "04100300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020103-1002-0100-060e-2b3401010102",
+     "name": "Time",
+     "pid": 6659,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05300508-0000-0000-060e-2b3401010102",
+     "name": "EditHint",
+     "pid": 6660,
+     "type": "02010106-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1a00-060e-2b3402060101",
+   "name": "DefinitionObject",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "01011503-0000-0000-060e-2b3401010102",
+     "name": "Identification",
+     "pid": 6913,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": true
+    },
+    {
+     "id": "01070102-0301-0000-060e-2b3401010102",
+     "name": "Name",
+     "pid": 6914,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03020301-0201-0000-060e-2b3401010102",
+     "name": "Description",
+     "pid": 6915,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1b00-060e-2b3402060101",
+   "name": "DataDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-1c00-060e-2b3402060101",
+   "name": "OperationDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300509-0000-0000-060e-2b3401010102",
+     "name": "DataDefinition",
+     "pid": 7681,
+     "type": "05010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05300503-0000-0000-060e-2b3401010101",
+     "name": "IsTimeWarp",
+     "pid": 7682,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0401-0000-060e-2b3401010102",
+     "name": "DegradeTo",
+     "pid": 7683,
+     "type": "05040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0530050a-0000-0000-060e-2b3401010102",
+     "name": "OperationCategory",
+     "pid": 7686,
+     "type": "02020101-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05300504-0000-0000-060e-2b3401010101",
+     "name": "NumberInputs",
+     "pid": 7687,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05300505-0000-0000-060e-2b3401010101",
+     "name": "Bypass",
+     "pid": 7688,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0302-0000-060e-2b3401010102",
+     "name": "ParametersDefined",
+     "pid": 7689,
+     "type": "05030e00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1d00-060e-2b3402060101",
+   "name": "ParameterDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0106-0000-060e-2b3401010102",
+     "name": "Type",
+     "pid": 7937,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "0530050b-0100-0000-060e-2b3401010102",
+     "name": "DisplayUnits",
+     "pid": 7939,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1e00-060e-2b3402060101",
+   "name": "PluginDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05200901-0000-0000-060e-2b3401010102",
+     "name": "PluginCategory",
+     "pid": 8707,
+     "type": "02020103-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03030301-0300-0000-060e-2b3401010102",
+     "name": "VersionNumber",
+     "pid": 8708,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03030301-0201-0000-060e-2b3401010102",
+     "name": "VersionString",
+     "pid": 8709,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "010a0101-0101-0000-060e-2b3401010102",
+     "name": "Manufacturer",
+     "pid": 8710,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-020b-0000-060e-2b3401010102",
+     "name": "ManufacturerInfo",
+     "pid": 8711,
+     "type": "05020400-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "010a0101-0300-0000-060e-2b3401010102",
+     "name": "ManufacturerID",
+     "pid": 8712,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200902-0000-0000-060e-2b3401010102",
+     "name": "Platform",
+     "pid": 8713,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200903-0000-0000-060e-2b3401010102",
+     "name": "MinPlatformVersion",
+     "pid": 8714,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200904-0000-0000-060e-2b3401010102",
+     "name": "MaxPlatformVersion",
+     "pid": 8715,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200905-0000-0000-060e-2b3401010102",
+     "name": "Engine",
+     "pid": 8716,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200906-0000-0000-060e-2b3401010102",
+     "name": "MinEngineVersion",
+     "pid": 8717,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200907-0000-0000-060e-2b3401010102",
+     "name": "MaxEngineVersion",
+     "pid": 8718,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200908-0000-0000-060e-2b3401010102",
+     "name": "PluginAPI",
+     "pid": 8719,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200909-0000-0000-060e-2b3401010102",
+     "name": "MinPluginAPI",
+     "pid": 8720,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0520090a-0000-0000-060e-2b3401010102",
+     "name": "MaxPluginAPI",
+     "pid": 8721,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0520090b-0000-0000-060e-2b3401010102",
+     "name": "SoftwareOnly",
+     "pid": 8722,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0520090c-0000-0000-060e-2b3401010102",
+     "name": "Accelerator",
+     "pid": 8723,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0520090d-0000-0000-060e-2b3401010102",
+     "name": "Locators",
+     "pid": 8724,
+     "type": "05060400-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0520090e-0000-0000-060e-2b3401010102",
+     "name": "Authentication",
+     "pid": 8725,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0520090f-0000-0000-060e-2b3401010102",
+     "name": "DefinitionObject",
+     "pid": 8726,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-1f00-060e-2b3402060101",
+   "name": "CodecDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0107-0000-060e-2b3401010102",
+     "name": "FileDescriptorClass",
+     "pid": 8961,
+     "type": "05010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0301-0000-060e-2b3401010102",
+     "name": "DataDefinitions",
+     "pid": 8962,
+     "type": "05040300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2000-060e-2b3402060101",
+   "name": "ContainerDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03010201-0300-0000-060e-2b3401010101",
+     "name": "EssenceIsIdentified",
+     "pid": 9217,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2100-060e-2b3402060101",
+   "name": "InterpolationDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-2200-060e-2b3402060101",
+   "name": "Dictionary",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0503-0000-060e-2b3401010102",
+     "name": "OperationDefinitions",
+     "pid": 9731,
+     "type": "05050800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0504-0000-060e-2b3401010102",
+     "name": "ParameterDefinitions",
+     "pid": 9732,
+     "type": "05050900-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0505-0000-060e-2b3401010102",
+     "name": "DataDefinitions",
+     "pid": 9733,
+     "type": "05050400-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0506-0000-060e-2b3401010102",
+     "name": "PluginDefinitions",
+     "pid": 9734,
+     "type": "05050a00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0507-0000-060e-2b3401010102",
+     "name": "CodecDefinitions",
+     "pid": 9735,
+     "type": "05050200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0508-0000-060e-2b3401010102",
+     "name": "ContainerDefinitions",
+     "pid": 9736,
+     "type": "05050300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0509-0000-060e-2b3401010102",
+     "name": "InterpolationDefinitions",
+     "pid": 9737,
+     "type": "05050600-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-050a-0000-060e-2b3401010107",
+     "name": "KLVDataDefinitions",
+     "pid": 9738,
+     "type": "05050d00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-050b-0000-060e-2b3401010107",
+     "name": "TaggedValueDefinitions",
+     "pid": 9739,
+     "type": "05050e00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2300-060e-2b3402060101",
+   "name": "EssenceData",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010106-0100-0000-060e-2b3401010102",
+     "name": "MobID",
+     "pid": 9985,
+     "type": "01030200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": true
+    },
+    {
+     "id": "04070200-0000-0000-060e-2b3401010102",
+     "name": "Data",
+     "pid": 9986,
+     "type": "04100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010102-0100-0000-060e-2b3401010102",
+     "name": "SampleIndex",
+     "pid": 11009,
+     "type": "04100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2400-060e-2b3402060101",
+   "name": "EssenceDescriptor",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "06010104-0603-0000-060e-2b3401010102",
+     "name": "Locator",
+     "pid": 12033,
+     "type": "05060400-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0610-0000-060e-2b3401010109",
+     "name": "SubDescriptors",
+     "pid": 0,
+     "type": "05060e00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2500-060e-2b3402060101",
+   "name": "FileDescriptor",
+   "parent": "0d010101-0101-2400-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "04060101-0000-0000-060e-2b3401010101",
+     "name": "SampleRate",
+     "pid": 12289,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04060102-0000-0000-060e-2b3401010101",
+     "name": "Length",
+     "pid": 12290,
+     "type": "01012002-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0102-0000-060e-2b3401010102",
+     "name": "ContainerFormat",
+     "pid": 12292,
+     "type": "05010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0103-0000-060e-2b3401010102",
+     "name": "CodecDefinition",
+     "pid": 12293,
+     "type": "05010b00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010103-0500-0000-060e-2b3401010105",
+     "name": "LinkedSlotID",
+     "pid": 12294,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2600-060e-2b3402060101",
+   "name": "AIFCDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03030302-0200-0000-060e-2b3401010102",
+     "name": "Summary",
+     "pid": 12545,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2700-060e-2b3402060101",
+   "name": "DigitalImageDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "04010601-0000-0000-060e-2b3401010102",
+     "name": "Compression",
+     "pid": 12801,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010502-0100-0000-060e-2b3401010101",
+     "name": "StoredHeight",
+     "pid": 12802,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010502-0200-0000-060e-2b3401010101",
+     "name": "StoredWidth",
+     "pid": 12803,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010501-0700-0000-060e-2b3401010101",
+     "name": "SampledHeight",
+     "pid": 12804,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0800-0000-060e-2b3401010101",
+     "name": "SampledWidth",
+     "pid": 12805,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0900-0000-060e-2b3401010101",
+     "name": "SampledXOffset",
+     "pid": 12806,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0a00-0000-060e-2b3401010101",
+     "name": "SampledYOffset",
+     "pid": 12807,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0b00-0000-060e-2b3401010101",
+     "name": "DisplayHeight",
+     "pid": 12808,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0c00-0000-060e-2b3401010101",
+     "name": "DisplayWidth",
+     "pid": 12809,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0d00-0000-060e-2b3401010101",
+     "name": "DisplayXOffset",
+     "pid": 12810,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-0e00-0000-060e-2b3401010101",
+     "name": "DisplayYOffset",
+     "pid": 12811,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010301-0400-0000-060e-2b3401010101",
+     "name": "FrameLayout",
+     "pid": 12812,
+     "type": "02010108-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010302-0500-0000-060e-2b3401010102",
+     "name": "VideoLineMap",
+     "pid": 12813,
+     "type": "04010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010101-0100-0000-060e-2b3401010101",
+     "name": "ImageAspectRatio",
+     "pid": 12814,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05200102-0000-0000-060e-2b3401010102",
+     "name": "AlphaTransparency",
+     "pid": 12815,
+     "type": "02010120-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010201-0101-0200-060e-2b3401010102",
+     "name": "TransferCharacteristic",
+     "pid": 12816,
+     "type": "02020102-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010201-0106-0100-060e-2b3401010109",
+     "name": "ColorPrimaries",
+     "pid": 12825,
+     "type": "02020105-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010201-0103-0100-060e-2b3401010102",
+     "name": "CodingEquations",
+     "pid": 12826,
+     "type": "02020106-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04180101-0000-0000-060e-2b3401010102",
+     "name": "ImageAlignmentFactor",
+     "pid": 12817,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010301-0600-0000-060e-2b3401010102",
+     "name": "FieldDominance",
+     "pid": 12818,
+     "type": "02010121-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04180102-0000-0000-060e-2b3401010102",
+     "name": "FieldStartOffset",
+     "pid": 12819,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04180103-0000-0000-060e-2b3401010102",
+     "name": "FieldEndOffset",
+     "pid": 12820,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04050113-0000-0000-060e-2b3401010105",
+     "name": "SignalStandard",
+     "pid": 12821,
+     "type": "02010127-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010302-0800-0000-060e-2b3401010105",
+     "name": "StoredF2Offset",
+     "pid": 12822,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010302-0700-0000-060e-2b3401010105",
+     "name": "DisplayF2Offset",
+     "pid": 12823,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010302-0900-0000-060e-2b3401010105",
+     "name": "ActiveFormatDescriptor",
+     "pid": 12824,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2800-060e-2b3402060101",
+   "name": "CDCIDescriptor",
+   "parent": "0d010101-0101-2700-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04010503-0a00-0000-060e-2b3401010102",
+     "name": "ComponentWidth",
+     "pid": 13057,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010501-0500-0000-060e-2b3401010101",
+     "name": "HorizontalSubsampling",
+     "pid": 13058,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010501-0600-0000-060e-2b3401010101",
+     "name": "ColorSiting",
+     "pid": 13059,
+     "type": "02010105-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0300-0000-060e-2b3401010101",
+     "name": "BlackReferenceLevel",
+     "pid": 13060,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0400-0000-060e-2b3401010101",
+     "name": "WhiteReferenceLevel",
+     "pid": 13061,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0500-0000-060e-2b3401010102",
+     "name": "ColorRange",
+     "pid": 13062,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04180104-0000-0000-060e-2b3401010102",
+     "name": "PaddingBits",
+     "pid": 13063,
+     "type": "01010600-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010501-1000-0000-060e-2b3401010102",
+     "name": "VerticalSubsampling",
+     "pid": 13064,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0700-0000-060e-2b3401010102",
+     "name": "AlphaSamplingWidth",
+     "pid": 13065,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03010201-0a00-0000-060e-2b3401010105",
+     "name": "ReversedByteOrder",
+     "pid": 13067,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2900-060e-2b3402060101",
+   "name": "RGBADescriptor",
+   "parent": "0d010101-0101-2700-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04010503-0600-0000-060e-2b3401010102",
+     "name": "PixelLayout",
+     "pid": 13313,
+     "type": "04020100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010503-0800-0000-060e-2b3401010102",
+     "name": "Palette",
+     "pid": 13315,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0900-0000-060e-2b3401010102",
+     "name": "PaletteLayout",
+     "pid": 13316,
+     "type": "04020100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010404-0100-0000-060e-2b3401010105",
+     "name": "ScanningDirection",
+     "pid": 13317,
+     "type": "02010128-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0b00-0000-060e-2b3401010105",
+     "name": "ComponentMaxRef",
+     "pid": 13318,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0c00-0000-060e-2b3401010105",
+     "name": "ComponentMinRef",
+     "pid": 13319,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0d00-0000-060e-2b3401010105",
+     "name": "AlphaMaxRef",
+     "pid": 13320,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010503-0e00-0000-060e-2b3401010105",
+     "name": "AlphaMinRef",
+     "pid": 13321,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2a00-060e-2b3402060101",
+   "name": "HTMLDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-2b00-060e-2b3402060101",
+   "name": "TIFFDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05020103-0101-0000-060e-2b3401010102",
+     "name": "IsUniform",
+     "pid": 14081,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06080201-0000-0000-060e-2b3401010101",
+     "name": "IsContiguous",
+     "pid": 14082,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010302-0300-0000-060e-2b3401010101",
+     "name": "LeadingLines",
+     "pid": 14083,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010302-0400-0000-060e-2b3401010101",
+     "name": "TrailingLines",
+     "pid": 14084,
+     "type": "01010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05020103-0102-0000-060e-2b3401010102",
+     "name": "JPEGTableID",
+     "pid": 14085,
+     "type": "01012003-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03030302-0300-0000-060e-2b3401010102",
+     "name": "Summary",
+     "pid": 14086,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2c00-060e-2b3402060101",
+   "name": "WAVEDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03030302-0100-0000-060e-2b3401010102",
+     "name": "Summary",
+     "pid": 14337,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2d00-060e-2b3402060101",
+   "name": "FilmDescriptor",
+   "parent": "0d010101-0101-2400-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04100103-0108-0000-060e-2b3401010102",
+     "name": "FilmFormat",
+     "pid": 14593,
+     "type": "0201010d-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010802-0300-0000-060e-2b3401010102",
+     "name": "FrameRate",
+     "pid": 14594,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100103-0103-0000-060e-2b3401010102",
+     "name": "PerforationsPerFrame",
+     "pid": 14595,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100103-0203-0000-060e-2b3401010102",
+     "name": "FilmAspectRatio",
+     "pid": 14596,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100103-0106-0100-060e-2b3401010102",
+     "name": "Manufacturer",
+     "pid": 14597,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100103-0105-0100-060e-2b3401010102",
+     "name": "Model",
+     "pid": 14598,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100103-0104-0100-060e-2b3401010102",
+     "name": "FilmGaugeFormat",
+     "pid": 14599,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100103-0107-0100-060e-2b3401010102",
+     "name": "FilmBatchNumber",
+     "pid": 14600,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2e00-060e-2b3402060101",
+   "name": "TapeDescriptor",
+   "parent": "0d010101-0101-2400-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04100101-0101-0000-060e-2b3401010102",
+     "name": "FormFactor",
+     "pid": 14849,
+     "type": "02010104-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010401-0100-0000-060e-2b3401010102",
+     "name": "VideoSignal",
+     "pid": 14850,
+     "type": "02010103-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0d010101-0101-0100-060e-2b3401010102",
+     "name": "TapeFormat",
+     "pid": 14851,
+     "type": "02010102-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100101-0300-0000-060e-2b3401010102",
+     "name": "Length",
+     "pid": 14852,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100101-0401-0000-060e-2b3401010102",
+     "name": "ManufacturerID",
+     "pid": 14853,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100101-0201-0000-060e-2b3401010102",
+     "name": "Model",
+     "pid": 14854,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100101-0601-0000-060e-2b3401010102",
+     "name": "TapeBatchNumber",
+     "pid": 14855,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04100101-0501-0000-060e-2b3401010102",
+     "name": "TapeStock",
+     "pid": 14856,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-2f00-060e-2b3402060101",
+   "name": "Header",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03010201-0200-0000-060e-2b3401010101",
+     "name": "ByteOrder",
+     "pid": 15105,
+     "type": "01010600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020110-0204-0000-060e-2b3401010102",
+     "name": "LastModified",
+     "pid": 15106,
+     "type": "03010700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0201-0000-060e-2b3401010102",
+     "name": "Content",
+     "pid": 15107,
+     "type": "05020100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0202-0000-060e-2b3401010102",
+     "name": "Dictionary",
+     "pid": 15108,
+     "type": "05020200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010201-0500-0000-060e-2b3401010102",
+     "name": "Version",
+     "pid": 15109,
+     "type": "03010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0604-0000-060e-2b3401010102",
+     "name": "IdentificationList",
+     "pid": 15110,
+     "type": "05060300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010201-0400-0000-060e-2b3401010102",
+     "name": "ObjectModelVersion",
+     "pid": 15111,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0108-0000-060e-2b3401010104",
+     "name": "PrimaryMob",
+     "pid": 15112,
+     "type": "05010600-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01020203-0000-0000-060e-2b3401010105",
+     "name": "OperationalPattern",
+     "pid": 15113,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01020210-0201-0000-060e-2b3401010105",
+     "name": "EssenceContainers",
+     "pid": 15114,
+     "type": "04030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01020210-0202-0000-060e-2b3401010105",
+     "name": "DescriptiveSchemes",
+     "pid": 15115,
+     "type": "04030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3000-060e-2b3402060101",
+   "name": "Identification",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05200701-0201-0000-060e-2b3401010102",
+     "name": "CompanyName",
+     "pid": 15361,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05200701-0301-0000-060e-2b3401010102",
+     "name": "ProductName",
+     "pid": 15362,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05200701-0400-0000-060e-2b3401010102",
+     "name": "ProductVersion",
+     "pid": 15363,
+     "type": "03010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200701-0501-0000-060e-2b3401010102",
+     "name": "ProductVersionString",
+     "pid": 15364,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05200701-0700-0000-060e-2b3401010102",
+     "name": "ProductID",
+     "pid": 15365,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020110-0203-0000-060e-2b3401010102",
+     "name": "Date",
+     "pid": 15366,
+     "type": "03010700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "05200701-0a00-0000-060e-2b3401010102",
+     "name": "ToolkitVersion",
+     "pid": 15367,
+     "type": "03010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200701-0601-0000-060e-2b3401010102",
+     "name": "Platform",
+     "pid": 15368,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05200701-0100-0000-060e-2b3401010102",
+     "name": "GenerationAUID",
+     "pid": 15369,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3100-060e-2b3402060101",
+   "name": "Locator",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-3200-060e-2b3402060101",
+   "name": "NetworkLocator",
+   "parent": "0d010101-0101-3100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01020101-0100-0000-060e-2b3401010101",
+     "name": "URLString",
+     "pid": 16385,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3300-060e-2b3402060101",
+   "name": "TextLocator",
+   "parent": "0d010101-0101-3100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01040102-0100-0000-060e-2b3401010102",
+     "name": "Name",
+     "pid": 16641,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3400-060e-2b3402060101",
+   "name": "Mob",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "01011510-0000-0000-060e-2b3401010101",
+     "name": "MobID",
+     "pid": 17409,
+     "type": "01030200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": true
+    },
+    {
+     "id": "01030302-0100-0000-060e-2b3401010101",
+     "name": "Name",
+     "pid": 17410,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0605-0000-060e-2b3401010102",
+     "name": "Slots",
+     "pid": 17411,
+     "type": "05060500-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020110-0205-0000-060e-2b3401010102",
+     "name": "LastModified",
+     "pid": 17412,
+     "type": "03010700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020110-0103-0000-060e-2b3401010102",
+     "name": "CreationTime",
+     "pid": 17413,
+     "type": "03010700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03020102-0c00-0000-060e-2b3401010102",
+     "name": "UserComments",
+     "pid": 17414,
+     "type": "05060800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03010210-0300-0000-060e-2b3401010102",
+     "name": "KLVData",
+     "pid": 17415,
+     "type": "05060900-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03010210-0700-0000-060e-2b3401010107",
+     "name": "Attributes",
+     "pid": 17417,
+     "type": "05060800-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05010108-0000-0000-060e-2b3401010107",
+     "name": "UsageCode",
+     "pid": 17416,
+     "type": "02020104-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3500-060e-2b3402060101",
+   "name": "CompositionMob",
+   "parent": "0d010101-0101-3400-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "07020201-0105-0100-060e-2b3401010102",
+     "name": "DefaultFadeLength",
+     "pid": 17665,
+     "type": "01012002-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05300201-0000-0000-060e-2b3401010101",
+     "name": "DefFadeType",
+     "pid": 17666,
+     "type": "02010107-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "05300403-0000-0000-060e-2b3401010102",
+     "name": "DefFadeEditUnit",
+     "pid": 17667,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-010a-0000-060e-2b3401010108",
+     "name": "Rendering",
+     "pid": 17668,
+     "type": "01030200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3600-060e-2b3402060101",
+   "name": "MasterMob",
+   "parent": "0d010101-0101-3400-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-3700-060e-2b3402060101",
+   "name": "SourceMob",
+   "parent": "0d010101-0101-3400-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0203-0000-060e-2b3401010102",
+     "name": "EssenceDescription",
+     "pid": 18177,
+     "type": "05020300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3800-060e-2b3402060101",
+   "name": "MobSlot",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "01070101-0000-0000-060e-2b3401010102",
+     "name": "SlotID",
+     "pid": 18433,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "01070102-0100-0000-060e-2b3401010102",
+     "name": "SlotName",
+     "pid": 18434,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-0204-0000-060e-2b3401010102",
+     "name": "Segment",
+     "pid": 18435,
+     "type": "05020600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "01040103-0000-0000-060e-2b3401010102",
+     "name": "PhysicalTrackNumber",
+     "pid": 18436,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3900-060e-2b3402060101",
+   "name": "EventMobSlot",
+   "parent": "0d010101-0101-3800-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300402-0000-0000-060e-2b3401010102",
+     "name": "EditRate",
+     "pid": 18689,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020103-010b-0000-060e-2b3401010105",
+     "name": "EventSlotOrigin",
+     "pid": 18690,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3a00-060e-2b3402060101",
+   "name": "StaticMobSlot",
+   "parent": "0d010101-0101-3800-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-3b00-060e-2b3402060101",
+   "name": "TimelineMobSlot",
+   "parent": "0d010101-0101-3800-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300405-0000-0000-060e-2b3401010102",
+     "name": "EditRate",
+     "pid": 19201,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020103-0103-0000-060e-2b3401010102",
+     "name": "Origin",
+     "pid": 19202,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "07020103-010c-0000-060e-2b3401010107",
+     "name": "MarkIn",
+     "pid": 19203,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "07020103-0203-0000-060e-2b3401010107",
+     "name": "MarkOut",
+     "pid": 19204,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "07020103-010d-0000-060e-2b3401010107",
+     "name": "UserPos",
+     "pid": 19205,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3c00-060e-2b3402060101",
+   "name": "Parameter",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "06010104-0104-0000-060e-2b3401010102",
+     "name": "Definition",
+     "pid": 19457,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3d00-060e-2b3402060101",
+   "name": "ConstantValue",
+   "parent": "0d010101-0101-3c00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "05300507-0000-0000-060e-2b3401010102",
+     "name": "Value",
+     "pid": 19713,
+     "type": "04100300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3e00-060e-2b3402060101",
+   "name": "VaryingValue",
+   "parent": "0d010101-0101-3c00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0105-0000-060e-2b3401010102",
+     "name": "Interpolation",
+     "pid": 19969,
+     "type": "05010500-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010104-0606-0000-060e-2b3401010102",
+     "name": "PointList",
+     "pid": 19970,
+     "type": "05060200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-3f00-060e-2b3402060101",
+   "name": "TaggedValue",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03020102-0901-0000-060e-2b3401010102",
+     "name": "Name",
+     "pid": 20481,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03020102-0a01-0000-060e-2b3401010102",
+     "name": "Value",
+     "pid": 20483,
+     "type": "04100300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4000-060e-2b3402060101",
+   "name": "KLVData",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03010210-0200-0000-060e-2b3401010102",
+     "name": "Value",
+     "pid": 20737,
+     "type": "04100400-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4100-060e-2b3402060101",
+   "name": "DescriptiveMarker",
+   "parent": "0d010101-0101-0800-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01070105-0000-0000-060e-2b3401010104",
+     "name": "DescribedSlots",
+     "pid": 24834,
+     "type": "04030200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-020c-0000-060e-2b3401010105",
+     "name": "Description",
+     "pid": 24833,
+     "type": "05021f00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4200-060e-2b3402060101",
+   "name": "SoundDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04020301-0101-0000-060e-2b3401010105",
+     "name": "AudioSamplingRate",
+     "pid": 15619,
+     "type": "03010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04020301-0400-0000-060e-2b3401010104",
+     "name": "Locked",
+     "pid": 15618,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020101-0300-0000-060e-2b3401010101",
+     "name": "AudioRefLevel",
+     "pid": 15620,
+     "type": "01010500-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020101-0100-0000-060e-2b3401010101",
+     "name": "ElectroSpatial",
+     "pid": 15621,
+     "type": "02010122-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020101-0400-0000-060e-2b3401010105",
+     "name": "Channels",
+     "pid": 15623,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04020303-0400-0000-060e-2b3401010104",
+     "name": "QuantizationBits",
+     "pid": 15617,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04020701-0000-0000-060e-2b3401010105",
+     "name": "DialNorm",
+     "pid": 15628,
+     "type": "01010500-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020402-0000-0000-060e-2b3401010102",
+     "name": "Compression",
+     "pid": 15622,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4300-060e-2b3402060101",
+   "name": "DataEssenceDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04030302-0000-0000-060e-2b3401010103",
+     "name": "DataEssenceCoding",
+     "pid": 15873,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4400-060e-2b3402060101",
+   "name": "MultipleDescriptor",
+   "parent": "0d010101-0101-2500-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-060b-0000-060e-2b3401010104",
+     "name": "FileDescriptors",
+     "pid": 16129,
+     "type": "05060b00-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4500-060e-2b3402060101",
+   "name": "DescriptiveClip",
+   "parent": "0d010101-0101-1100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01070106-0000-0000-060e-2b3401010105",
+     "name": "DescribedSlotIDs",
+     "pid": 24835,
+     "type": "04030200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4700-060e-2b3402060101",
+   "name": "AES3PCMDescriptor",
+   "parent": "0d010101-0101-4800-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04020501-0600-0000-060e-2b3401010105",
+     "name": "Emphasis",
+     "pid": 15629,
+     "type": "02010123-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020302-0300-0000-060e-2b3401010105",
+     "name": "BlockStartOffset",
+     "pid": 15631,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020501-0100-0000-060e-2b3401010105",
+     "name": "AuxBitsMode",
+     "pid": 15624,
+     "type": "02010124-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020501-0200-0000-060e-2b3401010105",
+     "name": "ChannelStatusMode",
+     "pid": 15632,
+     "type": "04010a00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020501-0300-0000-060e-2b3401010105",
+     "name": "FixedChannelStatusData",
+     "pid": 15633,
+     "type": "04010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020501-0400-0000-060e-2b3401010105",
+     "name": "UserDataMode",
+     "pid": 15634,
+     "type": "04010b00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020501-0500-0000-060e-2b3401010105",
+     "name": "FixedUserData",
+     "pid": 15635,
+     "type": "04010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4800-060e-2b3402060101",
+   "name": "PCMDescriptor",
+   "parent": "0d010101-0101-4200-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04020302-0100-0000-060e-2b3401010105",
+     "name": "BlockAlign",
+     "pid": 15626,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04020302-0200-0000-060e-2b3401010105",
+     "name": "SequenceOffset",
+     "pid": 15627,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020303-0500-0000-060e-2b3401010105",
+     "name": "AverageBPS",
+     "pid": 15625,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04020101-0500-0000-060e-2b3401010107",
+     "name": "ChannelAssignment",
+     "pid": 15666,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0600-0000-060e-2b3401010108",
+     "name": "PeakEnvelopeVersion",
+     "pid": 15657,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0700-0000-060e-2b3401010108",
+     "name": "PeakEnvelopeFormat",
+     "pid": 15658,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0800-0000-060e-2b3401010108",
+     "name": "PointsPerPeakValue",
+     "pid": 15659,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0900-0000-060e-2b3401010108",
+     "name": "PeakEnvelopeBlockSize",
+     "pid": 15660,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0a00-0000-060e-2b3401010108",
+     "name": "PeakChannels",
+     "pid": 15661,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0b00-0000-060e-2b3401010108",
+     "name": "PeakFrames",
+     "pid": 15662,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0c00-0000-060e-2b3401010108",
+     "name": "PeakOfPeaksPosition",
+     "pid": 15663,
+     "type": "01012001-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0d00-0000-060e-2b3401010108",
+     "name": "PeakEnvelopeTimestamp",
+     "pid": 15664,
+     "type": "03010700-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020301-0e00-0000-060e-2b3401010108",
+     "name": "PeakEnvelopeData",
+     "pid": 15665,
+     "type": "04100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4900-060e-2b3402060101",
+   "name": "PhysicalDescriptor",
+   "parent": "0d010101-0101-2400-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-4a00-060e-2b3402060101",
+   "name": "ImportDescriptor",
+   "parent": "0d010101-0101-4900-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-4b00-060e-2b3402060101",
+   "name": "RecordingDescriptor",
+   "parent": "0d010101-0101-4900-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-4c00-060e-2b3402060101",
+   "name": "TaggedValueDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-4d00-060e-2b3402060101",
+   "name": "KLVDataDefinition",
+   "parent": "0d010101-0101-1a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010104-0109-0000-060e-2b3401010107",
+     "name": "KLVDataType",
+     "pid": 19730,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4e00-060e-2b3402060101",
+   "name": "AuxiliaryDescriptor",
+   "parent": "0d010101-0101-4900-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04090201-0000-0000-060e-2b3401010107",
+     "name": "MimeType",
+     "pid": 19985,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04090300-0000-0000-060e-2b3401010108",
+     "name": "CharSet",
+     "pid": 19986,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-4f00-060e-2b3402060101",
+   "name": "RIFFChunk",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04060802-0000-0000-060e-2b3401010108",
+     "name": "ChunkID",
+     "pid": 20225,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04060903-0000-0000-060e-2b3401010108",
+     "name": "ChunkLength",
+     "pid": 20226,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04070400-0000-0000-060e-2b3401010108",
+     "name": "ChunkData",
+     "pid": 20227,
+     "type": "04100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-5000-060e-2b3402060101",
+   "name": "BWFImportDescriptor",
+   "parent": "0d010101-0101-4a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04020302-0500-0000-060e-2b3401010105",
+     "name": "QltyFileSecurityReport",
+     "pid": 15637,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020302-0600-0000-060e-2b3401010105",
+     "name": "QltyFileSecurityWave",
+     "pid": 15638,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0101-0000-060e-2b3401010105",
+     "name": "BextCodingHistory",
+     "pid": 15649,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0201-0000-060e-2b3401010105",
+     "name": "QltyBasicData",
+     "pid": 15650,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0301-0000-060e-2b3401010105",
+     "name": "QltyStartOfModulation",
+     "pid": 15651,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0401-0000-060e-2b3401010105",
+     "name": "QltyQualityEvent",
+     "pid": 15652,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0501-0000-060e-2b3401010105",
+     "name": "QltyEndOfModulation",
+     "pid": 15653,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0601-0000-060e-2b3401010105",
+     "name": "QltyQualityParameter",
+     "pid": 15654,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0701-0000-060e-2b3401010105",
+     "name": "QltyOperatorComment",
+     "pid": 15655,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04020502-0801-0000-060e-2b3401010105",
+     "name": "QltyCueSheet",
+     "pid": 15656,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010104-060f-0000-060e-2b3401010108",
+     "name": "UnknownBWFChunks",
+     "pid": 15667,
+     "type": "05060c00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-5100-060e-2b3402060101",
+   "name": "MPEGVideoDescriptor",
+   "parent": "0d010101-0101-2800-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04010602-0102-0000-060e-2b3401010105",
+     "name": "SingleSequence",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0103-0000-060e-2b3401010105",
+     "name": "ConstantBPictureCount",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0104-0000-060e-2b3401010105",
+     "name": "CodedContentScanning",
+     "pid": 0,
+     "type": "0201012a-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0105-0000-060e-2b3401010105",
+     "name": "LowDelay",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0106-0000-060e-2b3401010105",
+     "name": "ClosedGOP",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0107-0000-060e-2b3401010105",
+     "name": "IdenticalGOP",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0108-0000-060e-2b3401010105",
+     "name": "MaxGOP",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0109-0000-060e-2b3401010105",
+     "name": "MaxBPictureCount",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-010b-0000-060e-2b3401010105",
+     "name": "BitRate",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-010a-0000-060e-2b3401010105",
+     "name": "ProfileAndLevel",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-5900-060e-2b3402060101",
+   "name": "SubDescriptor",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-5a00-060e-2b3402060101",
+   "name": "JPEG2000SubDescriptor",
+   "parent": "0d010101-0101-5900-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04010603-0100-0000-060e-2b340101010a",
+     "name": "Rsiz",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0200-0000-060e-2b340101010a",
+     "name": "Xsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0300-0000-060e-2b340101010a",
+     "name": "Ysiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0400-0000-060e-2b340101010a",
+     "name": "XOsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0500-0000-060e-2b340101010a",
+     "name": "YOsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0600-0000-060e-2b340101010a",
+     "name": "XTsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0700-0000-060e-2b340101010a",
+     "name": "YTsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0800-0000-060e-2b340101010a",
+     "name": "XTOsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0900-0000-060e-2b340101010a",
+     "name": "YTOsiz",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0a00-0000-060e-2b340101010a",
+     "name": "Csiz",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0b00-0000-060e-2b340101010a",
+     "name": "PictureComponentSizing",
+     "pid": 0,
+     "type": "04010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010603-0c00-0000-060e-2b340101010a",
+     "name": "CodingStyleDefault",
+     "pid": 0,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010603-0d00-0000-060e-2b340101010a",
+     "name": "QuantizationDefault",
+     "pid": 0,
+     "type": "04100100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010603-0e00-0000-060e-2b340101010e",
+     "name": "J2CLayout",
+     "pid": 0,
+     "type": "04020100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-5b00-060e-2b3402060101",
+   "name": "VBIDataDescriptor",
+   "parent": "0d010101-0101-4300-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-5c00-060e-2b3402060101",
+   "name": "ANCDataDescriptor",
+   "parent": "0d010101-0101-4300-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-5e00-060e-2b3402060101",
+   "name": "MPEGAudioDescriptor",
+   "parent": "0d010101-0101-4200-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04020403-0102-0000-060e-2b340101010a",
+     "name": "MPEGAudioBitRate",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-6700-060e-2b3402060101",
+   "name": "ContainerConstraintsSubDescriptor",
+   "parent": "0d010101-0101-5900-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-6800-060e-2b3402060101",
+   "name": "MPEG4VisualSubDescriptor",
+   "parent": "0d010101-0101-5900-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04010602-0202-0000-060e-2b340101010d",
+     "name": "MPEG4VisualSingleSequence",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0203-0000-060e-2b340101010d",
+     "name": "MPEG4VisualConstantBVOPs",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0204-0000-060e-2b340101010d",
+     "name": "MPEG4VisualCodedContentType",
+     "pid": 0,
+     "type": "0201012d-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0205-0000-060e-2b340101010d",
+     "name": "MPEG4VisualLowDelay",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0206-0000-060e-2b340101010d",
+     "name": "MPEG4VisualClosedGOV",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0207-0000-060e-2b340101010d",
+     "name": "MPEG4VisualIdenticalGOV",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0208-0000-060e-2b340101010d",
+     "name": "MPEG4VisualMaxGOV",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-0209-0000-060e-2b340101010d",
+     "name": "MPEG4VisualBVOPCount",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-020a-0000-060e-2b340101010d",
+     "name": "MPEG4VisualProfileAndLevel",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010602-020b-0000-060e-2b340101010d",
+     "name": "MPEG4VisualBitRate",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-6a00-060e-2b3402060101",
+   "name": "MCALabelSubDescriptor",
+   "parent": "0d010101-0101-5900-060e-2b3402060101",
+   "concrete": false,
+   "properties": [
+    {
+     "id": "01030701-0100-0000-060e-2b340101010e",
+     "name": "MCALabelDictionaryID",
+     "pid": 0,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "01030701-0500-0000-060e-2b340101010e",
+     "name": "MCALinkID",
+     "pid": 0,
+     "type": "01030300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "01030701-0200-0000-060e-2b340101010e",
+     "name": "MCATagSymbol",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "01030701-0300-0000-060e-2b340101010e",
+     "name": "MCATagName",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "0103040a-0000-0000-060e-2b340101010e",
+     "name": "MCAChannelID",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03010102-0315-0000-060e-2b340101010d",
+     "name": "RFC5646SpokenLanguage",
+     "pid": 0,
+     "type": "01100400-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01051000-0000-0000-060e-2b340101010e",
+     "name": "MCATitle",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01051100-0000-0000-060e-2b340101010e",
+     "name": "MCATitleVersion",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01051200-0000-0000-060e-2b340101010e",
+     "name": "MCATitleSubVersion",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01051300-0000-0000-060e-2b340101010e",
+     "name": "MCAEpisode",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01040105-0000-0000-060e-2b340101010e",
+     "name": "MCAPartitionKind",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "01040106-0000-0000-060e-2b340101010e",
+     "name": "MCAPartitionNumber",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03020102-2000-0000-060e-2b340101010e",
+     "name": "MCAAudioContentKind",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "03020102-2100-0000-060e-2b340101010e",
+     "name": "MCAAudioElementKind",
+     "pid": 0,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-6b00-060e-2b3402060101",
+   "name": "AudioChannelLabelSubDescriptor",
+   "parent": "0d010101-0101-6a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01030701-0600-0000-060e-2b340101010e",
+     "name": "SoundfieldGroupLinkID",
+     "pid": 0,
+     "type": "01030300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-6c00-060e-2b3402060101",
+   "name": "SoundfieldGroupLabelSubDescriptor",
+   "parent": "0d010101-0101-6a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "01030701-0400-0000-060e-2b340101010e",
+     "name": "GroupOfSoundfieldGroupsLinkID",
+     "pid": 0,
+     "type": "04011500-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0101-6d00-060e-2b3402060101",
+   "name": "GroupOfSoundfieldGroupsLabelSubDescriptor",
+   "parent": "0d010101-0101-6a00-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0101-6e00-060e-2b3402060101",
+   "name": "AVCSubDescriptor",
+   "parent": "0d010101-0101-5900-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "04010606-0103-0000-060e-2b340101010e",
+     "name": "AVCConstantBPictureFlag",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0104-0000-060e-2b340101010e",
+     "name": "AVCCodedContentKind",
+     "pid": 0,
+     "type": "0201012c-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0106-0000-060e-2b340101010e",
+     "name": "AVCClosedGOPIndicator",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0107-0000-060e-2b340101010e",
+     "name": "AVCIdenticalGOPIndicator",
+     "pid": 0,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0108-0000-060e-2b340101010e",
+     "name": "AVCMaximumGOPSize",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0109-0000-060e-2b340101010e",
+     "name": "AVCMaximumBPictureCount",
+     "pid": 0,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-010a-0000-060e-2b340101010e",
+     "name": "AVCProfile",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-010b-0000-060e-2b340101010e",
+     "name": "AVCMaximumBitRate",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-010c-0000-060e-2b340101010e",
+     "name": "AVCProfileConstraint",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-010d-0000-060e-2b340101010e",
+     "name": "AVCLevel",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-010e-0000-060e-2b340101010e",
+     "name": "AVCDecodingDelay",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "04010606-010f-0000-060e-2b340101010e",
+     "name": "AVCMaximumRefFrames",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0110-0000-060e-2b340101010e",
+     "name": "AVCSequenceParameterSetFlag",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0111-0000-060e-2b340101010e",
+     "name": "AVCPictureParameterSetFlag",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "04010606-0114-0000-060e-2b340101010e",
+     "name": "AVCAverageBitRate",
+     "pid": 0,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0201-0000-060e-2b3402060101",
+   "name": "ClassDefinition",
+   "parent": "0d010101-0224-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0100-0000-060e-2b3401010102",
+     "name": "ParentClass",
+     "pid": 8,
+     "type": "05010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010107-0200-0000-060e-2b3401010102",
+     "name": "Properties",
+     "pid": 9,
+     "type": "05050b00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010107-0300-0000-060e-2b3401010102",
+     "name": "IsConcrete",
+     "pid": 10,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0202-0000-060e-2b3402060101",
+   "name": "PropertyDefinition",
+   "parent": "0d010101-0224-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0400-0000-060e-2b3401010102",
+     "name": "Type",
+     "pid": 11,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010202-0100-0000-060e-2b3401010102",
+     "name": "IsOptional",
+     "pid": 12,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010107-0500-0000-060e-2b3401010102",
+     "name": "LocalIdentification",
+     "pid": 13,
+     "type": "01010200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010107-0600-0000-060e-2b3401010102",
+     "name": "IsUniqueIdentifier",
+     "pid": 14,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0203-0000-060e-2b3402060101",
+   "name": "TypeDefinition",
+   "parent": "0d010101-0224-0000-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0204-0000-060e-2b3402060101",
+   "name": "TypeDefinitionInteger",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03010203-0100-0000-060e-2b3401010102",
+     "name": "Size",
+     "pid": 15,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0200-0000-060e-2b3401010102",
+     "name": "IsSigned",
+     "pid": 16,
+     "type": "01040100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0205-0000-060e-2b3402060101",
+   "name": "TypeDefinitionStrongObjectReference",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0900-0000-060e-2b3401010102",
+     "name": "ReferencedType",
+     "pid": 17,
+     "type": "05010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0206-0000-060e-2b3402060101",
+   "name": "TypeDefinitionWeakObjectReference",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0a00-0000-060e-2b3401010102",
+     "name": "ReferencedType",
+     "pid": 18,
+     "type": "05010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0b00-0000-060e-2b3401010102",
+     "name": "TargetSet",
+     "pid": 19,
+     "type": "04010600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0207-0000-060e-2b3402060101",
+   "name": "TypeDefinitionEnumeration",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0b00-0000-060e-2b3401010102",
+     "name": "ElementType",
+     "pid": 20,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0400-0000-060e-2b3401010102",
+     "name": "ElementNames",
+     "pid": 21,
+     "type": "04010500-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0500-0000-060e-2b3401010102",
+     "name": "ElementValues",
+     "pid": 22,
+     "type": "04010400-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0208-0000-060e-2b3402060101",
+   "name": "TypeDefinitionFixedArray",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0c00-0000-060e-2b3401010102",
+     "name": "ElementType",
+     "pid": 23,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0300-0000-060e-2b3401010102",
+     "name": "ElementCount",
+     "pid": 24,
+     "type": "01010300-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0209-0000-060e-2b3402060101",
+   "name": "TypeDefinitionVariableArray",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0d00-0000-060e-2b3401010102",
+     "name": "ElementType",
+     "pid": 25,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-020a-0000-060e-2b3402060101",
+   "name": "TypeDefinitionSet",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0e00-0000-060e-2b3401010102",
+     "name": "ElementType",
+     "pid": 26,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-020b-0000-060e-2b3402060101",
+   "name": "TypeDefinitionString",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0f00-0000-060e-2b3401010102",
+     "name": "ElementType",
+     "pid": 27,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-020c-0000-060e-2b3402060101",
+   "name": "TypeDefinitionStream",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-020d-0000-060e-2b3402060101",
+   "name": "TypeDefinitionRecord",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-1100-0000-060e-2b3401010102",
+     "name": "MemberTypes",
+     "pid": 28,
+     "type": "05040200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0600-0000-060e-2b3401010102",
+     "name": "MemberNames",
+     "pid": 29,
+     "type": "04010500-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-020e-0000-060e-2b3402060101",
+   "name": "TypeDefinitionRename",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-1200-0000-060e-2b3401010102",
+     "name": "RenamedType",
+     "pid": 30,
+     "type": "05010900-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0220-0000-060e-2b3402060101",
+   "name": "TypeDefinitionExtendibleEnumeration",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "03010203-0700-0000-060e-2b3401010102",
+     "name": "ElementNames",
+     "pid": 31,
+     "type": "04010500-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "03010203-0800-0000-060e-2b3401010102",
+     "name": "ElementValues",
+     "pid": 32,
+     "type": "04010600-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0221-0000-060e-2b3402060101",
+   "name": "TypeDefinitionIndirect",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0222-0000-060e-2b3402060101",
+   "name": "TypeDefinitionOpaque",
+   "parent": "0d010101-0221-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0223-0000-060e-2b3402060101",
+   "name": "TypeDefinitionCharacter",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": []
+  },
+  {
+   "id": "0d010101-0224-0000-060e-2b3402060101",
+   "name": "MetaDefinition",
+   "parent": null,
+   "concrete": false,
+   "properties": [
+    {
+     "id": "06010107-1300-0000-060e-2b3401010102",
+     "name": "Identification",
+     "pid": 5,
+     "type": "01030100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": true
+    },
+    {
+     "id": "03020401-0201-0000-060e-2b3401010102",
+     "name": "Name",
+     "pid": 6,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "06010107-1401-0000-060e-2b3401010102",
+     "name": "Description",
+     "pid": 7,
+     "type": "01100200-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010101-0225-0000-060e-2b3402060101",
+   "name": "MetaDictionary",
+   "parent": null,
+   "concrete": true,
+   "properties": [
+    {
+     "id": "06010107-0700-0000-060e-2b3401010102",
+     "name": "ClassDefinitions",
+     "pid": 3,
+     "type": "05050100-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    },
+    {
+     "id": "06010107-0800-0000-060e-2b3401010102",
+     "name": "TypeDefinitions",
+     "pid": 4,
+     "type": "05050c00-0000-0000-060e-2b3401040101",
+     "optional": true,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "0d010400-0000-0000-060e-2b3402060101",
+   "name": "DescriptiveObject",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0d010401-0000-0000-060e-2b3402060101",
+   "name": "DescriptiveFramework",
+   "parent": "0d010101-0101-0100-060e-2b3402060101",
+   "concrete": false,
+   "properties": []
+  },
+  {
+   "id": "0e040101-0000-0000-060e-2b3402060101",
+   "name": "TypeDefinitionGenericCharacter",
+   "parent": "0d010101-0203-0000-060e-2b3402060101",
+   "concrete": true,
+   "properties": [
+    {
+     "id": "0e040101-0101-0111-060e-2b3401010101",
+     "name": "CharacterSize",
+     "pid": 0,
+     "type": "01010100-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  },
+  {
+   "id": "b3b398a5-1c90-11d4-8053-080036210804",
+   "name": "Root",
+   "parent": null,
+   "concrete": true,
+   "properties": [
+    {
+     "id": "0d010301-0102-0100-060e-2b3401010102",
+     "name": "Header",
+     "pid": 2,
+     "type": "05022800-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    },
+    {
+     "id": "0d010301-0101-0100-060e-2b3401010102",
+     "name": "MetaDictionary",
+     "pid": 1,
+     "type": "05022700-0000-0000-060e-2b3401040101",
+     "optional": false,
+     "unique": false
+    }
+   ]
+  }
+ ],
+ "types": [
+  {
+   "id": "01010100-0000-0000-060e-2b3401040101",
+   "name": "aafUInt8",
+   "kind": "integer",
+   "size": 1,
+   "signed": false
+  },
+  {
+   "id": "01010200-0000-0000-060e-2b3401040101",
+   "name": "aafUInt16",
+   "kind": "integer",
+   "size": 2,
+   "signed": false
+  },
+  {
+   "id": "01010300-0000-0000-060e-2b3401040101",
+   "name": "aafUInt32",
+   "kind": "integer",
+   "size": 4,
+   "signed": false
+  },
+  {
+   "id": "01010400-0000-0000-060e-2b3401040101",
+   "name": "aafUInt64",
+   "kind": "integer",
+   "size": 8,
+   "signed": false
+  },
+  {
+   "id": "01010500-0000-0000-060e-2b3401040101",
+   "name": "aafInt8",
+   "kind": "integer",
+   "size": 1,
+   "signed": true
+  },
+  {
+   "id": "01010600-0000-0000-060e-2b3401040101",
+   "name": "aafInt16",
+   "kind": "integer",
+   "size": 2,
+   "signed": true
+  },
+  {
+   "id": "01010700-0000-0000-060e-2b3401040101",
+   "name": "aafInt32",
+   "kind": "integer",
+   "size": 4,
+   "signed": true
+  },
+  {
+   "id": "01010800-0000-0000-060e-2b3401040101",
+   "name": "aafInt64",
+   "kind": "integer",
+   "size": 8,
+   "signed": true
+  },
+  {
+   "id": "01012001-0000-0000-060e-2b3401040101",
+   "name": "aafPositionType",
+   "kind": "rename",
+   "element": "01010800-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "01012002-0000-0000-060e-2b3401040101",
+   "name": "aafLengthType",
+   "kind": "rename",
+   "element": "01010800-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "01012003-0000-0000-060e-2b3401040101",
+   "name": "aafJPEGTableIDType",
+   "kind": "rename",
+   "element": "01010700-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "01012300-0000-0000-060e-2b3401040101",
+   "name": "aafPhaseFrameType",
+   "kind": "rename",
+   "element": "01010700-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "01030100-0000-0000-060e-2b3401040101",
+   "name": "AUID",
+   "kind": "record",
+   "fields": [
+    [
+     "Data1",
+     "01010300-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "Data2",
+     "01010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "Data3",
+     "01010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "Data4",
+     "04010800-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "01030200-0000-0000-060e-2b3401040101",
+   "name": "MobIDType",
+   "kind": "record",
+   "fields": [
+    [
+     "SMPTELabel",
+     "04010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "length",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "instanceHigh",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "instanceMid",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "instanceLow",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "material",
+     "01030100-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "01030300-0000-0000-060e-2b3401040101",
+   "name": "aafUUID",
+   "kind": "fixed_array",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "count": 16
+  },
+  {
+   "id": "01040100-0000-0000-060e-2b3401040101",
+   "name": "Boolean",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "False"
+    ],
+    [
+     1,
+     "True"
+    ]
+   ]
+  },
+  {
+   "id": "01100100-0000-0000-060e-2b3401040101",
+   "name": "aafCharacter",
+   "kind": "character"
+  },
+  {
+   "id": "01100200-0000-0000-060e-2b3401040101",
+   "name": "aafString",
+   "kind": "string",
+   "element": "01100100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "01100300-0000-0000-060e-2b3401040101",
+   "name": "aafChar",
+   "kind": "generic_character",
+   "size": 1
+  },
+  {
+   "id": "01100400-0000-0000-060e-2b3401040101",
+   "name": "aafISO7",
+   "kind": "string",
+   "element": "01100300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "02010101-0000-0000-060e-2b3401040101",
+   "name": "ProductReleaseType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "VersionUnknown"
+    ],
+    [
+     1,
+     "VersionReleased"
+    ],
+    [
+     2,
+     "VersionDebug"
+    ],
+    [
+     3,
+     "VersionPatched"
+    ],
+    [
+     4,
+     "VersionBeta"
+    ],
+    [
+     5,
+     "VersionPrivateBuild"
+    ]
+   ]
+  },
+  {
+   "id": "02010102-0000-0000-060e-2b3401040101",
+   "name": "TapeFormatType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "TapeFormatNull"
+    ],
+    [
+     1,
+     "BetacamFormat"
+    ],
+    [
+     2,
+     "BetacamSPFormat"
+    ],
+    [
+     3,
+     "VHSFormat"
+    ],
+    [
+     4,
+     "SVHSFormat"
+    ],
+    [
+     5,
+     "8mmFormat"
+    ],
+    [
+     6,
+     "Hi8Format"
+    ]
+   ]
+  },
+  {
+   "id": "02010103-0000-0000-060e-2b3401040101",
+   "name": "VideoSignalType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "VideoSignalNull"
+    ],
+    [
+     1,
+     "NTSCSignal"
+    ],
+    [
+     2,
+     "PALSignal"
+    ]
+   ]
+  },
+  {
+   "id": "02010104-0000-0000-060e-2b3401040101",
+   "name": "TapeCaseType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "TapeCaseNull"
+    ],
+    [
+     1,
+     "ThreeFourthInchVideoTape"
+    ],
+    [
+     2,
+     "VHSVideoTape"
+    ],
+    [
+     3,
+     "8mmVideoTape"
+    ],
+    [
+     4,
+     "BetacamVideoTape"
+    ],
+    [
+     5,
+     "CompactCassette"
+    ],
+    [
+     6,
+     "DATCartridge"
+    ],
+    [
+     7,
+     "NagraAudioTape"
+    ]
+   ]
+  },
+  {
+   "id": "02010105-0000-0000-060e-2b3401040101",
+   "name": "ColorSitingType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "CoSiting"
+    ],
+    [
+     1,
+     "Averaging"
+    ],
+    [
+     2,
+     "ThreeTap"
+    ],
+    [
+     3,
+     "Quincunx"
+    ],
+    [
+     4,
+     "Rec601"
+    ],
+    [
+     5,
+     "LineAlternating"
+    ],
+    [
+     6,
+     "VerticalMidpoint"
+    ],
+    [
+     255,
+     "UnknownSiting"
+    ]
+   ]
+  },
+  {
+   "id": "02010106-0000-0000-060e-2b3401040101",
+   "name": "EditHintType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "NoEditHint"
+    ],
+    [
+     1,
+     "Proportional"
+    ],
+    [
+     2,
+     "RelativeLeft"
+    ],
+    [
+     3,
+     "RelativeRight"
+    ],
+    [
+     4,
+     "RelativeFixed"
+    ]
+   ]
+  },
+  {
+   "id": "02010107-0000-0000-060e-2b3401040101",
+   "name": "FadeType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "FadeNone"
+    ],
+    [
+     1,
+     "FadeLinearAmp"
+    ],
+    [
+     2,
+     "FadeLinearPower"
+    ]
+   ]
+  },
+  {
+   "id": "02010108-0000-0000-060e-2b3401040101",
+   "name": "LayoutType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "FullFrame"
+    ],
+    [
+     1,
+     "SeparateFields"
+    ],
+    [
+     2,
+     "OneField"
+    ],
+    [
+     3,
+     "MixedFields"
+    ],
+    [
+     4,
+     "SegmentedFrame"
+    ]
+   ]
+  },
+  {
+   "id": "02010109-0000-0000-060e-2b3401040101",
+   "name": "TCSource",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "TimecodeLTC"
+    ],
+    [
+     1,
+     "TimecodeVITC"
+    ]
+   ]
+  },
+  {
+   "id": "0201010a-0000-0000-060e-2b3401040101",
+   "name": "PulldownDirectionType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "TapeToFilmSpeed"
+    ],
+    [
+     1,
+     "FilmToTapeSpeed"
+    ]
+   ]
+  },
+  {
+   "id": "0201010b-0000-0000-060e-2b3401040101",
+   "name": "PulldownKindType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "TwoThreePD"
+    ],
+    [
+     1,
+     "PALPD"
+    ],
+    [
+     2,
+     "OneToOneNTSC"
+    ],
+    [
+     3,
+     "OneToOnePAL"
+    ],
+    [
+     4,
+     "VideoTapNTSC"
+    ],
+    [
+     5,
+     "OneToOneHDSixty"
+    ],
+    [
+     6,
+     "TwentyFourToSixtyPD"
+    ],
+    [
+     7,
+     "TwoToOnePD"
+    ]
+   ]
+  },
+  {
+   "id": "0201010c-0000-0000-060e-2b3401040101",
+   "name": "EdgeType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "EtNull"
+    ],
+    [
+     1,
+     "EtKeycode"
+    ],
+    [
+     2,
+     "EtEdgenum4"
+    ],
+    [
+     3,
+     "EtEdgenum5"
+    ],
+    [
+     8,
+     "EtHeaderSize"
+    ]
+   ]
+  },
+  {
+   "id": "0201010d-0000-0000-060e-2b3401040101",
+   "name": "FilmType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "FtNull"
+    ],
+    [
+     1,
+     "Ft35MM"
+    ],
+    [
+     2,
+     "Ft16MM"
+    ],
+    [
+     3,
+     "Ft8MM"
+    ],
+    [
+     4,
+     "Ft65MM"
+    ]
+   ]
+  },
+  {
+   "id": "0201010e-0000-0000-060e-2b3401040101",
+   "name": "RGBAComponentKind",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "CompNull"
+    ],
+    [
+     48,
+     "CompNone"
+    ],
+    [
+     65,
+     "CompAlpha"
+    ],
+    [
+     66,
+     "CompBlue"
+    ],
+    [
+     70,
+     "CompFill"
+    ],
+    [
+     71,
+     "CompGreen"
+    ],
+    [
+     80,
+     "CompPalette"
+    ],
+    [
+     82,
+     "CompRed"
+    ],
+    [
+     85,
+     "CompColorDifferenceU"
+    ],
+    [
+     86,
+     "CompColorDifferenceV"
+    ],
+    [
+     87,
+     "CompComposite"
+    ],
+    [
+     88,
+     "CompNonCoSitedLuma"
+    ],
+    [
+     89,
+     "CompLuma"
+    ],
+    [
+     90,
+     "CompDepth"
+    ],
+    [
+     97,
+     "CompAlphaLSBs"
+    ],
+    [
+     98,
+     "CompBlueLSBs"
+    ],
+    [
+     103,
+     "CompGreenLSBs"
+    ],
+    [
+     114,
+     "CompRedLSBs"
+    ],
+    [
+     117,
+     "CompColorDifferenceULSBs"
+    ],
+    [
+     118,
+     "CompColorDifferenceVLSBs"
+    ],
+    [
+     119,
+     "CompCompositeLSBs"
+    ],
+    [
+     120,
+     "CompNonCoSitedLumaLSBs"
+    ],
+    [
+     121,
+     "CompLumaLSBs"
+    ],
+    [
+     122,
+     "CompDepthLSBs"
+    ],
+    [
+     216,
+     "CompColorX"
+    ],
+    [
+     217,
+     "CompColorY"
+    ],
+    [
+     218,
+     "CompColorZ"
+    ]
+   ]
+  },
+  {
+   "id": "0201010f-0000-0000-060e-2b3401040101",
+   "name": "ReferenceType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "RefLimitMinimum"
+    ],
+    [
+     1,
+     "RefLimitMaximum"
+    ],
+    [
+     2,
+     "RefMinimum"
+    ],
+    [
+     3,
+     "RefMaximum"
+    ],
+    [
+     4,
+     "RefEnumvalue"
+    ]
+   ]
+  },
+  {
+   "id": "02010120-0000-0000-060e-2b3401040101",
+   "name": "AlphaTransparencyType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "MinValueTransparent"
+    ],
+    [
+     1,
+     "MaxValueTransparent"
+    ]
+   ]
+  },
+  {
+   "id": "02010121-0000-0000-060e-2b3401040101",
+   "name": "FieldNumber",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "UnspecifiedField"
+    ],
+    [
+     1,
+     "FieldOne"
+    ],
+    [
+     2,
+     "FieldTwo"
+    ]
+   ]
+  },
+  {
+   "id": "02010122-0000-0000-060e-2b3401040101",
+   "name": "ElectroSpatialFormulation",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "ElectroSpatialFormulation_Default"
+    ],
+    [
+     1,
+     "ElectroSpatialFormulation_TwoChannelMode"
+    ],
+    [
+     2,
+     "ElectroSpatialFormulation_SingleChannelMode"
+    ],
+    [
+     3,
+     "ElectroSpatialFormulation_PrimarySecondaryMode"
+    ],
+    [
+     4,
+     "ElectroSpatialFormulation_StereophonicMode"
+    ],
+    [
+     7,
+     "ElectroSpatialFormulation_SingleChannelDoubleSamplingFrequencyMode"
+    ],
+    [
+     8,
+     "ElectroSpatialFormulation_StereoLeftChannelDoubleSamplingFrequencyMode"
+    ],
+    [
+     9,
+     "ElectroSpatialFormulation_StereoRightChannelDoubleSamplingFrequencyMode"
+    ],
+    [
+     15,
+     "ElectroSpatialFormulation_MultiChannelMode"
+    ]
+   ]
+  },
+  {
+   "id": "02010123-0000-0000-060e-2b3401040101",
+   "name": "EmphasisType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "Emphasis_Unknown"
+    ],
+    [
+     1,
+     "Emphasis_Reserved0"
+    ],
+    [
+     2,
+     "Emphasis_Reserved1"
+    ],
+    [
+     3,
+     "Emphasis_Reserved2"
+    ],
+    [
+     4,
+     "Emphasis_None"
+    ],
+    [
+     5,
+     "Emphasis_Reserved3"
+    ],
+    [
+     6,
+     "Emphasis_15and50"
+    ],
+    [
+     7,
+     "Emphasis_ITU"
+    ]
+   ]
+  },
+  {
+   "id": "02010124-0000-0000-060e-2b3401040101",
+   "name": "AuxBitsModeType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "AuxBitsMode_NotDefined"
+    ],
+    [
+     1,
+     "AuxBitsMode_MainAudioSampleData"
+    ],
+    [
+     2,
+     "AuxBitsMode_SingleCoordinationSignal"
+    ],
+    [
+     3,
+     "AuxBitsMode_UserDefined"
+    ],
+    [
+     4,
+     "AuxBitsMode_Reserved0"
+    ],
+    [
+     5,
+     "AuxBitsMode_Reserved1"
+    ],
+    [
+     6,
+     "AuxBitsMode_Reserved2"
+    ],
+    [
+     7,
+     "AuxBitsMode_Reserved3"
+    ]
+   ]
+  },
+  {
+   "id": "02010125-0000-0000-060e-2b3401040101",
+   "name": "ChannelStatusModeType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "ChannelStatusMode_None"
+    ],
+    [
+     1,
+     "ChannelStatusMode_Minimum"
+    ],
+    [
+     2,
+     "ChannelStatusMode_Standard"
+    ],
+    [
+     3,
+     "ChannelStatusMode_Fixed"
+    ],
+    [
+     4,
+     "ChannelStatusMode_Stream"
+    ],
+    [
+     5,
+     "ChannelStatusMode_Essence"
+    ]
+   ]
+  },
+  {
+   "id": "02010126-0000-0000-060e-2b3401040101",
+   "name": "UserDataModeType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "UserDataMode_NotDefined"
+    ],
+    [
+     1,
+     "UserDataMode_192BitBlockStructure"
+    ],
+    [
+     2,
+     "UserDataMode_AES18"
+    ],
+    [
+     3,
+     "UserDataMode_UserDefined"
+    ],
+    [
+     4,
+     "UserDataMode_IEC"
+    ],
+    [
+     5,
+     "UserDataMode_Metadata"
+    ],
+    [
+     6,
+     "UserDataMode_Reserved0"
+    ],
+    [
+     7,
+     "UserDataMode_Reserved1"
+    ],
+    [
+     8,
+     "UserDataMode_Reserved2"
+    ],
+    [
+     9,
+     "UserDataMode_Reserved3"
+    ],
+    [
+     10,
+     "UserDataMode_Reserved4"
+    ],
+    [
+     11,
+     "UserDataMode_Reserved5"
+    ],
+    [
+     12,
+     "UserDataMode_Reserved6"
+    ],
+    [
+     13,
+     "UserDataMode_Reserved7"
+    ],
+    [
+     14,
+     "UserDataMode_Reserved8"
+    ],
+    [
+     15,
+     "UserDataMode_Reserved9"
+    ]
+   ]
+  },
+  {
+   "id": "02010127-0000-0000-060e-2b3401040101",
+   "name": "SignalStandardType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "SignalStandard_None"
+    ],
+    [
+     1,
+     "SignalStandard_ITU601"
+    ],
+    [
+     2,
+     "SignalStandard_ITU1358"
+    ],
+    [
+     3,
+     "SignalStandard_SMPTE347M"
+    ],
+    [
+     4,
+     "SignalStandard_SMPTE274M"
+    ],
+    [
+     5,
+     "SignalStandard_SMPTE296M"
+    ],
+    [
+     6,
+     "SignalStandard_SMPTE349M"
+    ],
+    [
+     7,
+     "SignalStandard_SMPTE428_1"
+    ]
+   ]
+  },
+  {
+   "id": "02010128-0000-0000-060e-2b3401040101",
+   "name": "ScanningDirectionType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "ScanningDirection_LeftToRightTopToBottom"
+    ],
+    [
+     1,
+     "ScanningDirection_RightToLeftTopToBottom"
+    ],
+    [
+     2,
+     "ScanningDirection_LeftToRightBottomToTop"
+    ],
+    [
+     3,
+     "ScanningDirection_RightToLeftBottomToTop"
+    ],
+    [
+     4,
+     "ScanningDirection_TopToBottomLeftToRight"
+    ],
+    [
+     5,
+     "ScanningDirection_TopToBottomRightToLeft"
+    ],
+    [
+     6,
+     "ScanningDirection_BottomToTopLeftToRight"
+    ],
+    [
+     7,
+     "ScanningDirection_BottomToTopRightToLeft"
+    ]
+   ]
+  },
+  {
+   "id": "0201012a-0000-0000-060e-2b3401040101",
+   "name": "ContentScanningType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "ContentScanning_NotKnown"
+    ],
+    [
+     1,
+     "ContentScanning_Progressive"
+    ],
+    [
+     2,
+     "ContentScanning_Interlace"
+    ],
+    [
+     3,
+     "ContentScanning_Mixed"
+    ]
+   ]
+  },
+  {
+   "id": "0201012b-0000-0000-060e-2b3401040101",
+   "name": "TitleAlignmentType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "TitleAlignment_Left"
+    ],
+    [
+     1,
+     "TitleAlignment_Center"
+    ],
+    [
+     2,
+     "TitleAlignment_Right"
+    ]
+   ]
+  },
+  {
+   "id": "0201012c-0000-0000-060e-2b3401040101",
+   "name": "AVCContentScanningType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "AVCContentScanning_NotKnown"
+    ],
+    [
+     1,
+     "AVCContentScanning_ProgressiveFramePicture"
+    ],
+    [
+     2,
+     "AVCContentScanning_InterlaceFieldPicture"
+    ],
+    [
+     3,
+     "AVCContentScanning_InterlaceFramePicture"
+    ],
+    [
+     4,
+     "AVCContentScanning_Interlace_FrameFieldPicture"
+    ]
+   ]
+  },
+  {
+   "id": "0201012d-0000-0000-060e-2b3401040101",
+   "name": "MPEG4VisualCodedContentType",
+   "kind": "enumeration",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "values": [
+    [
+     0,
+     "MPEG4VisualCodedContent_Unknown"
+    ],
+    [
+     1,
+     "MPEG4VisualCodedContent_Progressive"
+    ],
+    [
+     2,
+     "MPEG4VisualCodedContent_Interlaced"
+    ],
+    [
+     3,
+     "MPEG4VisualCodedContent_Mixed"
+    ]
+   ]
+  },
+  {
+   "id": "02020101-0000-0000-060e-2b3401040101",
+   "name": "OperationCategoryType",
+   "kind": "ext_enum",
+   "values": [
+    [
+     "0d010102-0101-0100-060e-2b3404010101",
+     "OperationCategory_Effect"
+    ]
+   ]
+  },
+  {
+   "id": "02020102-0000-0000-060e-2b3401040101",
+   "name": "TransferCharacteristicType",
+   "kind": "ext_enum",
+   "values": [
+    [
+     "04010101-0101-0000-060e-2b3404010101",
+     "TransferCharacteristic_ITU470_PAL"
+    ],
+    [
+     "04010101-0102-0000-060e-2b3404010101",
+     "TransferCharacteristic_ITU709"
+    ],
+    [
+     "04010101-0103-0000-060e-2b3404010101",
+     "TransferCharacteristic_SMPTE240M"
+    ],
+    [
+     "04010101-0104-0000-060e-2b3404010101",
+     "TransferCharacteristic_274M_296M"
+    ],
+    [
+     "04010101-0105-0000-060e-2b3404010101",
+     "TransferCharacteristic_ITU1361"
+    ],
+    [
+     "04010101-0106-0000-060e-2b3404010101",
+     "TransferCharacteristic_linear"
+    ],
+    [
+     "04010101-0107-0000-060e-2b3404010108",
+     "TransferCharacteristic_SMPTE_DCDM"
+    ],
+    [
+     "04010101-0108-0000-060e-2b340401010d",
+     "TransferCharacteristic_IEC6196624_xvYCC"
+    ],
+    [
+     "04010101-0109-0000-060e-2b340401010e",
+     "TransferCharacteristic_ITU2020"
+    ],
+    [
+     "04010101-010a-0000-060e-2b340401010d",
+     "TransferCharacteristic_SMPTEST2084"
+    ],
+    [
+     "04010101-010b-0000-060e-2b340401010d",
+     "TransferCharacteristic_HLG_OETF"
+    ]
+   ]
+  },
+  {
+   "id": "02020103-0000-0000-060e-2b3401040101",
+   "name": "PluginCategoryType",
+   "kind": "ext_enum",
+   "values": [
+    [
+     "0d010102-0101-0200-060e-2b3404010101",
+     "PluginCategory_Effect"
+    ],
+    [
+     "0d010102-0101-0300-060e-2b3404010101",
+     "PluginCategory_Codec"
+    ],
+    [
+     "0d010102-0101-0400-060e-2b3404010101",
+     "PluginCategory_Interpolation"
+    ]
+   ]
+  },
+  {
+   "id": "02020104-0000-0000-060e-2b3401040101",
+   "name": "UsageType",
+   "kind": "ext_enum",
+   "values": [
+    [
+     "0d010102-0101-0500-060e-2b3404010101",
+     "Usage_SubClip"
+    ],
+    [
+     "0d010102-0101-0600-060e-2b3404010101",
+     "Usage_AdjustedClip"
+    ],
+    [
+     "0d010102-0101-0700-060e-2b3404010101",
+     "Usage_TopLevel"
+    ],
+    [
+     "0d010102-0101-0800-060e-2b3404010101",
+     "Usage_LowerLevel"
+    ],
+    [
+     "0d010102-0101-0900-060e-2b3404010101",
+     "Usage_Template"
+    ]
+   ]
+  },
+  {
+   "id": "02020105-0000-0000-060e-2b3401040101",
+   "name": "ColorPrimariesType",
+   "kind": "ext_enum",
+   "values": [
+    [
+     "04010101-0301-0000-060e-2b3404010106",
+     "ColorPrimaries_SMPTE170M"
+    ],
+    [
+     "04010101-0302-0000-060e-2b3404010106",
+     "ColorPrimaries_ITU470_PAL"
+    ],
+    [
+     "04010101-0303-0000-060e-2b3404010106",
+     "ColorPrimaries_ITU709"
+    ],
+    [
+     "04010101-0304-0000-060e-2b340401010d",
+     "ColorPrimaries_ITU2020"
+    ],
+    [
+     "04010101-0305-0000-060e-2b340401010d",
+     "ColorPrimaries_SMPTE_DCDM"
+    ],
+    [
+     "04010101-0306-0000-060e-2b340401010d",
+     "ColorPrimaries_P3D65"
+    ]
+   ]
+  },
+  {
+   "id": "02020106-0000-0000-060e-2b3401040101",
+   "name": "CodingEquationsType",
+   "kind": "ext_enum",
+   "values": [
+    [
+     "04010101-0201-0000-060e-2b3404010101",
+     "CodingEquations_ITU601"
+    ],
+    [
+     "04010101-0202-0000-060e-2b3404010101",
+     "CodingEquations_ITU709"
+    ],
+    [
+     "04010101-0203-0000-060e-2b3404010101",
+     "CodingEquations_SMPTE240M"
+    ],
+    [
+     "04010101-0204-0000-060e-2b340401010d",
+     "CodingEquations_YCgCo"
+    ],
+    [
+     "04010101-0205-0000-060e-2b340401010d",
+     "CodingEquations_GBR"
+    ],
+    [
+     "04010101-0206-0000-060e-2b340401010d",
+     "CodingEquations_ITU2020_NCL"
+    ]
+   ]
+  },
+  {
+   "id": "03010100-0000-0000-060e-2b3401040101",
+   "name": "Rational",
+   "kind": "record",
+   "fields": [
+    [
+     "Numerator",
+     "01010700-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "Denominator",
+     "01010700-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "03010200-0000-0000-060e-2b3401040101",
+   "name": "ProductVersion",
+   "kind": "record",
+   "fields": [
+    [
+     "major",
+     "01010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "minor",
+     "01010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "tertiary",
+     "01010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "patchLevel",
+     "01010200-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "type",
+     "02010101-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "03010300-0000-0000-060e-2b3401040101",
+   "name": "VersionType",
+   "kind": "record",
+   "fields": [
+    [
+     "major",
+     "01010500-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "minor",
+     "01010500-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "03010400-0000-0000-060e-2b3401040101",
+   "name": "RGBAComponent",
+   "kind": "record",
+   "fields": [
+    [
+     "Code",
+     "0201010e-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "Size",
+     "01010100-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "03010500-0000-0000-060e-2b3401040101",
+   "name": "DateStruct",
+   "kind": "record",
+   "fields": [
+    [
+     "year",
+     "01010600-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "month",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "day",
+     "01010100-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "03010600-0000-0000-060e-2b3401040101",
+   "name": "TimeStruct",
+   "kind": "record",
+   "fields": [
+    [
+     "hour",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "minute",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "second",
+     "01010100-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "fraction",
+     "01010100-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "03010700-0000-0000-060e-2b3401040101",
+   "name": "TimeStamp",
+   "kind": "record",
+   "fields": [
+    [
+     "date",
+     "03010500-0000-0000-060e-2b3401040101"
+    ],
+    [
+     "time",
+     "03010600-0000-0000-060e-2b3401040101"
+    ]
+   ]
+  },
+  {
+   "id": "04010100-0000-0000-060e-2b3401040101",
+   "name": "aafUInt8Array",
+   "kind": "var_array",
+   "element": "01010100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010200-0000-0000-060e-2b3401040101",
+   "name": "aafUInt8Array12",
+   "kind": "fixed_array",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "count": 12
+  },
+  {
+   "id": "04010300-0000-0000-060e-2b3401040101",
+   "name": "aafInt32Array",
+   "kind": "var_array",
+   "element": "01010700-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010400-0000-0000-060e-2b3401040101",
+   "name": "aafInt64Array",
+   "kind": "var_array",
+   "element": "01010800-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010500-0000-0000-060e-2b3401040101",
+   "name": "aafStringArray",
+   "kind": "var_array",
+   "element": "01100100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010600-0000-0000-060e-2b3401040101",
+   "name": "aafAUIDArray",
+   "kind": "var_array",
+   "element": "01030100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010700-0000-0000-060e-2b3401040101",
+   "name": "aafPositionArray",
+   "kind": "var_array",
+   "element": "01010100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010800-0000-0000-060e-2b3401040101",
+   "name": "aafUInt8Array8",
+   "kind": "fixed_array",
+   "element": "01010100-0000-0000-060e-2b3401040101",
+   "count": 8
+  },
+  {
+   "id": "04010900-0000-0000-060e-2b3401040101",
+   "name": "aafUInt32Array",
+   "kind": "var_array",
+   "element": "01010300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010a00-0000-0000-060e-2b3401040101",
+   "name": "aafChannelStatusModeArray",
+   "kind": "var_array",
+   "element": "02010125-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04010b00-0000-0000-060e-2b3401040101",
+   "name": "aafUserDataModeArray",
+   "kind": "var_array",
+   "element": "02010126-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04011500-0000-0000-060e-2b3401040101",
+   "name": "aafUUIDArray",
+   "kind": "var_array",
+   "element": "01030300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04020100-0000-0000-060e-2b3401040101",
+   "name": "aafRGBALayout",
+   "kind": "fixed_array",
+   "element": "03010400-0000-0000-060e-2b3401040101",
+   "count": 8
+  },
+  {
+   "id": "04030100-0000-0000-060e-2b3401040101",
+   "name": "AUIDSet",
+   "kind": "set",
+   "element": "01030100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04030200-0000-0000-060e-2b3401040101",
+   "name": "UInt32Set",
+   "kind": "set",
+   "element": "01010300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04100100-0000-0000-060e-2b3401040101",
+   "name": "aafDataValue",
+   "kind": "var_array",
+   "element": "01010100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "04100200-0000-0000-060e-2b3401040101",
+   "name": "Stream",
+   "kind": "stream"
+  },
+  {
+   "id": "04100300-0000-0000-060e-2b3401040101",
+   "name": "aafIndirect",
+   "kind": "indirect"
+  },
+  {
+   "id": "04100400-0000-0000-060e-2b3401040101",
+   "name": "aafOpaque",
+   "kind": "opaque"
+  },
+  {
+   "id": "05010100-0000-0000-060e-2b3401040101",
+   "name": "ClassDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0201-0000-060e-2b3402060101",
+   "path": [
+    "0d010301-0101-0100-060e-2b3401010102",
+    "06010107-0700-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010200-0000-0000-060e-2b3401040101",
+   "name": "ContainerDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-2000-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0508-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010300-0000-0000-060e-2b3401040101",
+   "name": "DataDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-1b00-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0505-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010500-0000-0000-060e-2b3401040101",
+   "name": "InterpolationDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-2100-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0509-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010600-0000-0000-060e-2b3401040101",
+   "name": "MobWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-3400-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0201-0000-060e-2b3401010102",
+    "06010104-0501-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010700-0000-0000-060e-2b3401040101",
+   "name": "OperationDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-1c00-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0503-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010800-0000-0000-060e-2b3401040101",
+   "name": "ParameterDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-1d00-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0504-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010900-0000-0000-060e-2b3401040101",
+   "name": "TypeDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0203-0000-060e-2b3402060101",
+   "path": [
+    "0d010301-0101-0100-060e-2b3401010102",
+    "06010107-0800-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010a00-0000-0000-060e-2b3401040101",
+   "name": "PluginDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-1e00-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0506-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010b00-0000-0000-060e-2b3401040101",
+   "name": "CodecDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0101-1f00-060e-2b3402060101",
+   "path": [
+    "0d010301-0102-0100-060e-2b3401010102",
+    "06010104-0202-0000-060e-2b3401010102",
+    "06010104-0507-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05010c00-0000-0000-060e-2b3401040101",
+   "name": "PropertyDefinitionWeakReference",
+   "kind": "weak_ref",
+   "ref_class": "0d010101-0202-0000-060e-2b3402060101",
+   "path": [
+    "0d010301-0101-0100-060e-2b3401010102",
+    "06010107-0700-0000-060e-2b3401010102",
+    "06010107-0200-0000-060e-2b3401010102"
+   ]
+  },
+  {
+   "id": "05020100-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ContentStorageStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1800-060e-2b3402060101"
+  },
+  {
+   "id": "05020200-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DictionaryStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2200-060e-2b3402060101"
+  },
+  {
+   "id": "05020300-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_EssenceDescriptorStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2400-060e-2b3402060101"
+  },
+  {
+   "id": "05020400-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_NetworkLocatorStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3200-060e-2b3402060101"
+  },
+  {
+   "id": "05020500-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_OperationGroupStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-0a00-060e-2b3402060101"
+  },
+  {
+   "id": "05020600-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SegmentStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-0300-060e-2b3402060101"
+  },
+  {
+   "id": "05020700-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SourceClipStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1100-060e-2b3402060101"
+  },
+  {
+   "id": "05020800-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SourceReferenceStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1000-060e-2b3402060101"
+  },
+  {
+   "id": "05020900-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ClassDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0201-0000-060e-2b3402060101"
+  },
+  {
+   "id": "05020a00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_CodecDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1f00-060e-2b3402060101"
+  },
+  {
+   "id": "05020b00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ComponentStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-0200-060e-2b3402060101"
+  },
+  {
+   "id": "05020c00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ContainerDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2000-060e-2b3402060101"
+  },
+  {
+   "id": "05020d00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ControlPointStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1900-060e-2b3402060101"
+  },
+  {
+   "id": "05020e00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DataDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1b00-060e-2b3402060101"
+  },
+  {
+   "id": "05020f00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_EssenceDataStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2300-060e-2b3402060101"
+  },
+  {
+   "id": "05021000-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_IdentificationStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3000-060e-2b3402060101"
+  },
+  {
+   "id": "05021100-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_InterpolationDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2100-060e-2b3402060101"
+  },
+  {
+   "id": "05021200-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_LocatorStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3100-060e-2b3402060101"
+  },
+  {
+   "id": "05021300-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_MobStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3400-060e-2b3402060101"
+  },
+  {
+   "id": "05021400-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_MobSlotStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3800-060e-2b3402060101"
+  },
+  {
+   "id": "05021500-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_OperationDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1c00-060e-2b3402060101"
+  },
+  {
+   "id": "05021600-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ParameterStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3c00-060e-2b3402060101"
+  },
+  {
+   "id": "05021700-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ParameterDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1d00-060e-2b3402060101"
+  },
+  {
+   "id": "05021800-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_PluginDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-1e00-060e-2b3402060101"
+  },
+  {
+   "id": "05021900-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_PropertyDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0202-0000-060e-2b3402060101"
+  },
+  {
+   "id": "05021a00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TaggedValueStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-3f00-060e-2b3402060101"
+  },
+  {
+   "id": "05021b00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TypeDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0203-0000-060e-2b3402060101"
+  },
+  {
+   "id": "05021c00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_KLVDataStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-4000-060e-2b3402060101"
+  },
+  {
+   "id": "05021d00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_FileDescriptorStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2500-060e-2b3402060101"
+  },
+  {
+   "id": "05021e00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_RIFFChunkStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-4f00-060e-2b3402060101"
+  },
+  {
+   "id": "05021f00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DescriptiveFrameworkStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010401-0000-0000-060e-2b3402060101"
+  },
+  {
+   "id": "05022000-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_KLVDataDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-4d00-060e-2b3402060101"
+  },
+  {
+   "id": "05022100-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TaggedValueDefinitionStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-4c00-060e-2b3402060101"
+  },
+  {
+   "id": "05022200-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DescriptiveObjectStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010400-0000-0000-060e-2b3402060101"
+  },
+  {
+   "id": "05022600-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SubDescriptorStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-5900-060e-2b3402060101"
+  },
+  {
+   "id": "05022700-0000-0000-060e-2b3401040101",
+   "name": "MetaDictionaryStrongReference",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0225-0000-060e-2b3402060101"
+  },
+  {
+   "id": "05022800-0000-0000-060e-2b3401040101",
+   "name": "HeaderStrongRefence",
+   "kind": "strong_ref",
+   "ref_class": "0d010101-0101-2f00-060e-2b3402060101"
+  },
+  {
+   "id": "05030d00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DataDefinitionWeakReferenceSet",
+   "kind": "set",
+   "element": "05010300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05030e00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ParameterDefinitionWeakReferenceSet",
+   "kind": "set",
+   "element": "05010800-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05030f00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_PluginDefinitionWeakReferenceSet",
+   "kind": "set",
+   "element": "05010a00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05031000-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_PropertyDefinitionWeakReferenceSet",
+   "kind": "set",
+   "element": "05010c00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05040100-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_OperationDefinitionWeakReferenceVector",
+   "kind": "var_array",
+   "element": "05010700-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05040200-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TypeDefinitionWeakReferenceVector",
+   "kind": "var_array",
+   "element": "05010900-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05040300-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DataDefinitionWeakReferenceVector",
+   "kind": "var_array",
+   "element": "05010300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050100-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ClassDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05020900-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050200-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_CodecDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05020a00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050300-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ContainerDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05020c00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050400-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DataDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05020e00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050500-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_EssenceDataStrongReferenceSet",
+   "kind": "set",
+   "element": "05020f00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050600-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_InterpolationDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05021100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050700-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_MobStrongReferenceSet",
+   "kind": "set",
+   "element": "05021300-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050800-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_OperationDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05021500-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050900-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ParameterDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05021700-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050a00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_PluginDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05021800-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050b00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_PropertyDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05021900-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050c00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TypeDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05021b00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050d00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_KLVDataDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05022000-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050e00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TaggedValueDefinitionStrongReferenceSet",
+   "kind": "set",
+   "element": "05022100-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05050f00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DescriptiveObjectStrongReferenceSet",
+   "kind": "set",
+   "element": "05022200-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060100-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ComponentStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05020b00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060200-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ControlPointStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05020d00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060300-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_IdentificationStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021000-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060400-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_LocatorStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021200-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060500-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_MobSlotStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021400-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060600-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SegmentStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05020600-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060700-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SourceReferenceStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05020800-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060800-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_TaggedValueStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021a00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060900-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_KLVDataStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021c00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060a00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_ParameterStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021600-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060b00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_FileDescriptorStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021d00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060c00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_RIFFChunkStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05021e00-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060d00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_DescriptiveObjectStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05022200-0000-0000-060e-2b3401040101"
+  },
+  {
+   "id": "05060e00-0000-0000-060e-2b3401040101",
+   "name": "kAAFTypeID_SubDescriptorStrongReferenceVector",
+   "kind": "var_array",
+   "element": "05022600-0000-0000-060e-2b3401040101"
+  }
+ ]
+}

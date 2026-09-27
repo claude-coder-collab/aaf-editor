@@ -15,9 +15,13 @@ add_executable(aaf_tests
     cfb/test_corruption.cpp
     cfb/test_fixtures.cpp
     cfb/test_types.cpp
+    core/test_auid.cpp
+    core/test_document.cpp
+    core/test_metamodel.cpp
+    core/test_value.cpp
     support/fixtures.cpp
 )
 target_include_directories(aaf_tests PRIVATE support)
-target_link_libraries(aaf_tests PRIVATE aaf::cfb aaf::project_options Catch2::Catch2WithMain)
+target_link_libraries(aaf_tests PRIVATE aaf::core aaf::project_options Catch2::Catch2WithMain)
 target_compile_definitions(aaf_tests PRIVATE AAF_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 catch_discover_tests(aaf_tests)

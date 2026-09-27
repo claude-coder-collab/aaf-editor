@@ -159,7 +159,7 @@ auto writeFile(const Builder&, const std::filesystem::path&) -> Result<void>;   
 
 ## 5. Layer 2: AAF stored format (`libaafcore`)
 
-This maps CFB to AAF objects. The normative source is the **AAF Stored Format Specification v1.0.1**. The layouts below were checked against it. Real files are the final authority: fixture tests decide, and any discrepancy is recorded here. **This is a clean-room implementation: no AAF SDK source code is used or consulted.**
+This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core/` (namespace `aaf`, headers `aaf/core/{auid,metamodel,value,document}.hpp`); writing is M3. The normative source is the **AAF Stored Format Specification v1.0.1**. The layouts below were checked against it. Real files are the final authority: fixture tests decide, and any discrepancy is recorded here. **This is a clean-room implementation: no AAF SDK source code is used or consulted.**
 
 ### 5.1 Objects
 
@@ -172,6 +172,7 @@ This maps CFB to AAF objects. The normative source is the **AAF Stored Format Sp
 - Values are contiguous (there is no offset field). Index entries with an unknown stored form **must be skipped** using `length`, and are preserved verbatim.
 - **File signature**: `{42464141-000d-4d4f-060e-2b34010101ff}` (512-byte sectors) or `{0d010201-0200-0000-060e-2b3403020101}` (4096-byte sectors). **Discrepancy with the stored-format spec**, which says the signature is the root storage's CLSID. In every reference file, and in pyaaf2, the signature is in the **CFB header CLSID** (offset 8), and the root storage's CLSID is the Root class AUID `{b3b398a5-1c90-11d4-8053-080036210804}`. We follow the files. The writer sets the signature that matches the sector size it writes.
 - The root storage holds the root object, which has PID `0x0001` for the MetaDictionary and PID `0x0002` for the Header.
+- `InterchangeObject::ObjClass` (PID `0x0101`) is **never stored**: an object's class is its storage CLSID. Validation treats it as always present.
 
 ### 5.2 Stored forms
 
@@ -188,41 +189,100 @@ This maps CFB to AAF objects. The normative source is the **AAF Stored Format Sp
 
 - `referenced properties` (root stream): header `{u8 byteOrder, u16 pathCount, u32 pidCount}`, followed by `pathCount` PID lists, each terminated by `0x0000` (`pidCount` includes the terminators). Tag *n* is the *n*-th path, and each path runs from the root object to the strong-ref set holding the targets (for example Header → Dictionary → DataDefinitions).
 - Stored form values are bit fields (§1.4 of the stored-format spec). Decode by value, but keep the raw `u16` so unknown forms round-trip.
+- Names inside property values (child storage, index and stream names) are UTF-16 in the object's byte order, NUL-terminated. The index stream of a collection named *n* is `n index`. Its element storages are named `n{k}`, where `k` is the local key in lowercase hex with no padding. All of this is confirmed against the reference files.
+- **Loader** (`Document::open` / `Document::load`):
+  - Objects are loaded breadth-first from the root, with no recursion, so nesting depth is unbounded.
+  - A storage claimed by two properties, a missing child storage, a missing index stream, a malformed index or a truncated properties stream are **fatal** errors. The error names the object's storage.
+  - A missing data stream is a load **warning**.
+  - Limits: a `properties` stream may be at most 64 MiB, and an index stream at most 256 MiB. Counts are checked against stream sizes before allocation.
+  - Storage children not referenced by any property (for example extra vendor streams) are recorded in `Object::extraEntries`, so they can be preserved on save.
+- **Weak references** are resolved through an index built at load time: for every tag, its path is walked from the root to the target strong-ref set, and each element is keyed by the raw key bytes in that set's index. `Document::resolveWeak(tag, key)` is const and thread-safe.
 - Storage names are not semantically significant on read, because they are always resolved via the parent's property value. On write, **preserve by default** the original storage names, sibling order, `formatVersion` and local keys of objects loaded from the source file, to minimise structural diffs against it. This is controlled by `WriteOptions::preserveLayout` (default `true`). For new objects, or when `preserveLayout=false`, generate `<PropertyName>-<pid hex>` (with a `{<key hex>}` suffix for elements), truncated or hashed to stay within the 31-UTF-16-unit CFB name limit. Names must be unique among siblings.
 
 ### 5.3 Metamodel
 
-- A **built-in baseline** is compiled in from `model/`: every class, property and type in AAF Object Specification v1.1, with AUIDs and PIDs.
+- A **built-in baseline** is compiled in from `model/`: every class, property and type in AAF Object Specification v1.1, with AUIDs and PIDs. That is 116 classes (including the meta classes and `Root`) and 164 types.
   - The Object Specification defines names, the hierarchy, types and required/optional, but **not** the AUIDs or PIDs.
-  - The machine-readable IDs come from the pyaaf2 model tables (`aaf2/model/*.py`, MIT; attribution goes in `model/NOTICE`). `tools/gen_model.py` converts them into `model/baseline.json`, and from that into generated C++. Both outputs are committed.
-  - Cross-checks, run as unit tests: every class, property and type named in the Object Specification exists in the baseline; and every definition found in a reference file's MetaDictionary matches the baseline (same AUID, PID and type).
+  - The machine-readable IDs come from the pyaaf2 1.7.1 model tables (`aaf2/model/classdefs.py`, `typedefs.py`, plus `Root` from `metadict.py`; MIT, attribution in `model/NOTICE`). The Avid extensions in `aaf2/model/ext` are **not** included, because files define their own extensions.
+  - `tools/gen_model.py json` writes `model/baseline.json`, and `tools/gen_model.py cpp` writes `libs/core/src/generated/baseline_model.cpp`, which contains `constexpr` tables described in `baseline_tables.hpp`. Both outputs are committed.
+  - CI checks that the C++ matches the JSON (`gen_model.py check`), and pytest checks that the JSON matches the pinned pyaaf2.
+  - Properties that pyaaf2 lists without a fixed PID (newer MXF-derived descriptors, and `TypeDefinitionGenericCharacter::CharacterSize`) have PID `0` in the baseline, meaning "dynamic": the file's MetaDictionary assigns the PID.
+  - Cross-check, run as a unit test: every property definition found in a reference file's MetaDictionary has the same PID as the baseline, wherever the baseline PID is fixed. All 58 reference files pass. The check against the Object Specification's names is manual, because the PDF is not in CI.
   - Reference files carry only a partial MetaDictionary (the SDK samples hold 45–79 classes each), so the files alone are not a sufficient source.
 - On open, the file's MetaDictionary is parsed and **merged** with the baseline. File-defined extension classes, properties and types (dynamic PIDs ≥ 0x8000) are fully supported. The editor is data-driven, so unknown classes are still shown and editable through their definitions.
+  - **Bootstrapping**: the objects are first loaded structurally (stored forms only; no types are needed). The MetaDictionary objects are then interpreted using the **baseline** meta-class property PIDs, which are fixed.
+  - **Class definitions**: `Identification`, `Name`, `ParentClass` (a parent equal to itself means none), `IsConcrete`, and the `Properties` set.
+  - **Property definitions**: `Identification`, `Name`, `Type`, `IsOptional`, `LocalIdentification` and `IsUniqueIdentifier`. `Type` may be stored either as AUID data or as a weak reference; both are accepted.
+  - **Type definitions** are interpreted per `TypeDefinition*` class.
+  - **Merge rule**: file definitions replace baseline fields where both exist. Extendible enumerations take the union of their elements. A file PID that differs from a fixed baseline PID is a load warning. Every definition records its source (`baseline`, `file` or `both`).
 - Type categories to support: Integer (1/2/4/8, signed and unsigned), Character, String, Enum, ExtEnum, Record, FixedArray, VarArray, Set, Rename, StrongObjRef, WeakObjRef, Stream, Indirect, Opaque.
 - If a property cannot be decoded (unknown PID and no definition), it is kept as **opaque bytes with its stored form** and written back unchanged.
 
 ### 5.4 Values
 
-`aaf::Value` is a variant over: integers, bool, UTF-16 string, AUID, MobID, Rational, Timestamp, VersionType, enum/extenum (value + resolved name), record (ordered fields), array, set, indirect (type AUID + inner Value), stream handle, object refs, and opaque bytes. Every Value has codec round-trip tests.
+`aaf::Value` is a variant over:
+
+- null, bool, `int64`, `uint64`;
+- UTF-8 string;
+- `Auid`, `MobId`;
+- `Enum{value, name}`, `ExtEnum{value, name}`;
+- `Record{names, values}` and `Array`;
+- `Indirect{type, value}`;
+- `Opaque{type, bytes}`;
+- `Bytes`.
+
+It covers data properties only. Object references and streams are represented by the stored property payloads (§5.5).
+
+Decoding (`decodeValue(model, type, bytes, bigEndian)`):
+
+- Renames are resolved first.
+- `Boolean` becomes bool. Other enumerations decode their element integer and look up its name.
+- The `AUID` and `MobIDType` records become `Auid` and `MobId`. Other records decode field by field.
+- Arrays and sets require fixed-size elements. Arrays of `Character` decode as NUL-separated string lists.
+- Strings are UTF-16 up to the first NUL. Strings of 1-byte generic characters are treated as Latin-1.
+- `Indirect` and `Opaque` start with `u8 byteOrder` and a 16-byte type AUID.
+- Every size mismatch, unknown type, or nesting deeper than 32 is an error, never a crash.
+- Encoding (the inverse) arrives with M3/M4, together with codec round-trip tests.
+
+`MobId::toString()` produces `urn:smpte:umid:…` using the same algorithm as pyaaf2, including its special case for half-swapped material numbers.
 
 ### 5.5 Object graph
 
-- `Document` owns every `Object`. Each object has a session-stable `ObjectId` (u64, never reused within a session), class, property map (PID → Property), parent and owning property.
-- Weak refs are resolved on load to `ObjectId` targets. Dangling refs are kept as unresolved keys and flagged by validation.
+- `Document` owns the source `cfb::Container` and every `Object`. Each object has:
+  - a session-stable `ObjectId` (u64, never reused within a session; object 0 is the root);
+  - its class AUID;
+  - its parent and the owning PID;
+  - its storage entry and name, byte order and `formatVersion`;
+  - its properties in file order, and `extraEntries`.
+- Each `Property` is `{pid, storedForm, payload}`. The payload is one of:
+  - `DataProperty`: raw bytes, decoded on demand by `Document::decode`;
+  - `StrongRefProperty`;
+  - `StrongRefVectorProperty` (with its local keys and free-key range);
+  - `StrongRefSetProperty` (with the index entries: local key, reference count and key bytes; and the key PID and size);
+  - `WeakRefProperty`;
+  - `WeakRefCollectionProperty`;
+  - `StreamProperty` (byte order, name, entry and size);
+  - `UnknownProperty` (raw bytes).
+
+  Everything the file stores is kept, so that the M3 writer can reproduce it.
+- Weak refs keep their raw `{tag, keyPid, key}` and are resolved through the load-time index. Dangling refs are flagged by validation.
 - On save, weak-ref keys are re-derived from each target's current unique identifier, and `referenced properties` is regenerated.
 - Stream properties hold a `StreamHandle`, which is either a reference into the source file (lazy) or new in-memory or file-backed data.
 - Loading is eager for objects and properties and lazy for streams. Target: open a 50k-object file in under 2 s.
 
 ### 5.6 Validation (`validate()`)
 
-Returns a list of diagnostics `{severity, objectId, pid, message}`:
+Returns the load diagnostics plus a list of diagnostics `{severity (info, warning or error), objectId, pid, message}`. Implemented in M2:
 
-- required properties present; values conform to their types
-- strong-ref tree is a tree (no sharing, no cycles)
-- weak refs resolve
-- MobIDs unique; definitions referenced by components exist in the Dictionary
-- timeline sanity: segment lengths vs slot lengths, transitions flanked by segments, non-negative lengths
-- known vendor quirks are reported as info, not errors
+- **Warning:** an unknown class (the object is then skipped), an undefined PID, a property its class does not define, or an unknown stored form.
+- **Error:** a missing required property (except the implicit `ObjClass`), or a data value that fails to decode.
+- **Stored form must match the property type:** strong ref, strong vector or set, weak ref, weak vector or set, data stream, otherwise data. A mismatch is an error, except that swapping vector and set is **info**: it's a known SDK/Avid quirk, and `OperationGroup.Parameters` is stored as a set although it is typed as a vector.
+- **Weak references must resolve**, or else name a definition known to the merged model. SDK files omit baseline definitions from their MetaDictionary but still reference them. A reference that does neither is an error.
+- The strong-ref structure is a tree by construction: the loader rejects a storage claimed twice.
+
+All 58 reference files report 0 errors and 0 warnings; the only notes are the `Parameters` quirk.
+
+Later milestones: MobIDs unique; definitions referenced by components exist in the Dictionary; timeline sanity (segment lengths versus slot lengths, transitions flanked by segments, non-negative lengths).
 
 ## 6. Layer 3: Timeline projection (`libaaftl`)
 
@@ -267,16 +327,27 @@ Adjacent Fillers are merged after every op. Transitions adjacent to an edited po
 ### 8.1 `aaftool` (CLI)
 
 ```
-aaftool dump <file> [--depth N] [--json]      object tree
+aaftool dump <file> [--json] [--depth N] [--header|--metadict]
+                                              object tree from the root, Header or MetaDictionary (M2)
 aaftool cfb <file>                            raw CFB directory listing (header info + tree)
 aaftool cfb-roundtrip <in> <out> [--v3|--v4]  rewrite the CFB container only (no AAF parsing)
-aaftool validate <file>                       diagnostics, exit 1 on errors
+aaftool validate <file> [--json]              diagnostics; exit 1 on errors (M2)
 aaftool roundtrip <in> <out>                  read + write, no edits
 aaftool timeline <file> [--mob NAME|ID]       text timeline
 aaftool extract <file> <mobid> <out>          dump embedded essence stream
 ```
 
-The JSON output schema is the same one the RPC bridge uses (§8.3).
+The JSON output schema is the same one the RPC bridge uses (§8.3). **Canonical dump form** (`dump --json`):
+
+- **Object:** `{"class": <class name, or AUID if unknown>, "properties": {<property name, or "0x%04x" if undefined>: <value>}}`, in file order.
+- **Strong references:** a strong ref is a nested object; a strong vector or set is an array of objects.
+- **Weak references:** a weak ref is its key as a string; a weak vector or set is an array of key strings. Keys of 16 bytes format as an AUID, 32 bytes as a MobID URN, anything else as hex.
+- **Streams:** `{"stream": name, "size": n}`.
+- **Scalars:** booleans, integers and strings map to JSON scalars.
+- **Identifiers and enumerations:** an AUID is `"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"`, and a MobID is its URN. Enumerations and extendible enumerations give the element name, falling back to the number or AUID.
+- **Composites:** records map to objects, arrays to arrays, and an indirect value to its inner value.
+- **Opaque and undecodable data:** opaque values are `{"opaque": type, "bytes": hex}`; undecodable data is `{"error": message, "bytes": hex}`; unknown stored forms are `{"storedForm": n, "bytes": hex}`.
+- The text dump shows the same tree, indented, with set elements labelled by their key.
 
 ### 8.2 Editor host (`apps/editor`)
 
@@ -337,8 +408,13 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 - Additional real-world samples (anonymised, redistributable) can be added to the manifest with provenance notes. Large samples are always fetched, never committed.
 - **Cross-check**:
   - Container level (M1): `tools/crosscheck_cfb.py <aaftool>` rewrites every reference file with `aaftool cfb-roundtrip` as v3 and v4. pyaaf2 must then read an identical directory tree, CLSIDs and stream bytes, and the same mob IDs.
-  - Object level (M2+): `tools/crosscheck.py` compares `aaftool dump --json` with pyaaf2's reading of the same file.
-- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) runs 10 minutes nightly, seeded from the SDK fixtures. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
+  - Object level (M2): `tools/crosscheck.py <aaftool>` compares `aaftool dump --json --header` with pyaaf2's reading of the Header tree, reduced to the same canonical form. The comparison covers every object, property, decoded value, weak key and stream.
+    - Strong-set order is ignored.
+    - Python sets map to sorted lists; `datetime` values map back to the `TimeStamp` record, with microseconds as `fraction`.
+    - One pyaaf2 quirk is accepted: it normalises a stored 0/0 rational to 0/1.
+    - All 58 reference files match.
+- Python tool versions are pinned in `tools/requirements.txt` (pyaaf2 1.7.1, pytest).
+- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
 - **UI**: Vitest for the frontend logic and the RPC codec. Playwright smoke test against a headless build of the UI with a mock bridge.
 
 ## 11. CI/CD (GitHub Actions, frugal)
@@ -372,7 +448,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | # | Deliverable | Exit criterion |
 |---|---|---|
 | M1 ✅ | `libaafcfb` read + write, `aaftool cfb` / `cfb-roundtrip`, fixture fetch script + manifest, fuzz target, CI | All 58 reference files round-trip at the CFB level (v3 and v4) and pass the pyaaf2 cross-check; fuzz target running |
-| M2 | Stored-format reader, baseline metamodel, `aaftool dump/validate` | Dumps all fixtures and matches the pyaaf2 cross-check |
+| M2 ✅ | Stored-format reader, baseline metamodel, `aaftool dump/validate` | All 58 reference files load and validate with 0 errors, and their Header trees match pyaaf2 exactly |
 | M3 | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
 | M4 | Edit session + primitive commands | Undo/redo symmetry tests pass |
 | M5 | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
@@ -396,6 +472,9 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | 2026-09-27 | Spec PDFs kept local only (not redistributable), fetched by script |
 | 2026-09-27 | AAF file signature lives in the CFB header CLSID, not the root storage CLSID (the files contradict the stored-format spec) |
 | 2026-09-27 | CI: frugal PR pipeline on Linux only; Windows, macOS, sanitizers, external fixtures and fuzzing run nightly and on main |
+| 2026-09-27 | Baseline excludes pyaaf2's Avid extension tables; dynamic-PID properties have PID 0 in the baseline |
+| 2026-09-27 | `ObjClass` is implicit; strong vector and set swaps are info-level quirks; weak refs to baseline definitions missing from the file are valid |
+| 2026-09-27 | Load errors are fatal for structural damage (missing storages or indexes, malformed streams), and warnings for missing data streams |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

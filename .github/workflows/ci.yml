@@ -22,8 +22,10 @@ jobs:
           python-version: "3.12"
       - name: Python tests
         run: |
-          pip install pytest pyaaf2
+          pip install -r tools/requirements.txt
           pytest -q tools/tests
+      - name: Generated model is up to date
+        run: python tools/gen_model.py check
 
   linux:
     runs-on: ubuntu-24.04
