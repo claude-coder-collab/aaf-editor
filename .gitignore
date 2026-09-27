@@ -1,0 +1,9 @@
+docs/reference/
+/out/
+/build/
+node_modules/
+tests/fixtures/external/*
+!tests/fixtures/external/manifest.json
+!tests/fixtures/external/otio_expectations.json
+__pycache__/
+.venv/
