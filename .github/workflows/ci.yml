@@ -26,6 +26,17 @@ jobs:
           pytest -q tools/tests
       - name: Generated model is up to date
         run: python tools/gen_model.py check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: UI type check and tests
+        working-directory: ui
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
+          npm test
 
   linux:
     runs-on: ubuntu-24.04
@@ -43,14 +54,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-llvm
         if: matrix.compiler == 'clang'
-      - name: Install Ninja
-        run: sudo apt-get install -y ninja-build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install Ninja and WebKitGTK
+        run: sudo apt-get install -y ninja-build libwebkit2gtk-4.1-dev xvfb
       - name: Configure
         run: cmake --preset ${{ matrix.compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DAAF_WARNINGS_AS_ERRORS=ON
       - name: Build
         run: cmake --build build/${{ matrix.compiler }} --config ${{ matrix.config }}
       - name: Test
         run: ctest --test-dir build/${{ matrix.compiler }} -C ${{ matrix.config }} --output-on-failure
+      - name: Editor smoke test
+        run: xvfb-run -a build/${{ matrix.compiler }}/apps/editor/${{ matrix.config }}/aafedit --smoke-test tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf
       - name: clang-tidy
         if: matrix.compiler == 'clang'
         run: run-clang-tidy-22 -p build/clang -quiet -warnings-as-errors='*' 'libs/.*\.cpp' 'apps/.*\.cpp'
@@ -59,6 +77,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Configure
         run: cmake --preset msvc -DAAF_WARNINGS_AS_ERRORS=ON
@@ -66,11 +89,19 @@ jobs:
         run: cmake --build build/msvc --config Release
       - name: Test
         run: ctest --test-dir build/msvc -C Release --output-on-failure
+      - name: Editor smoke test
+        shell: bash
+        run: build/msvc/apps/editor/Release/aafedit.exe --smoke-test tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf
 
   macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
       - name: Install Ninja
         run: brew install ninja
       - name: Configure
@@ -79,3 +110,5 @@ jobs:
         run: cmake --build build/clang --config Release
       - name: Test
         run: ctest --test-dir build/clang -C Release --output-on-failure
+      - name: Editor smoke test
+        run: build/clang/apps/editor/Release/aafedit.app/Contents/MacOS/aafedit --smoke-test tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf

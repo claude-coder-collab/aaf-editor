@@ -1,6 +1,7 @@
 #include "fixtures.hpp"
 
 #include <aaf/core/writer.hpp>
+#include <aaf/edit/defaults.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/edit/session.hpp>
 
@@ -574,4 +575,44 @@ TEST_CASE("Stream data can come from a file and is copied lazily on save", "[edi
         CHECK(undone.bytes() == before.bytes());
     }
     std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Objects created with defaults validate", "[edit][defaults]")
+{
+    auto opened = openSession();
+    REQUIRE(opened);
+    auto& session = *opened;
+    const auto& doc = session.document();
+    const auto& model = doc.model();
+    const auto content = doc.object(firstOfClass(doc, "CompositionMob")).parent;
+    ObjectId mob = kNoObject;
+    const auto result = session.execute("Create with defaults", [&](Transaction& tx) -> Result<void> {
+        auto created = createWithDefaults(tx, model.findClassByName("CompositionMob")->id);
+        if (!created)
+        {
+            return std::unexpected(created.error());
+        }
+        mob = *created;
+        auto slot = createWithDefaults(tx, model.findClassByName("TimelineMobSlot")->id);
+        if (!slot)
+        {
+            return std::unexpected(slot.error());
+        }
+        if (auto r = insertIntoCollection(tx, mob, pid(doc, mob, "Slots"), 0, *slot); !r)
+        {
+            return r;
+        }
+        return insertIntoCollection(tx, content, pid(doc, content, "Mobs"), 0, mob);
+    });
+    INFO((result ? std::string() : result.error().message));
+    REQUIRE(result);
+    CHECK(errorCount(doc) == 0);
+    const auto& slots = std::get<StrongRefVectorProperty>(doc.object(mob).find(pid(doc, mob, "Slots"))->payload);
+    REQUIRE(slots.objects.size() == 1);
+    const auto segment = std::get<StrongRefProperty>(doc.object(slots.objects[0]).find(pid(doc, slots.objects[0], "Segment"))->payload).object;
+    CHECK(doc.classOf(segment)->name == "Sequence");
+    CHECK(doc.value(mob, "Mob", "MobID")->as<MobId>() != MobId{});
+    CHECK(concreteClassFor(model, model.findClassByName("Segment")->id)->name == "Sequence");
+    CHECK(concreteClassFor(model, model.findClassByName("Header")->id)->name == "Header");
+    CHECK_FALSE(weakCandidates(doc, segment, pid(doc, segment, "DataDefinition")).empty());
 }

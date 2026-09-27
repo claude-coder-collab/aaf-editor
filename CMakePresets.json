@@ -37,7 +37,7 @@
         {
             "name": "clang-fuzz",
             "inherits": "clang",
-            "cacheVariables": { "AAF_BUILD_FUZZERS": "ON", "AAF_BUILD_TESTS": "OFF" }
+            "cacheVariables": { "AAF_BUILD_FUZZERS": "ON", "AAF_BUILD_TESTS": "OFF", "AAF_BUILD_EDITOR": "OFF" }
         }
     ],
     "buildPresets": [

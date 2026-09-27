@@ -7,3 +7,4 @@ tests/fixtures/external/*
 !tests/fixtures/external/otio_expectations.json
 __pycache__/
 .venv/
+ui/dist/

@@ -35,7 +35,7 @@ jobs:
         run: python tools/fetch_fixtures.py
       - name: Build (ASan/UBSan)
         run: |
-          cmake --preset clang-asan -DCMAKE_CXX_COMPILER=clang++-22
+          cmake --preset clang-asan -DCMAKE_CXX_COMPILER=clang++-22 -DAAF_BUILD_EDITOR=OFF
           cmake --build build/clang-asan --config Debug
       - name: Test (ASan/UBSan, all fixtures)
         run: ctest --test-dir build/clang-asan -C Debug --output-on-failure
@@ -56,7 +56,7 @@ jobs:
       - name: Build (TSan)
         run: |
           sudo apt-get install -y ninja-build
-          cmake --preset clang-tsan -DCMAKE_CXX_COMPILER=clang++-22
+          cmake --preset clang-tsan -DCMAKE_CXX_COMPILER=clang++-22 -DAAF_BUILD_EDITOR=OFF
           cmake --build build/clang-tsan --config Debug
       - name: Test (TSan)
         run: ctest --test-dir build/clang-tsan -C Debug --output-on-failure

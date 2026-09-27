@@ -51,3 +51,26 @@ TEST_CASE("MobIDs format as SMPTE UMID URNs like pyaaf2", "[core][auid]")
     }
     CHECK(swapped.toString() == "urn:smpte:umid:060c2b34.02051101.01001000.13000000.060e2b34.7f7f2a80.ca9af110.040011d4");
 }
+
+TEST_CASE("MobIDs parse from their URN form and can be generated", "[core][auid]")
+{
+    for (const auto* urn : { "urn:smpte:umid:060c2b34.02051101.01001000.13000000.ca9af110.040011d4.8e3d0090.27dfca7c",
+             "urn:smpte:umid:060c2b34.02051101.01001000.13000000.060e2b34.7f7f2a80.ca9af110.040011d4" })
+    {
+        const auto id = MobId::parse(urn);
+        REQUIRE(id);
+        CHECK(id->toString() == urn);
+    }
+    CHECK_FALSE(MobId::parse("urn:smpte:umid:060c2b34"));
+    CHECK_FALSE(MobId::parse("urn:smpte:umid:zz0c2b34.02051101.01001000.13000000.ca9af110.040011d4.8e3d0090.27dfca7c"));
+
+    const auto a = MobId::generate();
+    const auto b = MobId::generate();
+    CHECK(a != b);
+    CHECK(MobId::parse(a.toString()).value() == a);
+    CHECK(a.toString().starts_with("urn:smpte:umid:060a2b34.01010105.01010f20.13000000."));
+
+    const auto u = Auid::generate();
+    CHECK(u != Auid::generate());
+    CHECK(u.toString()[14] == '4');
+}

@@ -1,4 +1,5 @@
 add_library(aaf_edit
+    src/defaults.cpp
     src/operations.cpp
     src/session.cpp
     src/transaction.cpp
