@@ -1027,6 +1027,57 @@ auto Document::value(ObjectId id, std::string_view className, std::string_view p
     return v ? std::optional(std::move(*v)) : std::nullopt;
 }
 
+auto readStream(const Document& document, const StreamProperty& stream, std::uint64_t offset, std::span<std::byte> out) -> Result<std::size_t>
+{
+    if (stream.data)
+    {
+        return stream.data->read(offset, out);
+    }
+    if (stream.entry == cfb::kNoStream)
+    {
+        return 0;
+    }
+    auto reader = document.container().openStream(stream.entry);
+    if (!reader)
+    {
+        return std::unexpected(reader.error());
+    }
+    return reader->read(offset, out);
+}
+
+auto copyStream(const Document& document, const StreamProperty& stream, cfb::ByteSink& sink) -> Result<std::uint64_t>
+{
+    std::optional<cfb::StreamReader> reader;
+    if (!stream.data && stream.entry != cfb::kNoStream)
+    {
+        auto opened = document.container().openStream(stream.entry);
+        if (!opened)
+        {
+            return std::unexpected(opened.error());
+        }
+        reader = std::move(*opened);
+    }
+    std::vector<std::byte> buffer(std::size_t{ 1 } << 20);
+    std::uint64_t total = 0;
+    while (true)
+    {
+        auto got = reader ? reader->read(total, buffer) : readStream(document, stream, total, buffer);
+        if (!got)
+        {
+            return std::unexpected(got.error());
+        }
+        if (*got == 0)
+        {
+            return total;
+        }
+        if (auto r = sink.write(std::span(buffer).first(*got)); !r)
+        {
+            return std::unexpected(r.error());
+        }
+        total += *got;
+    }
+}
+
 auto formatKey(std::span<const std::byte> key, bool bigEndian) -> std::string
 {
     if (key.size() == 16)

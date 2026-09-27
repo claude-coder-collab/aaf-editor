@@ -296,7 +296,9 @@ Decoding (`decodeValue(model, type, bytes, bigEndian)`):
   Everything the file stores is kept, so that the M3 writer can reproduce it.
 - Weak refs keep their raw `{tag, keyPid, key}` and are resolved through the load-time index. Dangling refs are flagged by validation.
 - On save, weak references are written from their stored `{tag, keyPid, key}`, and `referenced properties` is regenerated from its current paths. Edits keep keys consistent (§7): changing a set element's unique identifier rewrites the set index entry and every weak reference to it.
-- Stream properties reference their source entry, which is copied lazily on save, unless an edit has attached new contents (`StreamProperty::data`, a shared immutable buffer).
+- Stream properties reference their source entry, which is copied lazily on save, unless an edit has attached new contents. `StreamProperty::data` is a `std::shared_ptr<const cfb::ByteSource>`: either a `MemorySource`, or a `FileSource` for large essence, which is then read in chunks only when saving and never loaded into memory.
+  - `readStream(doc, stream, offset, out)` and `copyStream(doc, stream, sink)` read either kind, so extraction, previews and the RPC bridge don't need to care where the bytes live.
+  - In the CFB builder, `StreamData` has a third alternative, `SharedSource`. `sizeOf` and `readStreamData` work for all alternatives, and a container stream is opened once per copy, so its sector chain is not walked for every chunk.
 - **Editing hooks** (M4): `Document::mutableObject`, `addObject`, `mutableReferencedProperties`, `rebuildIndexes`, `isAttached` and `tagTarget`. They are low-level: only `aaf::edit` uses them, and it maintains the invariants. Detached objects stay in the object table so that ids remain stable for undo. They are not validated and not written.
 - Loading is eager for objects and properties and lazy for streams. Target: open a 50k-object file in under 2 s.
 
@@ -367,7 +369,7 @@ Status: **implemented (M4)** in `libs/edit/` (namespace `aaf::edit`, headers `aa
   | `moveInCollection(parent, pid, from, to)` | Vectors only. Local keys move with their elements. |
   | `deleteObject(id, force)` | Detaches the object from its parent, whether a singleton, vector or set. Without `force`, fails if any weak reference points into the subtree. With `force`, dangling references are allowed. |
   | `setWeakRef(id, pid, target)` | The target must be attached, an element of a strong set, and of the referenced class. Its tag is found from the path of `parentPid`s from the root, or appended to `referenced properties`. The key is the target's set entry key. |
-  | `setStreamData(id, pid, bytes)` | Replaces or adds stream contents. |
+  | `setStreamData(id, pid, bytes \| shared ByteSource)` | Replaces or adds stream contents. A shared `ByteSource` (for example a file) is read lazily on save and must stay readable until then. |
   | `pidOf(doc, id, name)` | Looks up a property PID by name, including superclasses. |
 
   Weak-reference collections (vectors and sets of weak references) are not yet editable.
@@ -408,7 +410,10 @@ aaftool validate <file> [--json]              diagnostics; exit 1 on errors (M2)
 aaftool roundtrip <in> <out> [--v3|--v4] [--regenerate-layout]
                                               load and save without edits (M3)
 aaftool timeline <file> [--mob NAME|ID]       text timeline
-aaftool extract <file> <mobid> <out>          dump embedded essence stream
+aaftool extract <file> --list                 list embedded essence: index, MobID, size, mob name
+aaftool extract <file> <mobid|index> <out>    write an embedded essence stream to a file, in 1 MiB chunks
+aaftool set-essence <in> <mobid|index> <data> <out>
+                                              replace an embedded essence stream with a file's contents (file-backed, undoable edit)
 ```
 
 The JSON output schema is the same one the RPC bridge uses (§8.3). **Canonical dump form** (`dump --json`):
@@ -487,6 +492,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
     - Python sets map to sorted lists; `datetime` values map back to the `TimeStamp` record, with microseconds as `fraction`.
     - One pyaaf2 quirk is accepted: it normalises a stored 0/0 rational to 0/1.
     - All 58 reference files match.
+  - Essence: `tools/crosscheck.py --essence <aaftool>` checks, for every reference file, that every stream written by `aaftool extract` equals pyaaf2's reading of it, and that pyaaf2 reads back a stream replaced by `aaftool set-essence`. The largest case is 4.7 MB of DNxHD in `picchu_seq0100_snippet_embedded.aaf`.
   - Round-trip (M3): `tools/crosscheck.py --roundtrip <aaftool>` rewrites each file with `aaftool roundtrip`, both preserving the layout (as v3) and regenerating it (as v4). It then compares pyaaf2's reading of the output with aaftool's reading of the original. Stream names are ignored for regenerated layouts.
 - Python tool versions are pinned in `tools/requirements.txt` (pyaaf2 1.7.1, pytest).
 - **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
@@ -496,11 +502,11 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 
 - **`ci.yml`** (every PR and push to main):
   - lint: clang-format 22 check and pytest for `tools/`;
-  - Linux GCC 14 Debug and Clang 22 Release, with `-Werror`, unit tests, and clang-tidy (`.clang-tidy`, warnings as errors) on the Clang job.
+  - Linux GCC 14 Debug and Clang 22 Release, with `-Werror`, unit tests, and clang-tidy (`.clang-tidy`, warnings as errors) on the Clang job;
+  - Windows MSVC and macOS AppleClang Release builds and tests.
   - LLVM 22 comes from apt.llvm.org (`.github/actions/setup-llvm`).
 - **`full.yml`** (push to main, nightly at 03:17 UTC, manual, or PRs that change it):
-  - Windows MSVC and macOS AppleClang builds and tests;
-  - ASan/UBSan tests with the external fixtures (cached by manifest hash) and the pyaaf2 cross-check;
+  - ASan/UBSan tests with the external fixtures (cached by manifest hash), and the pyaaf2 cross-checks (object, round-trip and essence);
   - TSan tests (including concurrent stream reads through one `FileSource`);
   - 10-minute fuzzing.
 - UI lint and tests are added with M5.
@@ -555,6 +561,8 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | 2026-09-27 | Baseline property types win over conflicting file declarations |
 | 2026-09-27 | Undo/redo uses object snapshots (before and after journals) instead of per-command inverse operations |
 | 2026-09-27 | Changing a set element's key rewrites all weak references to it within the same command |
+| 2026-09-27 | Windows and macOS builds run on every PR; sanitizers, external fixtures and fuzzing stay nightly |
+| 2026-09-27 | Edited stream data is a shared `ByteSource`, so large essence can be replaced from a file without loading it |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

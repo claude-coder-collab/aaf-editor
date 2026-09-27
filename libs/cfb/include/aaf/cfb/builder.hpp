@@ -5,6 +5,7 @@
 #include <aaf/cfb/types.hpp>
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -19,7 +20,18 @@ struct SourceStream
     EntryId id = kNoStream;
 };
 
-using StreamData = std::variant<std::vector<std::byte>, SourceStream>;
+/// Stream contents read from any byte source, for example a file on disk; shared so edits can hold it cheaply.
+struct SharedSource
+{
+    std::shared_ptr<const ByteSource> source;
+};
+
+using StreamData = std::variant<std::vector<std::byte>, SourceStream, SharedSource>;
+
+/// Size of stream data.
+[[nodiscard]] auto sizeOf(const StreamData& data) -> std::uint64_t;
+/// Reads up to `out.size()` bytes of stream data at `offset`.
+[[nodiscard]] auto readStreamData(const StreamData& data, std::uint64_t offset, std::span<std::byte> out) -> Result<std::size_t>;
 
 using NodeId = std::uint32_t;
 

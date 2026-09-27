@@ -288,7 +288,7 @@ private:
                     e.putName(name);
                     if (payload.data)
                     {
-                        return addStream(node, name, *payload.data, options_.preserveLayout ? o.storage : cfb::kNoStream);
+                        return addStream(node, name, cfb::SharedSource{ payload.data }, options_.preserveLayout ? o.storage : cfb::kNoStream);
                     }
                     if (payload.entry == cfb::kNoStream)
                     {
