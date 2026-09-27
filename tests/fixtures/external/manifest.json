@@ -1,0 +1,282 @@
+{
+  "sources": [
+    {
+      "name": "pyaaf2",
+      "repo": "markreidvfx/pyaaf2",
+      "commit": "08dcc3dfe823ea5781db1cb657d9c2606557fcdc",
+      "prefix": "tests/test_files/",
+      "licence": "MIT",
+      "files": [
+        {
+          "path": "tests/test_files/empty.aaf",
+          "sha256": "0a83da0fc7e2de89391c101c4b668dac6f857fbd721504e6d8f6b408b6e84a05",
+          "size": 184320
+        },
+        {
+          "path": "tests/test_files/retimes/bezier01.aaf",
+          "sha256": "d3bad62742fc46a8d59e142d29971c736ea7258c233667aebe965a66fd2fcc90",
+          "size": 520192
+        },
+        {
+          "path": "tests/test_files/retimes/bezier02.aaf",
+          "sha256": "bc203fc62dd31f5082508b78bd441b41924805afaaec5624d2b208f61c846fd5",
+          "size": 520192
+        },
+        {
+          "path": "tests/test_files/retimes/bezier03.aaf",
+          "sha256": "3391496abedfc701528a45162eda26ec975edfd0bbce660f929100b8bf6bf94e",
+          "size": 520192
+        },
+        {
+          "path": "tests/test_files/retimes/linear01.aaf",
+          "sha256": "36f411847256e0964df4297dc78558554867a4653c5468e86634aba88dff7f37",
+          "size": 495616
+        },
+        {
+          "path": "tests/test_files/retimes/linear02.aaf",
+          "sha256": "053d05d3349d40a97387b3452bc63f06700365ad8c7a7372db2132f674155ec0",
+          "size": 483328
+        },
+        {
+          "path": "tests/test_files/retimes/linear03.aaf",
+          "sha256": "544b31bbf474ab99372d46218d38d6e5d96199e5aee192da60636e5894e3ff7b",
+          "size": 483328
+        },
+        {
+          "path": "tests/test_files/retimes/spline01.aaf",
+          "sha256": "50851c8e133f9062ae3c3a29e0bbc4766c1f5e54a8fd33c1006c7d74845eae83",
+          "size": 520192
+        },
+        {
+          "path": "tests/test_files/retimes/spline02.aaf",
+          "sha256": "c8c584979c84ce971a019d6c9accf2ff983d432b6aea2535b99abc0c6a9b7a16",
+          "size": 483328
+        },
+        {
+          "path": "tests/test_files/retimes/spline03.aaf",
+          "sha256": "dcd2931856c0f98ca13433dfe8f99036e85340a38a740e968104f691e1a65150",
+          "size": 483328
+        },
+        {
+          "path": "tests/test_files/retimes/step01.aaf",
+          "sha256": "00b9464c710c15fef3b284c7c4cd4807b9890b2aa4b9f4091b8d6c5f7c363575",
+          "size": 495616
+        },
+        {
+          "path": "tests/test_files/retimes/step02.aaf",
+          "sha256": "a86afbd3c6679c3e943aa88e70ee120fe364958902f5ff69fceda1b51bba7605",
+          "size": 483328
+        },
+        {
+          "path": "tests/test_files/retimes/step03.aaf",
+          "sha256": "8d5c9e9770e3d879ffae6ef4d78e7328e8d358486ec1dc8893c661a5b528221b",
+          "size": 483328
+        },
+        {
+          "path": "tests/test_files/sector_size_512.aaf",
+          "sha256": "e4991b3e1272a8d23efb16a6fa11d560184e4024ddee41cbe32277345ce9af3b",
+          "size": 327168
+        },
+        {
+          "path": "tests/test_files/test_file_01.aaf",
+          "sha256": "be513199eb84f554421da2523b202183a43c8a68e9703f9d0e8541f6e831b9e9",
+          "size": 2318336
+        }
+      ]
+    },
+    {
+      "name": "otio-aaf-adapter",
+      "repo": "OpenTimelineIO/otio-aaf-adapter",
+      "commit": "47886982d67c00573ad4a565ae51ad0e73f4caff",
+      "prefix": "tests/sample_data/",
+      "licence": "Apache-2.0",
+      "files": [
+        {
+          "path": "tests/sample_data/2997fps-DFTC.aaf",
+          "sha256": "c5e3be1e04bb970d238f35df88d61552746e424a060e231ca3b17add16406af3",
+          "size": 285696
+        },
+        {
+          "path": "tests/sample_data/2997fps.aaf",
+          "sha256": "27570d7a829eaa044a3f2cb590d4dd421d9c77777b3ecb8c65fc475b981ce244",
+          "size": 393216
+        },
+        {
+          "path": "tests/sample_data/30fps.aaf",
+          "sha256": "73aff4db4515b09674ad47b1f57a4c3d44a2c87c2bf081b4ac654c3d95b4c028",
+          "size": 401408
+        },
+        {
+          "path": "tests/sample_data/avid_data_track_example.aaf",
+          "sha256": "325f5c3fa1b455987edce44a54f7b35234314ee6d1054470c37da42ea9fec4bc",
+          "size": 499712
+        },
+        {
+          "path": "tests/sample_data/bad_marker_track_from_avid.aaf",
+          "sha256": "4c02def7e87f9d4cd4bcb6d8117e493d9085e808daca5b61c9a6b5e51f582f4f",
+          "size": 436736
+        },
+        {
+          "path": "tests/sample_data/colored_clips.aaf",
+          "sha256": "818a460afe06753926b5fbc595366ba4bf462c341f8551fba019e8c6e66cec43",
+          "size": 495616
+        },
+        {
+          "path": "tests/sample_data/composite.aaf",
+          "sha256": "abf24f9b35019381cc7f6d93e6e563154a09f9c06bd208b173f593f63dfb6095",
+          "size": 442368
+        },
+        {
+          "path": "tests/sample_data/duplicates.aaf",
+          "sha256": "99a86d4400f77c4eeeb1b5f75af99fd55c1d8f620438a0866fecbafdbc0150b4",
+          "size": 421888
+        },
+        {
+          "path": "tests/sample_data/essence_group.aaf",
+          "sha256": "333171d344791aeda59b5242aa15a12803a145ac25d0bc58b9a5c13226fbaa1e",
+          "size": 454656
+        },
+        {
+          "path": "tests/sample_data/keyframed_properties.aaf",
+          "sha256": "c7427b3cc7432bf0e4375b1640dea18ec6167f25c571108edd35aebb6b56e885",
+          "size": 1302528
+        },
+        {
+          "path": "tests/sample_data/linear_speed_effects.aaf",
+          "sha256": "43aaef4185ef345728d1e067f314e1ce9e6975591b48526011a5cf500046975b",
+          "size": 999424
+        },
+        {
+          "path": "tests/sample_data/marker-over-audio.aaf",
+          "sha256": "a1ef166874eb245216880ae60d18c41cda7d694c19bd6d5c81a71c730c305722",
+          "size": 1826816
+        },
+        {
+          "path": "tests/sample_data/marker-over-transition.aaf",
+          "sha256": "350b1350c39920ef878a043b1317cfb3da4ed624793eb225bd17554778f9a5c3",
+          "size": 524288
+        },
+        {
+          "path": "tests/sample_data/misc_speed_effects.aaf",
+          "sha256": "6881f8213e33500b092cbb47b1bb8182e111fdd591123ae692f469ce31b2680f",
+          "size": 659456
+        },
+        {
+          "path": "tests/sample_data/multiple-markers-over-transitions.aaf",
+          "sha256": "fa416a972af6b58ad087fa3dec43e572f31d49f06d579e3fe05b9c4b992603f1",
+          "size": 942080
+        },
+        {
+          "path": "tests/sample_data/multiple_markers.aaf",
+          "sha256": "9f878dedb7750c5e428d5c8c052544e32e58ba158a1e79ceb3b34c4a80a6e744",
+          "size": 921600
+        },
+        {
+          "path": "tests/sample_data/multiple_timecode_objects.aaf",
+          "sha256": "8cb08c3edc7d029f2e65baae4a9b8fe3aa9e6e0d76ad2435b2ce9b76b7553e18",
+          "size": 380928
+        },
+        {
+          "path": "tests/sample_data/multiple_top_level_mobs.aaf",
+          "sha256": "c5995eeaaf257033f9a8194ca32957c4fb3cd80d3f901ef9ac197877c6d8fb47",
+          "size": 565248
+        },
+        {
+          "path": "tests/sample_data/multitrack.aaf",
+          "sha256": "baef32d64009278079207537527ef3dccd71392c60aeb7cd814f83d9c1b5ab21",
+          "size": 663552
+        },
+        {
+          "path": "tests/sample_data/nested_audio_dissolve.aaf",
+          "sha256": "4386bdb7e8adeb134e3d1a46f5f8136a8951c3ede604fb70cc1b411dd4faa579",
+          "size": 454656
+        },
+        {
+          "path": "tests/sample_data/nested_stack.aaf",
+          "sha256": "397715a8687a84158652d0988dded27ac187bd059678d9492adb2e399bd3deba",
+          "size": 487424
+        },
+        {
+          "path": "tests/sample_data/nesting_test.aaf",
+          "sha256": "73a782c2f7a3c06719ee0546b9ec3c89d68476ce68eae1e416d4e4c0b9362242",
+          "size": 446464
+        },
+        {
+          "path": "tests/sample_data/nesting_test_preflattened.aaf",
+          "sha256": "a952400a46e36ebf042303c7e042073dc06a2b5fedae42d90b18e78e917c9bed",
+          "size": 425984
+        },
+        {
+          "path": "tests/sample_data/normalclip_sourceclip_references_compositionmob_has_also_mastermob_usercomments.aaf",
+          "sha256": "9aa69926d3361c63446a250d14d93a930df8687d0dae376ea48b17cd0de805e0",
+          "size": 495616
+        },
+        {
+          "path": "tests/sample_data/normalclip_sourceclip_references_compositionmob_with_usercomments_no_mastermob_usercomments.aaf",
+          "sha256": "05ebdb72279b1e9336178390d15d2b4fb4d7e16259a13032756649ca8ec71e6e",
+          "size": 491520
+        },
+        {
+          "path": "tests/sample_data/one_audio_clip.aaf",
+          "sha256": "e88c33a71c5ec05906e8132c1535ac0f80bd6dcc1c465d65b03f3bd7aa26fffe",
+          "size": 430080
+        },
+        {
+          "path": "tests/sample_data/one_clip.aaf",
+          "sha256": "efca85765931bbf0c1d5ad0bd87e3f539f9c8cd24363d22c6803116666a784bc",
+          "size": 438272
+        },
+        {
+          "path": "tests/sample_data/picchu_seq0100_snippet_embedded.aaf",
+          "sha256": "af79374a5a66300d2491e7d296870716fd5240b08642e74519093a3e1bd5d863",
+          "size": 5173248
+        },
+        {
+          "path": "tests/sample_data/preflattened.aaf",
+          "sha256": "f8e4ba896d9f9b13a1078843daa9068a10531b5a6a8c3f6f0394883dd26d749b",
+          "size": 634880
+        },
+        {
+          "path": "tests/sample_data/simple.aaf",
+          "sha256": "c76686dd6e39eb570fe3c3cee631433ec8cf092e89345b7d8b96ac3337523fbf",
+          "size": 593920
+        },
+        {
+          "path": "tests/sample_data/subclip_sourceclip_references_compositionmob_with_mastermob.aaf",
+          "sha256": "0307895ae5d616d03675a9e1ebc0917d63fefaf5a865cb527dfcdac6917855dd",
+          "size": 458752
+        },
+        {
+          "path": "tests/sample_data/test_muted_clip.aaf",
+          "sha256": "e1f4a1ad1a3076209aef4d7eed888e383694de4ce64c5373eb2f7906854da40d",
+          "size": 397312
+        },
+        {
+          "path": "tests/sample_data/time_warp_test.avid_media_composer.aaf",
+          "sha256": "84a3754e8099c6be95cbd463268d37693e3e9750a54d64ffd0e9b31b17873973",
+          "size": 1953792
+        },
+        {
+          "path": "tests/sample_data/timecode_test.aaf",
+          "sha256": "ac663ba195ef59063ece1cad21bd5739a72305bd6b949c48197786145253c182",
+          "size": 425984
+        },
+        {
+          "path": "tests/sample_data/transitions.aaf",
+          "sha256": "03d8f1f97c455ed6861b3a2842cc22fc8a1716771cc3b7143e74c6878267535c",
+          "size": 679936
+        },
+        {
+          "path": "tests/sample_data/trims.aaf",
+          "sha256": "5dac7e1300d83c2bdd2538aac6b7930a0f73397dc099c8fe3a0451bc3d056c66",
+          "size": 593920
+        },
+        {
+          "path": "tests/sample_data/utf8.aaf",
+          "sha256": "065701c3ec634534031c1c76a97acf55b00cac15ce00f3a54f8c02156789a181",
+          "size": 438272
+        }
+      ]
+    }
+  ]
+}

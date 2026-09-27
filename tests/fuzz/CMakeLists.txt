@@ -1,0 +1,7 @@
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "AAF_BUILD_FUZZERS requires Clang")
+endif()
+add_executable(fuzz_cfb fuzz_cfb.cpp)
+target_link_libraries(fuzz_cfb PRIVATE aaf::cfb aaf::project_options)
+target_compile_options(fuzz_cfb PRIVATE -fsanitize=fuzzer)
+target_link_options(fuzz_cfb PRIVATE -fsanitize=fuzzer)

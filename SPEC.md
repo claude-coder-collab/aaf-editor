@@ -39,15 +39,16 @@ An edit in either view is one undoable command that updates both views.
 aaf-editor/
   CMakeLists.txt, CMakePresets.json      Ninja Multi-Config
   libs/
+    common/     aaf::Error / aaf::Result (header-only)
     cfb/        libaafcfb     CFB container read/write (no AAF knowledge)
     core/       libaafcore    stored format, metamodel, object graph, validation
     timeline/   libaaftl      timeline projection + editorial operations
     edit/       libaafedit    command/undo engine, document session
   apps/
-    aaftool/    CLI: dump, validate, roundtrip, json, extract
+    aaftool/    CLI: cfb, cfb-roundtrip (M1); dump, validate, roundtrip, json, extract (later)
     editor/     webview host application + RPC bridge
   ui/           TypeScript frontend (Vite), bundled into the editor binary
-  tests/        Catch2 unit tests, fixtures, fuzz targets
+  tests/        Catch2 unit tests (tests/<lib>/), helpers (tests/support/), fixtures, fuzz targets (tests/fuzz/)
   tools/        Python scripts (fixture generation, spec checks)
   docs/reference/  AAF specification PDFs (local only, gitignored; fetched by tools/fetch_specs.py)
   model/        built-in AAF baseline metamodel data (generated source)
@@ -57,43 +58,102 @@ Dependency direction: `cfb ← core ← timeline ← edit ← apps`. The librari
 
 ### 3.1 Language and tooling
 
-- C++26 mode, restricted to features supported by current GCC, Clang and MSVC (in practice mostly C++23: `std::expected`, `std::span`, `std::byte`, `std::format`, ranges, `std::flat_map` only if all three ship it).
+- C++26 mode (on MSVC, `cxx_std_23`, which CMake maps to `/std:c++latest`, because CMake does not yet know `cxx_std_26` for MSVC; C++ module scanning is off), restricted to features supported by current GCC, Clang and MSVC (in practice mostly C++23: `std::expected`, `std::span`, `std::byte`, `std::format`, ranges, `std::flat_map` only if all three ship it).
 - Library errors use `std::expected<T, aaf::Error>`. No exceptions cross library API boundaries. `Error` carries a code, a message and a byte offset/path when relevant.
 - CMake ≥ 3.28, Ninja Multi-Config, presets for `gcc`, `clang` and `msvc`.
 - Strict warnings (`-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror` in CI; `/W4 /WX` on MSVC).
 - clang-format using the `~/.clang-format` style (copied into the repo as `.clang-format`), clang-tidy in CI.
-- Sanitizers (ASan/UBSan) in a debug CI job. libFuzzer targets for the CFB and stored-format readers.
+- Sanitizers: ASan/UBSan and TSan in separate debug CI jobs (presets `clang-asan` and `clang-tsan`). libFuzzer targets for the CFB and stored-format readers.
 - Tests use Catch2 v3. Python scripts in `tools/` (with type hints and pytest tests in `tools/tests/`) use pyaaf2 for fixture generation and cross-checks, **test-time only**.
 
 ## 4. Layer 1: CFB container (`libaafcfb`)
 
-Implements [MS-CFB] v3 (512-byte sectors) and v4 (4096-byte sectors).
+Implements [MS-CFB] v3 (512-byte sectors) and v4 (4096-byte sectors). Status: **implemented (M1)**. The code lives in `libs/cfb/`, with the shared `aaf::Error`/`aaf::Result` in `libs/common/include/aaf/error.hpp`.
 
 ### 4.1 Reading
 
-- Parse the header, DIFAT (including chained DIFAT sectors), FAT, MiniFAT, the directory stream and the mini stream.
-- Input comes through a `ByteSource` interface (memory-mapped file by default) so that huge essence streams are never fully loaded.
-- The directory is exposed as a tree: `Entry{name (UTF-16→UTF-8), type, clsid, children, stream size}`.
-- A stream is read through a `StreamReader` (random access, lazy sector chain resolution).
-- **Robustness**: every read is bounds-checked. Detect cycles in FAT chains, MiniFAT chains, DIFAT chains and the directory red-black tree. Reject files over size limits, and never trust sizes or counts without checking them against the file length. Report a precise error rather than crashing.
+- `Container::open` parses the header, DIFAT (header plus chained DIFAT sectors), FAT, MiniFAT, directory and mini-stream chain up front, and validates all structure. Stream data is read lazily.
+- **Input**: comes through the `ByteSource` interface (`size()`, thread-safe positional `read(offset, span)`). Two implementations exist:
+  - `FileSource`: positional reads under a mutex. Memory mapping is a possible later optimisation.
+  - `MemorySource`: used by tests and fuzzing.
+- **Header checks**:
+  - signature `D0 CF 11 E0 A1 B1 1A E1` and byte order `0xFFFE`;
+  - (major 3, shift 9) or (major 4, shift 12), otherwise `Errc::unsupported`;
+  - mini sector shift 6 and cutoff 4096.
+  - The **header CLSID** (offset 8) is exposed as `HeaderInfo::clsid`, because AAF stores its file signature there (§5.1).
+- **Directory**:
+  - Exposed as `DirEntry{id, parent, name (UTF-16), type, clsid, stateBits, creation and modified times, startSector, size, children}`.
+  - `children` are listed in tree order, which is sorted order.
+  - Slots not reachable from the root are reported as `EntryType::empty`.
+  - Lookups: `find(parent, name)` (CFB name comparison) and `findPath("a/b/c")` (UTF-8).
+- **Streams**: `openStream(id)` returns a `StreamReader` with random-access `read(offset, span)` and `readAll(maxSize)`.
+  - The reader precomputes the absolute file offset of each sector, or of each 64-byte mini sector (a mini sector never spans two regular sectors).
+  - It holds a non-owning pointer to the container's source, so it must not outlive the `Container`.
+- **Robustness**:
+  - Every read is bounds-checked.
+  - Sector chains are rejected if they reference sectors that are special or out of range, or if they are longer than the table they index (which means a cycle).
+  - The directory tree is walked iteratively, and an entry linked twice (a cycle or shared node) is an error.
+  - FAT and DIFAT counts are checked against the file size before any allocation.
+  - A stream whose chain is shorter than its size is an error.
+- **Leniency**, needed to read real-world files:
+  - A chain longer than the stream needs is accepted.
+  - A final sector cut short by end of file is zero-filled.
+  - The upper 32 bits of v3 stream sizes are ignored.
+  - Names are read up to the first NUL.
+  - The header CLSID is not required to be zero.
+- **Name ordering** (`compareNames`): shorter names sort first, then names are compared by upper-cased UTF-16 code units. `upperCase` covers ASCII, Latin-1, Latin Extended-A, Greek and Cyrillic. That is sufficient for AAF's ASCII names; other code units compare unchanged.
 
 ### 4.2 Writing
 
-- Always write a **complete new file**. Never modify a file in place.
-- Target path: write `<path>.tmp-<random>`, fsync, then atomically replace the original. On Windows use `ReplaceFileW`, which requires the source mapping to be closed or reopened.
-- By default the sector size is inherited from the source file. New files use 4096-byte sectors (v4).
-- Streams under 4096 bytes go in the mini stream.
-- Directory siblings are stored as a valid red-black tree ordered by the CFB comparison: length first, then case-insensitive uppercase compare of UTF-16 code units.
-- Streams that were not modified are copied sector-by-sector from the source `ByteSource`, so essence is never buffered whole.
+- `Builder` describes a tree of storages and streams. Node 0 is the root.
+  - `addStorage` and `addStream` validate names: 1–31 UTF-16 units, no `/ \ : !` or NUL, and unique among siblings under the CFB comparison.
+  - Stream data is either owned bytes or a `SourceStream{container, entryId}`, which is copied lazily in 1 MiB chunks, so essence is never buffered whole.
+  - `Builder::fromContainer` copies a whole tree, including CLSIDs, state bits, timestamps and the header CLSID, with every stream referencing its source.
+- **Output**: always a **complete new file**, never an in-place modification. `writeFile` uses `writeFileAtomic`:
+  - write to `<path>.tmp-<random>`;
+  - fsync (`fsync` on POSIX, `_commit` on Windows);
+  - rename over the target (`std::filesystem::rename` on POSIX, `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)` on Windows);
+  - on failure, delete the temporary file and leave the target untouched.
+  - Open issue for M3: saving over a file that is still open as the source needs verifying on Windows.
+- **Version**: inherited from the source by default (`Builder::setVersion` overrides it). New builders default to v4. v3 streams are limited to 2 GiB.
+- **Layout**: sectors are laid out in this order:
+  1. regular streams, in directory order;
+  2. the mini stream (streams of 1–4095 bytes, 64-byte aligned);
+  3. the MiniFAT;
+  4. the directory;
+  5. the FAT;
+  6. the DIFAT.
 
-### 4.3 API sketch
+  The FAT and DIFAT counts are solved as a fixed point. Every region is zero-padded to a whole sector, and a v4 header occupies a full 4096-byte sector.
+- **Directory entries**:
+  - Entry ids are assigned depth-first, with siblings in sorted order.
+  - Siblings form a balanced binary search tree split at the median. Nodes at the maximum depth are coloured red and all others black, which is always a valid red-black tree. This is verified by tests for 0–300 siblings.
+  - The root is always named `Root Entry`.
+  - Empty streams and storages use start sector `ENDOFCHAIN` and `0` respectively.
+  - Unused slots are zero, with their sibling and child links set to `NOSTREAM`.
+
+### 4.3 API
 
 ```cpp
 namespace aaf::cfb {
-class Container;                        // read-only view of an existing file
-auto open(std::unique_ptr<ByteSource>) -> std::expected<Container, Error>;
-class Builder;                          // builds a new file tree
-auto write(const Builder&, ByteSink&) -> std::expected<void, Error>;
+class Container {                       // read-only, validated view
+    static auto open(std::unique_ptr<ByteSource>) -> Result<Container>;
+    static auto openFile(const std::filesystem::path&) -> Result<Container>;
+    auto header() const -> const HeaderInfo&;           // version, sector size, counts, header CLSID
+    auto root() const -> const DirEntry&;
+    auto entry(EntryId) const -> const DirEntry&;
+    auto find(EntryId parent, std::u16string_view) const -> std::optional<EntryId>;
+    auto findPath(std::string_view) const -> std::optional<EntryId>;
+    auto openStream(EntryId) const -> Result<StreamReader>;
+};
+class Builder {                         // tree to write
+    static auto fromContainer(const Container&) -> Result<Builder>;
+    auto addStorage(NodeId parent, std::u16string name, Clsid = {}) -> Result<NodeId>;
+    auto addStream(NodeId parent, std::u16string name, StreamData) -> Result<NodeId>;
+    void setVersion(Version); void setHeaderClsid(const Clsid&);
+};
+auto write(const Builder&, ByteSink&) -> Result<void>;
+auto writeFile(const Builder&, const std::filesystem::path&) -> Result<void>;   // atomic
 }
 ```
 
@@ -110,7 +170,7 @@ This maps CFB to AAF objects. The normative source is the **AAF Stored Format Sp
   - Values: concatenated in index order.
 - Both byte orders must be readable. The byte order applies to the header, index and values. The writer always writes little-endian.
 - Values are contiguous (there is no offset field). Index entries with an unknown stored form **must be skipped** using `length`, and are preserved verbatim.
-- The root storage CLSID is the file signature: `{42464141-000d-4d4f-060e-2b34010101ff}` (512-byte sectors) or `{0d010201-0200-0000-060e-2b3403020101}` (4096-byte sectors). The writer sets the signature that matches the sector size.
+- **File signature**: `{42464141-000d-4d4f-060e-2b34010101ff}` (512-byte sectors) or `{0d010201-0200-0000-060e-2b3403020101}` (4096-byte sectors). **Discrepancy with the stored-format spec**, which says the signature is the root storage's CLSID. In every reference file, and in pyaaf2, the signature is in the **CFB header CLSID** (offset 8), and the root storage's CLSID is the Root class AUID `{b3b398a5-1c90-11d4-8053-080036210804}`. We follow the files. The writer sets the signature that matches the sector size it writes.
 - The root storage holds the root object, which has PID `0x0001` for the MetaDictionary and PID `0x0002` for the Header.
 
 ### 5.2 Stored forms
@@ -208,7 +268,8 @@ Adjacent Fillers are merged after every op. Transitions adjacent to an edited po
 
 ```
 aaftool dump <file> [--depth N] [--json]      object tree
-aaftool cfb <file>                            raw CFB directory listing
+aaftool cfb <file>                            raw CFB directory listing (header info + tree)
+aaftool cfb-roundtrip <in> <out> [--v3|--v4]  rewrite the CFB container only (no AAF parsing)
 aaftool validate <file>                       diagnostics, exit 1 on errors
 aaftool roundtrip <in> <out>                  read + write, no edits
 aaftool timeline <file> [--mob NAME|ID]       text timeline
@@ -254,7 +315,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 2. Unknown classes, properties and opaque data survive round-trip.
 3. Files written by us open in: pyaaf2 (automated in CI), the AAF SDK InfoDumper (automated if feasible), and Avid Media Composer, Pro Tools and DaVinci Resolve (manual release checklist).
 4. Editing only touches the objects in the command's ChangeSet. Diffing the graph before and after an edit shows no other changes.
-5. Malformed input never crashes: fuzz with no findings across 1 CPU-hour per fuzz target in the nightly job.
+5. Malformed input never crashes: every fuzz target runs with no findings in the nightly job (10 minutes per target, under ASan/UBSan).
 
 ## 10. Testing
 
@@ -268,19 +329,30 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
   | pyaaf2 | `github.com/markreidvfx/pyaaf2` `tests/test_files/**` (includes `sector_size_512.aaf` and `retimes/`) | MIT | Includes a v3 (512-byte sector) file |
   | OpenTimelineIO AAF adapter | `github.com/OpenTimelineIO/otio-aaf-adapter` `tests/sample_data/*.aaf` | Apache-2.0 | Real Avid/Premiere/Resolve exports: effects, transitions, nesting, multicam, markers |
 
-  - The pyaaf2 and OTIO files are **not committed**. `tools/fetch_fixtures.py` downloads them into `tests/fixtures/external/<source>/`, driven by `tests/fixtures/external/manifest.json`. The manifest records the repo URL, pinned commit, path and SHA-256 of each file, and the script verifies every hash.
+  - The pyaaf2 and OTIO files are **not committed**. `tools/fetch_fixtures.py` (`fetch` is the default; `pin` re-resolves `main` to a commit and rewrites the manifest) downloads them into `tests/fixtures/external/<source>/`, driven by `tests/fixtures/external/manifest.json`. The manifest records the repo URL, pinned commit, path and SHA-256 of each file, and the script verifies every hash.
   - The fetch is idempotent and cached, and CI caches the directory keyed on the manifest hash.
   - The vendored AAF SDK files are always present, so their tests run on every PR. Tests that need fetched fixtures are tagged `[external]` and skipped with a message when the files are absent.
   - Every reference file must pass: open without error, `validate` with no errors (known upstream defects are listed in the manifest as expected diagnostics), lossless round-trip (§9.1), and the pyaaf2 cross-check.
   - For the OTIO files, a test compares our timeline projection (track count, clip count, record in/out, source in/out per clip) with the expected values in `tests/fixtures/external/otio_expectations.json`. Those values are generated once by running the OTIO AAF adapter (`tools/gen_otio_expectations.py`) and committed.
 - Additional real-world samples (anonymised, redistributable) can be added to the manifest with provenance notes. Large samples are always fetched, never committed.
-- **Cross-check**: `tools/crosscheck.py` compares `aaftool dump --json` with the pyaaf2 reading of the same file.
+- **Cross-check**:
+  - Container level (M1): `tools/crosscheck_cfb.py <aaftool>` rewrites every reference file with `aaftool cfb-roundtrip` as v3 and v4. pyaaf2 must then read an identical directory tree, CLSIDs and stream bytes, and the same mob IDs.
+  - Object level (M2+): `tools/crosscheck.py` compares `aaftool dump --json` with pyaaf2's reading of the same file.
+- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) runs 10 minutes nightly, seeded from the SDK fixtures. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
 - **UI**: Vitest for the frontend logic and the RPC codec. Playwright smoke test against a headless build of the UI with a mock bridge.
 
 ## 11. CI/CD (GitHub Actions, frugal)
 
-- **PR**: Linux with GCC and Clang, Debug and Release, unit tests; clang-format check; clang-tidy on changed files; UI lint and tests.
-- **main / nightly**: add Windows (MSVC) and macOS builds, ASan/UBSan, fuzzing (time-boxed), and external-fixture tests with the pyaaf2 and OTIO cross-checks.
+- **`ci.yml`** (every PR and push to main):
+  - lint: clang-format 22 check and pytest for `tools/`;
+  - Linux GCC 14 Debug and Clang 22 Release, with `-Werror`, unit tests, and clang-tidy (`.clang-tidy`, warnings as errors) on the Clang job.
+  - LLVM 22 comes from apt.llvm.org (`.github/actions/setup-llvm`).
+- **`full.yml`** (push to main, nightly at 03:17 UTC, manual, or PRs that change it):
+  - Windows MSVC and macOS AppleClang builds and tests;
+  - ASan/UBSan tests with the external fixtures (cached by manifest hash) and the pyaaf2 cross-check;
+  - TSan tests (including concurrent stream reads through one `FileSource`);
+  - 10-minute fuzzing.
+- UI lint and tests are added with M5.
 - **Tags `v*`**: a release workflow builds on a three-OS matrix and publishes a GitHub Release with these assets:
 
   | OS | Runner | Artifacts |
@@ -299,7 +371,7 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 
 | # | Deliverable | Exit criterion |
 |---|---|---|
-| M1 | `libaafcfb` read + write, `aaftool cfb`, fixture fetch script + manifest | Round-trips all reference fixtures at the CFB level, fuzz target running |
+| M1 ✅ | `libaafcfb` read + write, `aaftool cfb` / `cfb-roundtrip`, fixture fetch script + manifest, fuzz target, CI | All 58 reference files round-trip at the CFB level (v3 and v4) and pass the pyaaf2 cross-check; fuzz target running |
 | M2 | Stored-format reader, baseline metamodel, `aaftool dump/validate` | Dumps all fixtures and matches the pyaaf2 cross-check |
 | M3 | Stored-format writer, `aaftool roundtrip` | §9.1–9.3 (automated parts) pass |
 | M4 | Edit session + primitive commands | Undo/redo symmetry tests pass |
@@ -322,6 +394,8 @@ TypeScript, Vite and Svelte 5. The timeline is drawn on `<canvas>`.
 | 2026-09-27 | Clean-room library built from the AAF specifications. The only thing taken from the AAF SDK is its 6 sample `.aaf` files, committed as fixtures |
 | 2026-09-27 | Baseline metamodel IDs come from the pyaaf2 model tables (MIT), cross-checked against the Object Spec and reference files |
 | 2026-09-27 | Spec PDFs kept local only (not redistributable), fetched by script |
+| 2026-09-27 | AAF file signature lives in the CFB header CLSID, not the root storage CLSID (the files contradict the stored-format spec) |
+| 2026-09-27 | CI: frugal PR pipeline on Linux only; Windows, macOS, sanitizers, external fixtures and fuzzing run nightly and on main |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 
