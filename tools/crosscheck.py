@@ -5,6 +5,9 @@ With `--roundtrip`, each file is first rewritten by `aaftool roundtrip` (preserv
 regenerated layout as v4), and pyaaf2's reading of the rewritten file is compared with aaftool's
 reading of the original.
 
+With `--essence`, every embedded essence stream extracted by `aaftool extract` must equal pyaaf2's
+reading of it, and a stream replaced by `aaftool set-essence` must read back through pyaaf2.
+
 Both sides are reduced to the canonical JSON form described in SPEC §8.1; strong-reference sets are
 compared order-insensitively. Differences are printed as JSON paths.
 """
@@ -162,11 +165,47 @@ def compare_roundtrip(aaftool: Path, path: Path, workdir: Path) -> list[str]:
     return problems
 
 
+def compare_essence(aaftool: Path, path: Path, workdir: Path) -> list[str]:
+    run = subprocess.run([str(aaftool), "extract", str(path), "--list"], capture_output=True, text=True)
+    if run.returncode != 0:
+        return [f"aaftool extract --list failed: {run.stderr.strip()}"]
+    listed = [line.split("\t") for line in run.stdout.splitlines() if line]
+    with aaf2.open(str(path), "r") as f:
+        theirs = {ed.mob_id.urn: ed.open("r").read() for ed in f.content.essencedata}
+    problems: list[str] = []
+    if sorted(row[1] for row in listed) != sorted(theirs):
+        problems.append("essence MobIDs differ")
+    for index, mob_id, size, *_ in listed:
+        out = workdir / "essence.bin"
+        run = subprocess.run([str(aaftool), "extract", str(path), index, str(out)], capture_output=True, text=True)
+        if run.returncode != 0:
+            problems.append(f"extract {index} failed: {run.stderr.strip()}")
+            continue
+        data = out.read_bytes()
+        if data != theirs.get(mob_id) or len(data) != int(size):
+            problems.append(f"essence {mob_id} differs from pyaaf2")
+    if listed:
+        replacement = workdir / "replacement.bin"
+        replacement.write_bytes(bytes(range(256)) * 97)
+        edited = workdir / "edited.aaf"
+        run = subprocess.run([str(aaftool), "set-essence", str(path), "0", str(replacement), str(edited)], capture_output=True, text=True)
+        if run.returncode != 0:
+            problems.append(f"set-essence failed: {run.stderr.strip()}")
+        else:
+            with aaf2.open(str(edited), "r") as f:
+                replaced = {ed.mob_id.urn: ed.open("r").read() for ed in f.content.essencedata}
+            if replaced.get(listed[0][1]) != replacement.read_bytes():
+                problems.append("pyaaf2 does not read the replaced essence")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("aaftool", type=Path)
     parser.add_argument("files", nargs="*", type=Path)
-    parser.add_argument("--roundtrip", action="store_true", help="compare pyaaf2's reading of files rewritten by aaftool")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--roundtrip", action="store_true", help="compare pyaaf2's reading of files rewritten by aaftool")
+    mode.add_argument("--essence", action="store_true", help="compare embedded essence extracted and replaced by aaftool")
     args = parser.parse_args(argv)
     logging.disable(logging.WARNING)
 
@@ -174,7 +213,12 @@ def main(argv: list[str] | None = None) -> int:
     failures = 0
     workdir = Path(tempfile.mkdtemp())
     for path in files:
-        problems = compare_roundtrip(args.aaftool, path, workdir) if args.roundtrip else compare(args.aaftool, path)
+        if args.essence:
+            problems = compare_essence(args.aaftool, path, workdir)
+        elif args.roundtrip:
+            problems = compare_roundtrip(args.aaftool, path, workdir)
+        else:
+            problems = compare(args.aaftool, path)
         if problems:
             failures += 1
             print(f"FAIL {path}")

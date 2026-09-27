@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <format>
+#include <optional>
 
 namespace aaf::cfb
 {
@@ -247,13 +248,17 @@ private:
         {
             return *bytes;
         }
-        const auto& src = std::get<SourceStream>(node.data);
-        auto reader = src.container->openStream(src.id);
-        if (!reader)
+        std::vector<std::byte> out(static_cast<std::size_t>(sizeOf(node.data)));
+        auto got = readStreamData(node.data, 0, out);
+        if (!got)
         {
-            return std::unexpected(reader.error());
+            return std::unexpected(got.error());
         }
-        return reader->readAll();
+        if (*got != out.size())
+        {
+            return fail(Errc::io, std::format("stream '{}' ended early", toUtf8(node.name)));
+        }
+        return out;
     }
 
     static auto tableBytes(const std::vector<std::uint32_t>& table, std::size_t entries) -> std::vector<std::byte>
@@ -293,18 +298,22 @@ private:
         {
             return emitPadded(*bytes);
         }
-        const auto& src = std::get<SourceStream>(node.data);
-        auto reader = src.container->openStream(src.id);
-        if (!reader)
+        std::optional<StreamReader> reader;
+        if (const auto* src = std::get_if<SourceStream>(&node.data))
         {
-            return std::unexpected(reader.error());
+            auto opened = src->container->openStream(src->id);
+            if (!opened)
+            {
+                return std::unexpected(opened.error());
+            }
+            reader = std::move(*opened);
         }
         std::vector<std::byte> buffer(kCopyChunk);
         std::uint64_t offset = 0;
         while (offset < slot.size)
         {
             const auto n = static_cast<std::size_t>(std::min<std::uint64_t>(buffer.size(), slot.size - offset));
-            auto got = reader->read(offset, std::span(buffer).first(n));
+            auto got = reader ? reader->read(offset, std::span(buffer).first(n)) : readStreamData(node.data, offset, std::span(buffer).first(n));
             if (!got)
             {
                 return std::unexpected(got.error());
@@ -584,13 +593,50 @@ auto Builder::addStream(NodeId parent, std::u16string name, StreamData data) -> 
 
 auto Builder::streamSize(NodeId id) const -> std::uint64_t
 {
-    const auto& node = nodes_.at(id);
-    if (const auto* bytes = std::get_if<std::vector<std::byte>>(&node.data))
+    return sizeOf(nodes_.at(id).data);
+}
+
+auto sizeOf(const StreamData& data) -> std::uint64_t
+{
+    if (const auto* bytes = std::get_if<std::vector<std::byte>>(&data))
     {
         return bytes->size();
     }
-    const auto& src = std::get<SourceStream>(node.data);
+    if (const auto* shared = std::get_if<SharedSource>(&data))
+    {
+        return shared->source ? shared->source->size() : 0;
+    }
+    const auto& src = std::get<SourceStream>(data);
     return src.container->entry(src.id).size;
+}
+
+auto readStreamData(const StreamData& data, std::uint64_t offset, std::span<std::byte> out) -> Result<std::size_t>
+{
+    if (const auto* bytes = std::get_if<std::vector<std::byte>>(&data))
+    {
+        if (offset >= bytes->size())
+        {
+            return 0;
+        }
+        const auto n = static_cast<std::size_t>(std::min<std::uint64_t>(out.size(), bytes->size() - offset));
+        std::copy_n(bytes->begin() + static_cast<std::ptrdiff_t>(offset), n, out.begin());
+        return n;
+    }
+    if (const auto* shared = std::get_if<SharedSource>(&data))
+    {
+        if (!shared->source)
+        {
+            return 0;
+        }
+        return shared->source->read(offset, out);
+    }
+    const auto& src = std::get<SourceStream>(data);
+    auto reader = src.container->openStream(src.id);
+    if (!reader)
+    {
+        return std::unexpected(reader.error());
+    }
+    return reader->read(offset, out);
 }
 
 auto write(const Builder& builder, ByteSink& sink) -> Result<void>

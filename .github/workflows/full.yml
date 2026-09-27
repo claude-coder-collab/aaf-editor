@@ -15,31 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Configure
-        run: cmake --preset msvc -DAAF_WARNINGS_AS_ERRORS=ON
-      - name: Build
-        run: cmake --build build/msvc --config Release
-      - name: Test
-        run: ctest --test-dir build/msvc -C Release --output-on-failure
-
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Ninja
-        run: brew install ninja
-      - name: Configure
-        run: cmake --preset clang -DAAF_WARNINGS_AS_ERRORS=ON
-      - name: Build
-        run: cmake --build build/clang --config Release
-      - name: Test
-        run: ctest --test-dir build/clang -C Release --output-on-failure
-
   sanitizers-and-fixtures:
     runs-on: ubuntu-24.04
     steps:
@@ -70,6 +45,8 @@ jobs:
         run: python tools/crosscheck.py build/clang-asan/apps/aaftool/Debug/aaftool
       - name: Cross-check round-tripped files with pyaaf2
         run: python tools/crosscheck.py --roundtrip build/clang-asan/apps/aaftool/Debug/aaftool
+      - name: Cross-check embedded essence with pyaaf2
+        run: python tools/crosscheck.py --essence build/clang-asan/apps/aaftool/Debug/aaftool
 
   tsan:
     runs-on: ubuntu-24.04

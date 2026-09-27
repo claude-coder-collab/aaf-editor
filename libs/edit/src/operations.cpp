@@ -696,6 +696,15 @@ auto setWeakRef(Transaction& tx, ObjectId id, std::uint16_t pid, ObjectId target
 
 auto setStreamData(Transaction& tx, ObjectId id, std::uint16_t pid, std::vector<std::byte> data) -> Result<void>
 {
+    return setStreamData(tx, id, pid, std::make_shared<const cfb::MemorySource>(std::move(data)));
+}
+
+auto setStreamData(Transaction& tx, ObjectId id, std::uint16_t pid, std::shared_ptr<const cfb::ByteSource> source) -> Result<void>
+{
+    if (!source)
+    {
+        return fail(Errc::invalid_argument, "stream source is null");
+    }
     auto def = definitionFor(tx.document(), id, pid, StoredForm::dataStream);
     if (!def)
     {
@@ -710,8 +719,8 @@ auto setStreamData(Transaction& tx, ObjectId id, std::uint16_t pid, std::vector<
     {
         stream.name = newName(**def);
     }
-    stream.size = data.size();
-    stream.data = std::make_shared<const std::vector<std::byte>>(std::move(data));
+    stream.size = source->size();
+    stream.data = std::move(source);
     setPayload(tx.touch(id), pid, StoredForm::dataStream, std::move(stream));
     return {};
 }

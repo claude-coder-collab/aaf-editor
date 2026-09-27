@@ -528,3 +528,50 @@ TEST_CASE("Random edit sequences undo and redo symmetrically", "[edit][session][
         CHECK(sameAs(doc, edited) == "");
     }
 }
+
+TEST_CASE("Stream data can come from a file and is copied lazily on save", "[edit][session]")
+{
+    const auto dir = std::filesystem::temp_directory_path() / std::format("aaf-stream-{}", std::random_device{}());
+    std::filesystem::create_directories(dir);
+    const auto dataPath = dir / "essence.bin";
+    const auto payload = patternBytes(3'000'000, 5);
+    REQUIRE(cfb::writeFileAtomic(dataPath, [&](cfb::ByteSink& sink) { return sink.write(payload); }));
+    {
+        auto opened = openSession("aafsdk/examples/com-api/ExportPCM/ExportPCM_NoCodecDef.aaf");
+        REQUIRE(opened);
+        auto& session = *opened;
+        const auto& doc = session.document();
+        const auto essence = firstOfClass(doc, "EssenceData");
+        const auto dataPid = pid(doc, essence, "Data");
+        const auto& original = std::get<StreamProperty>(doc.object(essence).find(dataPid)->payload);
+        cfb::MemorySink before;
+        REQUIRE(copyStream(doc, original, before).value() == original.size);
+
+        auto file = cfb::FileSource::open(dataPath);
+        REQUIRE(file);
+        std::shared_ptr<const cfb::ByteSource> source = std::move(*file);
+        REQUIRE(session.execute("Replace essence from file", [&](Transaction& tx) { return setStreamData(tx, essence, dataPid, source); }));
+        const auto& replaced = std::get<StreamProperty>(doc.object(essence).find(dataPid)->payload);
+        CHECK(replaced.size == payload.size());
+        std::vector<std::byte> middle(16);
+        REQUIRE(readStream(doc, replaced, 1'000'000, middle).value() == 16);
+        CHECK(std::equal(middle.begin(), middle.end(), payload.begin() + 1'000'000));
+
+        const auto saved = dir / "saved.aaf";
+        REQUIRE(session.save(saved));
+        auto reloaded = Document::open(saved);
+        REQUIRE(reloaded);
+        const bool anyMatches = std::ranges::any_of(allOfClass(*reloaded, "EssenceData"), [&](ObjectId id) {
+            cfb::MemorySink sink;
+            const auto& s = std::get<StreamProperty>(reloaded->object(id).find(dataPid)->payload);
+            return copyStream(*reloaded, s, sink) && sink.bytes() == payload;
+        });
+        CHECK(anyMatches);
+
+        REQUIRE(session.undo());
+        cfb::MemorySink undone;
+        REQUIRE(copyStream(doc, std::get<StreamProperty>(doc.object(essence).find(dataPid)->payload), undone));
+        CHECK(undone.bytes() == before.bytes());
+    }
+    std::filesystem::remove_all(dir);
+}

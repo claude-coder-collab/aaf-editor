@@ -33,6 +33,9 @@ namespace aaf::edit
 [[nodiscard]] auto setWeakRef(Transaction& tx, ObjectId id, std::uint16_t pid, ObjectId target) -> Result<void>;
 /// Replaces the contents of a stream property, adding it if absent.
 [[nodiscard]] auto setStreamData(Transaction& tx, ObjectId id, std::uint16_t pid, std::vector<std::byte> data) -> Result<void>;
+/// Replaces the contents of a stream property with data read lazily from `source` (e.g. a `cfb::FileSource`)
+/// when the document is saved. The source must stay readable until then.
+[[nodiscard]] auto setStreamData(Transaction& tx, ObjectId id, std::uint16_t pid, std::shared_ptr<const cfb::ByteSource> source) -> Result<void>;
 
 /// The PID of a property by class and property name (searching superclasses), for convenience.
 [[nodiscard]] auto pidOf(const Document& document, ObjectId id, std::string_view propertyName) -> Result<std::uint16_t>;

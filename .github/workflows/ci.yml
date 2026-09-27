@@ -54,3 +54,28 @@ jobs:
       - name: clang-tidy
         if: matrix.compiler == 'clang'
         run: run-clang-tidy-22 -p build/clang -quiet -warnings-as-errors='*' 'libs/.*\.cpp' 'apps/.*\.cpp'
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure
+        run: cmake --preset msvc -DAAF_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build/msvc --config Release
+      - name: Test
+        run: ctest --test-dir build/msvc -C Release --output-on-failure
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja
+        run: brew install ninja
+      - name: Configure
+        run: cmake --preset clang -DAAF_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build/clang --config Release
+      - name: Test
+        run: ctest --test-dir build/clang -C Release --output-on-failure

@@ -99,8 +99,8 @@ struct StreamProperty
     std::uint8_t byteOrder = 0x4C;
     cfb::EntryId entry = cfb::kNoStream;
     std::uint64_t size = 0;
-    /// New contents set by an edit; when present it replaces the source entry's data.
-    std::shared_ptr<const std::vector<std::byte>> data;
+    /// New contents set by an edit (in memory or file-backed); when present it replaces the source entry's data.
+    std::shared_ptr<const cfb::ByteSource> data;
     auto operator==(const StreamProperty&) const -> bool = default;
 };
 
@@ -219,6 +219,11 @@ private:
 [[nodiscard]] auto expectedStoredForm(const MetaModel& model, const Auid& typeId) -> std::optional<StoredForm>;
 /// True if an unresolved weak-reference key names a definition known to the model (valid in SDK files).
 [[nodiscard]] auto isKnownDefinitionKey(const MetaModel& model, std::span<const std::byte> key, bool bigEndian) -> bool;
+
+/// Reads up to `out.size()` bytes of a stream property at `offset`, from its edited data or its source entry.
+[[nodiscard]] auto readStream(const Document& document, const StreamProperty& stream, std::uint64_t offset, std::span<std::byte> out) -> Result<std::size_t>;
+/// Copies a stream property's full contents to `sink` in chunks.
+[[nodiscard]] auto copyStream(const Document& document, const StreamProperty& stream, cfb::ByteSink& sink) -> Result<std::uint64_t>;
 
 /// Formats a key of a weak reference or set entry: 16 bytes as an AUID, 32 bytes as a MobID, else hex.
 [[nodiscard]] auto formatKey(std::span<const std::byte> key, bool bigEndian = false) -> std::string;
