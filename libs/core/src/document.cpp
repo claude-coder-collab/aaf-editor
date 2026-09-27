@@ -108,8 +108,14 @@ auto typeKindOf(std::string_view typeDefinitionClass) -> TypeKind
         { "TypeDefinitionOpaque", TypeKind::opaque },
         { "TypeDefinitionCharacter", TypeKind::character },
     } };
-    const auto* it = std::ranges::find(kKinds, typeDefinitionClass, &std::pair<std::string_view, TypeKind>::first);
-    return it == kKinds.end() ? TypeKind::opaque : it->second;
+    for (const auto& [name, kind] : kKinds)
+    {
+        if (name == typeDefinitionClass)
+        {
+            return kind;
+        }
+    }
+    return TypeKind::opaque;
 }
 
 auto auidOf(const Property* p, bool bigEndian) -> std::optional<Auid>

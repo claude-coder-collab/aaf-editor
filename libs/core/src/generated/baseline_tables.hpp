@@ -7,8 +7,7 @@
 namespace aaf::detail
 {
 
-enum class GenKind : std::uint8_t
-{
+enum class GenKind : std::uint8_t {
     integer,
     enumeration,
     record,
