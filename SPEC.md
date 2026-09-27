@@ -112,11 +112,11 @@ Implements [MS-CFB] v3 (512-byte sectors) and v4 (4096-byte sectors). Status: **
 - **Output**: always a **complete new file**, never an in-place modification. `writeFile` uses `writeFileAtomic`:
   - write to `<path>.tmp-<random>`;
   - fsync (`fsync` on POSIX, `_commit` on Windows);
-  - rename over the target (`std::filesystem::rename` on POSIX, `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)` on Windows);
+  - rename over the target (`std::filesystem::rename` on POSIX; on Windows a POSIX-semantics rename, falling back to `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`);
   - on failure, delete the temporary file and leave the target untouched.
   - **Saving over the source file** while the document still reads streams from it is supported:
     - On POSIX, the rename leaves the old inode readable through the open handle.
-    - On Windows, `FileSource` opens files with `CreateFileW(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)`, so `MoveFileExW` can replace them while they are still open.
+    - On Windows, `FileSource` opens files with `CreateFileW(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)`. The replacement uses `SetFileInformationByHandle(FileRenameInfoEx, REPLACE_IF_EXISTS | POSIX_SEMANTICS)` (Windows 10 1607+, NTFS), falling back to `MoveFileExW`. A plain `MoveFileExW` over a file that is still open fails, as CI showed.
     - A test saves a document over its own source twice (M3).
 - **Version**: inherited from the source by default (`Builder::setVersion` overrides it). New builders default to v4. v3 streams are limited to 2 GiB.
 - **Layout**: sectors are laid out in this order:
