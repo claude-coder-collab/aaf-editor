@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <iostream>
 #include <map>
 #include <memory>
 
@@ -38,6 +39,8 @@ commands:
                                    load the AAF file and save it again unchanged
   timeline <file> [--mobs] [--mob NAME|ID] [--json]
                                    list mobs, or show a mob's tracks (default: first top-level composition)
+  serve                            answer JSON-RPC requests from stdin, one per line; each output line is
+                                   {"response": ..., "events": [...]} (used by the UI end-to-end tests)
   rpc <file> (--call METHOD PARAMS-JSON)... [--save OUT]
                                    run editor RPC calls (see SPEC §8.3) and optionally save the result
   extract <file> --list            list embedded essence
@@ -558,6 +561,32 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
     return 0;
 }
 
+auto cmdServe(std::span<const std::string_view> args) -> int
+{
+    if (!args.empty())
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    aaf::rpc::Server server;
+    auto events = nlohmann::json::array();
+    server.setEventSink([&events](const std::string& method, const nlohmann::json& params) -> void { events.push_back({ { "method", method }, { "params", params } }); });
+    std::string line;
+    while (std::getline(std::cin, line))
+    {
+        if (line.empty())
+        {
+            continue;
+        }
+        events = nlohmann::json::array();
+        const auto response = server.handle(line);
+        const nlohmann::json out = { { "response", response.empty() ? nlohmann::json(nullptr) : nlohmann::json::parse(response) }, { "events", events } };
+        std::cout << out.dump() << '\n'
+                  << std::flush;
+    }
+    return 0;
+}
+
 auto cmdRpc(std::span<const std::string_view> args) -> int
 {
     if (args.empty())
@@ -641,6 +670,10 @@ auto run(std::span<char*> argv) -> int
     if (args[0] == "roundtrip")
     {
         return cmdRoundtrip(rest);
+    }
+    if (args[0] == "serve")
+    {
+        return cmdServe(rest);
     }
     if (args[0] == "rpc")
     {

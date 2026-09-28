@@ -48,6 +48,9 @@ aaftool rpc in.aaf --call timeline.op '{"op":"relink","find":"file:///Volumes/Ol
 aaftool rpc in.aaf --call object.setProperty '{"id":7,"pid":17410,"value":{"t":"string","v":"New name"}}' --save out.aaf
 ```
 
+`aaftool serve` answers the same calls interactively. It reads one JSON-RPC request per line from stdin and writes one
+line per request: `{"response": ..., "events": [...]}`. The UI's end-to-end tests use it (SPEC §10).
+
 Useful methods:
 
 - `timeline.mobs`, `timeline.get {mob}` and `timeline.resolve {clip}`;

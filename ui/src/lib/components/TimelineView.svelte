@@ -285,6 +285,20 @@
     draw();
   });
 
+  $effect(() => {
+    if (!window.__aafTest) return;
+    window.__aafTimeline = {
+      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length })) })) ?? [],
+      itemRect: (object: number) => {
+        const row = view?.rows.find((r) => r.track.items.some((i) => i.object === object));
+        const item = row?.track.items.find((i) => i.object === object);
+        if (!row || !item) return null;
+        return { x: toX(item.start * row.scale), y: row.y - scrollTop, width: item.length * row.scale * pixelsPerUnit, height: row.height };
+      },
+    };
+    return () => delete window.__aafTimeline;
+  });
+
   async function op(params: Record<string, unknown>) {
     try {
       return await client.timelineOp(params);
