@@ -385,6 +385,17 @@ TEST_CASE("The compact timeline form carries every projected field", "[rpc][time
             CHECK((j.contains("comment") ? j["comment"].get<std::string>() : std::string()) == item.comment);
             CHECK(j.contains("timecode") == item.timecode.has_value());
             CHECK(j.contains("source") == item.source.has_value());
+            CHECK(j.contains("clip") == item.clip.has_value());
+            if (item.clip)
+            {
+                CHECK(j["clip"] == *item.clip);
+                REQUIRE(j["effects"].size() == item.effects.size());
+                for (std::size_t e = 0; e < item.effects.size(); ++e)
+                {
+                    CHECK(j["effects"][e]["object"] == item.effects[e].object);
+                    CHECK(j["effects"][e]["name"].get<std::string>() == item.effects[e].name);
+                }
+            }
             if (item.source)
             {
                 const auto& s = j["source"];

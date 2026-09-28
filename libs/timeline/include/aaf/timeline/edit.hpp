@@ -54,7 +54,8 @@ enum class Edge : std::uint8_t {
 /// Replaces `find` with `replace` in every NetworkLocator URL; returns the number of URLs that changed.
 [[nodiscard]] auto relink(edit::Transaction& tx, const std::string& find, const std::string& replace) -> Result<std::size_t>;
 
-/// Copies an object and everything it strongly references (collections holding sets are not supported).
+/// Copies an object and everything it strongly references. Copied set elements keep their keys, which stay unique
+/// because keys only need to be unique within their set.
 [[nodiscard]] auto deepCopy(edit::Transaction& tx, ObjectId id) -> Result<ObjectId>;
 
 }

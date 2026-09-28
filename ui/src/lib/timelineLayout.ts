@@ -124,6 +124,23 @@ export class RunMerger {
   }
 }
 
+/// True if `id` is the item itself, the clip inside its effects, or one of those effects.
+export function holds(item: TimelineItem, id: number | null): boolean {
+  return id !== null && (item.object === id || item.clip === id || (item.effects?.some((e) => e.object === id) ?? false));
+}
+
+/// The object a click selects: the clip inside an item's effects, or the item.
+export function selectionTarget(item: TimelineItem): number {
+  return item.clip ?? item.object;
+}
+
+/// Text of the effects badge on a clip inside effects: effect names when `room` allows, else just "fx".
+export function badgeText(item: TimelineItem, room: number, measure: (text: string) => number): string | null {
+  if (!item.effects?.length) return null;
+  const names = `fx ${item.effects.map((e) => e.name || "effect").join(", ")}`;
+  return measure(names) + 8 <= room ? names : "fx";
+}
+
 export interface Hit {
   row: Row;
   item: TimelineItem;

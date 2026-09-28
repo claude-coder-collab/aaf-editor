@@ -530,6 +530,16 @@ private:
             w_.key("timecode");
             timecode(item.timecode);
         }
+        if (item.clip)
+        {
+            w_.key("clip").value(*item.clip);
+            w_.key("effects").beginArray();
+            for (const auto& effect : item.effects)
+            {
+                w_.beginObject().key("object").value(effect.object).key("name").value(effect.name).endObject();
+            }
+            w_.endArray();
+        }
         if (!item.nested.empty())
         {
             w_.key("nested").beginArray();
@@ -584,6 +594,17 @@ auto labelOf(const Document& document, ObjectId id) -> std::string
             {
                 return v->toString();
             }
+        }
+    }
+    const auto* group = model.findClassByName("OperationGroup");
+    const auto* operation = model.findProperty("OperationGroup", "Operation");
+    if (group != nullptr && operation != nullptr && model.isA(o.classId, group->id))
+    {
+        const auto* p = o.find(operation->pid);
+        const auto* weak = p != nullptr ? std::get_if<WeakRefProperty>(&p->payload) : nullptr;
+        if (const auto definition = weak != nullptr ? document.resolveWeak(weak->tag, weak->key) : std::nullopt; definition && *definition != id)
+        {
+            return labelOf(document, *definition);
         }
     }
     return className(document, id);

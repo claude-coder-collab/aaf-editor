@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Timeline, TimelineItem, TimelineTrack } from "./rpc";
-import { hitTest, layout, RULER_HEIGHT, RunMerger, tickStep, visibleRange } from "./timelineLayout";
+import { badgeText, hitTest, holds, layout, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange } from "./timelineLayout";
 
 function item(object: number, kind: string, start: number, length: number): TimelineItem {
   return { object, kind, class: kind, start, length, hasLength: true, label: `item ${object}` };
@@ -102,5 +102,31 @@ describe("RunMerger", () => {
       [1.0, 1, "b"],
       [5, 1, "b"],
     ]);
+  });
+});
+
+describe("clips inside effects", () => {
+  const plain = item(1, "sourceClip", 0, 10);
+  const wrapped = { ...item(2, "operationGroup", 10, 10), clip: 5, effects: [{ object: 2, name: "Audio Gain" }, { object: 3, name: "Pan" }] };
+
+  it("hold their clip and effects for selection", () => {
+    expect(holds(wrapped, 2)).toBe(true);
+    expect(holds(wrapped, 3)).toBe(true);
+    expect(holds(wrapped, 5)).toBe(true);
+    expect(holds(wrapped, 1)).toBe(false);
+    expect(holds(wrapped, null)).toBe(false);
+    expect(holds(plain, 1)).toBe(true);
+  });
+
+  it("select the clip, not the outer effect", () => {
+    expect(selectionTarget(wrapped)).toBe(5);
+    expect(selectionTarget(plain)).toBe(1);
+  });
+
+  it("name their effects in the badge when there is room", () => {
+    const measure = (text: string) => text.length * 6;
+    expect(badgeText(wrapped, 200, measure)).toBe("fx Audio Gain, Pan");
+    expect(badgeText(wrapped, 50, measure)).toBe("fx");
+    expect(badgeText(plain, 200, measure)).toBeNull();
   });
 });

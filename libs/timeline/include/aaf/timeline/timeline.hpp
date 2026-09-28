@@ -82,6 +82,16 @@ struct Timecode
     auto operator==(const Timecode&) const -> bool = default;
 };
 
+/// An effect (OperationGroup) by object and operation definition name: a whole track's, or a clip's.
+/// A track effect's group wraps the track's content.
+struct Effect
+{
+    ObjectId object = kNoObject;
+    std::string name;
+
+    auto operator==(const Effect&) const -> bool = default;
+};
+
 struct Item
 {
     ObjectId object = kNoObject;
@@ -100,17 +110,13 @@ struct Item
     std::vector<std::vector<Item>> nested;
     /// Marker comment for descriptive markers and comment markers.
     std::string comment;
+    /// For an effect whose only input is a source clip, possibly through further single-input effects: that clip.
+    /// The item then also carries the clip's `label` and `source`, so it can be shown as the clip.
+    std::optional<ObjectId> clip;
+    /// The effects around `clip`, from the track inwards.
+    std::vector<Effect> effects;
 
     auto operator==(const Item&) const -> bool = default;
-};
-
-/// An effect applied to a whole track (the slot's segment is an OperationGroup wrapping the track's content).
-struct TrackEffect
-{
-    ObjectId object = kNoObject;
-    std::string name;
-
-    auto operator==(const TrackEffect&) const -> bool = default;
 };
 
 struct Track
@@ -126,7 +132,7 @@ struct Track
     std::int64_t length = 0;
     /// The slot's segment. When `effects` is not empty, `items` are the content inside those effects.
     ObjectId segment = kNoObject;
-    std::vector<TrackEffect> effects;
+    std::vector<Effect> effects;
     std::vector<Item> items;
     std::vector<std::string> warnings;
 

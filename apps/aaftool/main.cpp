@@ -449,6 +449,15 @@ auto itemJson(const aaf::timeline::Item& item) -> nlohmann::ordered_json
     {
         j["timecode"] = { { "start", item.timecode->start }, { "fps", item.timecode->fps }, { "drop", item.timecode->drop } };
     }
+    if (item.clip)
+    {
+        j["clip"] = *item.clip;
+        j["effects"] = nlohmann::ordered_json::array();
+        for (const auto& effect : item.effects)
+        {
+            j["effects"].push_back({ { "object", effect.object }, { "name", effect.name } });
+        }
+    }
     if (!item.nested.empty())
     {
         j["nested"] = nlohmann::ordered_json::array();
@@ -555,7 +564,12 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
         std::println("  slot {} {} [{}] rate {} length {}{}", track.slotId, aaf::timeline::to_string(track.kind), track.name, track.editRate.toString(), track.length, track.slotKind == aaf::timeline::SlotKind::event ? " (events)" : "");
         for (const auto& item : track.items)
         {
-            std::println("    {:>8} +{:<6} {:<14} {}", item.start, item.length, aaf::timeline::to_string(item.kind), item.label);
+            std::string effects;
+            for (const auto& effect : item.effects)
+            {
+                effects += std::format("{}{}", effects.empty() ? "  [fx " : ", ", effect.name.empty() ? "effect" : effect.name);
+            }
+            std::println("    {:>8} +{:<6} {:<14} {}{}", item.start, item.length, aaf::timeline::to_string(item.kind), item.label, effects.empty() ? "" : effects + "]");
         }
     }
     return 0;

@@ -8,6 +8,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <filesystem>
+#include <format>
 #include <numeric>
 #include <random>
 
@@ -548,4 +550,219 @@ TEST_CASE("Changes outside a mob require a full projection", "[timeline][ops]")
     REQUIRE(one);
     CHECK(*one == std::vector{ where.slot });
     CHECK_FALSE(projector.project(where.mob, std::vector{ other->object }));
+}
+
+namespace
+{
+
+struct EffectClip
+{
+    ObjectId mob = kNoObject;
+    ObjectId slot = kNoObject;
+    Item item;
+    /// True if a transition touches the clip, so edits at its edges are refused.
+    bool nearTransition = false;
+};
+
+/// Composition items shown as a clip inside effects, found by their outermost effect's name.
+auto effectClips(const Document& doc, std::string_view outerEffect) -> std::vector<EffectClip>
+{
+    const Projector projector(doc);
+    std::vector<EffectClip> out;
+    for (const auto& m : projector.mobs())
+    {
+        if (m.kind != MobKind::composition)
+        {
+            continue;
+        }
+        const auto projected = projector.project(m.object).value();
+        for (const auto& track : projected.tracks)
+        {
+            for (std::size_t i = 0; i < track.items.size(); ++i)
+            {
+                const auto& item = track.items[i];
+                if (item.clip && item.effects.front().name == outerEffect)
+                {
+                    const auto transition = [&](std::size_t n) -> bool { return n < track.items.size() && track.items[n].kind == ItemKind::transition; };
+                    out.push_back({ m.object, track.slot, item, (i > 0 && transition(i - 1)) || transition(i + 1) });
+                }
+            }
+        }
+    }
+    return out;
+}
+
+}
+
+auto editableGainClip(const Document& doc) -> EffectClip
+{
+    const auto all = effectClips(doc, "Audio Gain");
+    const auto it = std::ranges::find(all, false, &EffectClip::nearTransition);
+    REQUIRE(it != all.end());
+    return *it;
+}
+
+TEST_CASE("Clips inside single-input effects are projected as clips with effects", "[timeline]")
+{
+    auto opened = openSession();
+    REQUIRE(opened);
+    const auto& doc = opened->document();
+    const auto gains = effectClips(doc, "Audio Gain");
+    CHECK(gains.size() >= 20);
+    for (const auto& found : gains)
+    {
+        const auto& item = found.item;
+        CHECK(item.kind == ItemKind::operationGroup);
+        CHECK(item.effects.front().object == item.object);
+        CHECK(doc.classOf(*item.clip)->name == "SourceClip");
+        REQUIRE(item.source);
+        CHECK(item.label == (item.source->mobName.empty() ? item.label : item.source->mobName));
+        const Item* node = &item;
+        for (const auto& effect : item.effects)
+        {
+            CHECK(node->object == effect.object);
+            CHECK(node->effect == effect.name);
+            REQUIRE(node->nested.size() == 1);
+            REQUIRE(node->nested.front().size() == 1);
+            node = &node->nested.front().front();
+        }
+        CHECK(node->object == *item.clip);
+    }
+}
+
+TEST_CASE("Clips inside constant effects can be split and trimmed", "[timeline][ops]")
+{
+    auto opened = openSession();
+    REQUIRE(opened);
+    auto& session = *opened;
+    const auto& doc = session.document();
+    const auto found = editableGainClip(doc);
+    const auto group = found.item.object;
+    const auto clip = *found.item.clip;
+    REQUIRE(found.item.length >= 4);
+    const auto startBefore = startTime(doc, clip);
+    const auto at = found.item.start + found.item.length / 2;
+
+    ObjectId right = kNoObject;
+    const auto splitResult = run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::split(tx, found.slot, at).transform([&](ObjectId id) { right = id; }); });
+    INFO((splitResult ? std::string() : splitResult.error().message));
+    REQUIRE(splitResult);
+    const auto track = trackOf(doc, found.slot);
+    const auto left = std::ranges::find(track.items, group, &Item::object);
+    const auto second = std::ranges::find(track.items, right, &Item::object);
+    REQUIRE(left != track.items.end());
+    REQUIRE(second != track.items.end());
+    for (const auto& part : { *left, *second })
+    {
+        REQUIRE(part.clip);
+        CHECK(part.effects.size() == 1);
+        CHECK(part.effects.front().name == "Audio Gain");
+        CHECK(storedLength(doc, part.object) == part.length);
+        CHECK(storedLength(doc, *part.clip) == part.length);
+    }
+    CHECK(left->length + second->length == found.item.length);
+    CHECK(*second->clip != clip);
+    CHECK(startTime(doc, *second->clip) == startBefore + (at - found.item.start));
+    checkConsistent(doc, found.slot);
+
+    const auto trimmed = run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::trim(tx, group, ops::Edge::head, 1, true); });
+    INFO((trimmed ? std::string() : trimmed.error().message));
+    REQUIRE(trimmed);
+    CHECK(startTime(doc, clip) == startBefore + 1);
+    CHECK(storedLength(doc, clip) == storedLength(doc, group));
+    checkConsistent(doc, found.slot);
+
+    const auto path = std::filesystem::temp_directory_path() / std::format("aaf-effect-split-{}.aaf", std::random_device{}());
+    REQUIRE(session.save(path));
+    const auto reopened = Document::open(path);
+    std::filesystem::remove(path);
+    REQUIRE(reopened);
+    CHECK(errorCount(*reopened) == 0);
+    const auto summary = [](const Document& d, ObjectId mob) -> std::vector<std::string> {
+        std::vector<std::string> out;
+        const auto timeline = Projector(d).project(mob).value();
+        for (const auto& projected : timeline.tracks)
+        {
+            for (const auto& item : projected.items)
+            {
+                std::string effects;
+                for (const auto& effect : item.effects)
+                {
+                    effects += effect.name + ";";
+                }
+                out.push_back(std::format("{} {} {} {} {} {} {}", projected.slotId, to_string(item.kind), item.start, item.length, item.label, item.source ? item.source->startTime : -1, effects));
+            }
+        }
+        return out;
+    };
+    CHECK(summary(*reopened, found.mob) == summary(doc, found.mob));
+}
+
+TEST_CASE("Clips inside keyframed or speed-changing effects are not split or trimmed", "[timeline][ops]")
+{
+    const auto expectLocked = [](edit::Session& session, const EffectClip& found, std::string_view reason) -> void {
+        const auto split = run(session, [&](edit::Transaction& tx) { return ops::split(tx, found.slot, found.item.start + found.item.length / 2).transform([](ObjectId) {}); });
+        REQUIRE_FALSE(split);
+        CHECK(split.error().message.contains(reason));
+        CHECK(split.error().message.contains("Audio Gain"));
+        const auto trimmed = run(session, [&](edit::Transaction& tx) { return ops::trim(tx, found.item.object, ops::Edge::tail, -1, true); });
+        REQUIRE_FALSE(trimmed);
+        CHECK(trimmed.error().message.contains(reason));
+        CHECK(run(session, [&](edit::Transaction& tx) { return ops::lift(tx, found.item.object); }));
+        REQUIRE(session.undo());
+    };
+
+    SECTION("keyframes")
+    {
+        auto opened = openSession();
+        REQUIRE(opened);
+        auto& session = *opened;
+        const auto& doc = session.document();
+        const auto found = editableGainClip(doc);
+        std::optional<ObjectId> keyframed;
+        for (std::size_t i = 0; i < doc.objectCount() && !keyframed; ++i)
+        {
+            if (doc.isAttached(i) && doc.model().isA(doc.object(i).classId, doc.model().findClassByName("VaryingValue")->id))
+            {
+                keyframed = i;
+            }
+        }
+        REQUIRE(keyframed);
+        const auto built = run(session, [&](edit::Transaction& tx) -> Result<void> {
+            auto copy = ops::deepCopy(tx, *keyframed);
+            auto pid = edit::pidOf(doc, found.item.object, "Parameters");
+            if (!copy || !pid)
+            {
+                return fail(Errc::not_found, "cannot copy a keyframed parameter");
+            }
+            if (auto r = edit::removeProperty(tx, found.item.object, *pid); !r)
+            {
+                return r;
+            }
+            return edit::insertIntoCollection(tx, found.item.object, *pid, 0, *copy);
+        });
+        INFO((built ? std::string() : built.error().message));
+        REQUIRE(built);
+        expectLocked(session, found, "keyframed");
+    }
+
+    SECTION("speed change")
+    {
+        auto opened = openSession();
+        REQUIRE(opened);
+        auto& session = *opened;
+        const auto& doc = session.document();
+        const auto found = editableGainClip(doc);
+        const auto target = [&]() -> ObjectId {
+            const auto& object = doc.object(found.item.object);
+            const auto pid = doc.model().findProperty("OperationGroup", "Operation")->pid;
+            const auto* weak = std::get_if<WeakRefProperty>(&object.find(pid)->payload);
+            return doc.resolveWeak(weak->tag, weak->key).value();
+        }();
+        REQUIRE(run(session, [&](edit::Transaction& tx) -> Result<void> {
+            auto pid = edit::pidOf(doc, target, "IsTimeWarp");
+            return pid ? edit::setProperty(tx, target, *pid, Value(true)) : Result<void>(std::unexpected(pid.error()));
+        }));
+        expectLocked(session, found, "speed change");
+    }
 }
