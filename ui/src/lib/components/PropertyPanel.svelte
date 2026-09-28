@@ -9,9 +9,10 @@
     onselect: (id: number) => void;
     onerror: (message: string) => void;
     onessence: (id: number, action: "extract" | "replace") => void;
+    ontimeline: (mob: number) => void;
   }
 
-  let { client, object, onselect, onerror, onessence }: Props = $props();
+  let { client, object, onselect, onerror, onessence, ontimeline }: Props = $props();
 
   let candidates = $state<Record<number, SearchHit[]>>({});
   let addPid = $state<number | null>(null);
@@ -128,6 +129,9 @@
       </div>
     </div>
     <div class="actions">
+      {#if object.class.endsWith("Mob") && object.properties.some((p) => p.name === "Slots")}
+        <button onclick={() => ontimeline(object.id)}>Timeline</button>
+      {/if}
       {#if object.parent !== null && object.parent !== 0}
         <button onclick={() => onselect(object.parent!)} title="Select parent">Parent</button>
         <button onclick={() => moveWithinParent(-1)} title="Move up (vectors only)">↑</button>

@@ -4,6 +4,7 @@
 #include <aaf/core/writer.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/edit/session.hpp>
+#include <aaf/timeline/timeline.hpp>
 
 #include "dump.hpp"
 
@@ -34,6 +35,8 @@ commands:
   validate <file> [--json]         check the file; exit 1 if there are errors
   roundtrip <in> <out> [--v3|--v4] [--regenerate-layout]
                                    load the AAF file and save it again unchanged
+  timeline <file> [--mobs] [--mob NAME|ID] [--json]
+                                   list mobs, or show a mob's tracks (default: first top-level composition)
   extract <file> --list            list embedded essence
   extract <file> <mobid|index> <out>
                                    write an embedded essence stream to a file
@@ -425,6 +428,133 @@ auto cmdSetEssence(std::span<const std::string_view> args) -> int
     return 0;
 }
 
+auto itemJson(const aaf::timeline::Item& item) -> nlohmann::ordered_json
+{
+    nlohmann::ordered_json j = { { "object", item.object }, { "kind", aaf::timeline::to_string(item.kind) }, { "class", item.className }, { "start", item.start }, { "length", item.length }, { "label", item.label } };
+    if (!item.effect.empty())
+    {
+        j["effect"] = item.effect;
+    }
+    if (item.source)
+    {
+        j["source"] = { { "mobId", item.source->mobId.toString() }, { "slotId", item.source->slotId }, { "startTime", item.source->startTime }, { "found", item.source->mob.has_value() }, { "original", item.source->original } };
+    }
+    if (item.timecode)
+    {
+        j["timecode"] = { { "start", item.timecode->start }, { "fps", item.timecode->fps }, { "drop", item.timecode->drop } };
+    }
+    if (!item.nested.empty())
+    {
+        j["nested"] = nlohmann::ordered_json::array();
+        for (const auto& track : item.nested)
+        {
+            auto list = nlohmann::ordered_json::array();
+            for (const auto& child : track)
+            {
+                list.push_back(itemJson(child));
+            }
+            j["nested"].push_back(std::move(list));
+        }
+    }
+    return j;
+}
+
+auto cmdTimeline(std::span<const std::string_view> args) -> int
+{
+    if (args.empty())
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    bool json = false;
+    bool listMobs = false;
+    std::string_view which;
+    for (std::size_t i = 1; i < args.size(); ++i)
+    {
+        if (args[i] == "--json")
+        {
+            json = true;
+        }
+        else if (args[i] == "--mobs")
+        {
+            listMobs = true;
+        }
+        else if (args[i] == "--mob" && i + 1 < args.size())
+        {
+            which = args[++i];
+        }
+        else
+        {
+            std::print(stderr, "{}", kUsage);
+            return 2;
+        }
+    }
+    auto doc = aaf::Document::open(args[0]);
+    if (!doc)
+    {
+        return reportError(doc.error());
+    }
+    const aaf::timeline::Projector projector(*doc);
+    const auto mobs = projector.mobs();
+    if (listMobs)
+    {
+        for (const auto& m : mobs)
+        {
+            std::println("{}\t{}\t{}\t{} tracks\t{}{}", m.object, aaf::timeline::to_string(m.kind), m.mobId.toString(), m.tracks, m.name, m.topLevel ? " (top level)" : "");
+        }
+        return 0;
+    }
+    const aaf::timeline::MobSummary* chosen = nullptr;
+    for (const auto& m : mobs)
+    {
+        if (which.empty() ? m.kind == aaf::timeline::MobKind::composition : (m.name == which || std::to_string(m.object) == which || m.mobId.toString() == which))
+        {
+            chosen = &m;
+            break;
+        }
+    }
+    if (chosen == nullptr)
+    {
+        std::println(stderr, "aaftool: no matching mob");
+        return 1;
+    }
+    auto timeline = projector.project(chosen->object);
+    if (!timeline)
+    {
+        return reportError(timeline.error());
+    }
+    if (json)
+    {
+        nlohmann::ordered_json tracks = nlohmann::ordered_json::array();
+        for (const auto& track : timeline->tracks)
+        {
+            auto items = nlohmann::ordered_json::array();
+            for (const auto& item : track.items)
+            {
+                items.push_back(itemJson(item));
+            }
+            auto effects = nlohmann::ordered_json::array();
+            for (const auto& effect : track.effects)
+            {
+                effects.push_back({ { "object", effect.object }, { "name", effect.name } });
+            }
+            tracks.push_back({ { "slot", track.slot }, { "slotId", track.slotId }, { "name", track.name }, { "kind", aaf::timeline::to_string(track.kind) }, { "slotKind", aaf::timeline::to_string(track.slotKind) }, { "editRate", track.editRate.toString() }, { "origin", track.origin }, { "length", track.length }, { "effects", std::move(effects) }, { "items", std::move(items) } });
+        }
+        std::println("{}", nlohmann::ordered_json{ { "mob", timeline->mob }, { "name", timeline->name }, { "kind", aaf::timeline::to_string(timeline->kind) }, { "tracks", std::move(tracks) }, { "warnings", timeline->warnings } }.dump(1));
+        return 0;
+    }
+    std::println("{} ({}, {})", timeline->name, aaf::timeline::to_string(timeline->kind), timeline->mobId.toString());
+    for (const auto& track : timeline->tracks)
+    {
+        std::println("  slot {} {} [{}] rate {} length {}{}", track.slotId, aaf::timeline::to_string(track.kind), track.name, track.editRate.toString(), track.length, track.slotKind == aaf::timeline::SlotKind::event ? " (events)" : "");
+        for (const auto& item : track.items)
+        {
+            std::println("    {:>8} +{:<6} {:<14} {}", item.start, item.length, aaf::timeline::to_string(item.kind), item.label);
+        }
+    }
+    return 0;
+}
+
 auto run(std::span<char*> argv) -> int
 {
     const std::vector<std::string_view> args(argv.begin() + 1, argv.end());
@@ -458,6 +588,10 @@ auto run(std::span<char*> argv) -> int
     if (args[0] == "roundtrip")
     {
         return cmdRoundtrip(rest);
+    }
+    if (args[0] == "timeline")
+    {
+        return cmdTimeline(rest);
     }
     if (args[0] == "extract")
     {

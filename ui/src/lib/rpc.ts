@@ -120,6 +120,66 @@ export interface SearchHit {
   label: string;
 }
 
+export interface EditRate {
+  num: number;
+  den: number;
+}
+
+export interface TimelineItem {
+  object: number;
+  kind: string;
+  class: string;
+  start: number;
+  length: number;
+  hasLength: boolean;
+  label: string;
+  effect?: string;
+  comment?: string;
+  source?: { mobId: string; slotId: number; startTime: number; mob: number | null; mobName: string; mobKind: string; original: boolean };
+  timecode?: { start: number; fps: number; drop: boolean };
+  nested?: TimelineItem[][];
+}
+
+export interface TimelineTrack {
+  slot: number;
+  slotId: number;
+  name: string;
+  physicalNumber: number | null;
+  kind: string;
+  slotKind: string;
+  editRate: EditRate;
+  origin: number;
+  length: number;
+  segment: number;
+  effects: { object: number; name: string }[];
+  items: TimelineItem[];
+}
+
+export interface Timeline {
+  mob: number;
+  mobId: string;
+  name: string;
+  kind: string;
+  tracks: TimelineTrack[];
+  warnings: string[];
+  timecode: { start: number; fps: number; drop: boolean } | null;
+}
+
+export interface MobSummary {
+  id: number;
+  mobId: string;
+  name: string;
+  kind: string;
+  tracks: number;
+  topLevel: boolean;
+}
+
+export interface SourceChain {
+  status: string;
+  links: { mob: number | null; mobId: string; name: string; kind: string; slotId: number; position: number; editRate: EditRate; descriptor: string }[];
+  essence: { embedded: boolean; essenceData: number | null; locators: string[]; descriptor: string } | null;
+}
+
 export class RpcError extends Error {
   constructor(
     message: string,
@@ -196,6 +256,9 @@ export class RpcClient {
   redo = () => this.call<ChangeSet>("edit.redo");
   history = () => this.call<{ items: string[]; position: number }>("edit.history");
   search = (text: string, cls = "", limit = 200) => this.call<SearchHit[]>("search.query", { text, class: cls, limit });
+  mobs = () => this.call<MobSummary[]>("timeline.mobs");
+  timeline = (mob: number) => this.call<Timeline>("timeline.get", { mob });
+  resolve = (clip: number) => this.call<SourceChain>("timeline.resolve", { clip });
   extractEssence = (id: number, path: string) => this.call<{ size: number }>("essence.extract", { id, path });
   replaceEssence = (id: number, path: string) => this.call<ChangeSet>("essence.replace", { id, path });
 }

@@ -3,8 +3,9 @@
 
   import BottomPanel from "./lib/components/BottomPanel.svelte";
   import PropertyPanel from "./lib/components/PropertyPanel.svelte";
+  import TimelineView from "./lib/components/TimelineView.svelte";
   import TreeView from "./lib/components/TreeView.svelte";
-  import { hostCommand, hostTransport, RpcClient, type ChangeSet, type Diagnostic, type DocInfo, type ObjectInfo, type SearchHit } from "./lib/rpc";
+  import { hostCommand, hostTransport, RpcClient, type ChangeSet, type Diagnostic, type DocInfo, type MobSummary, type ObjectInfo, type SearchHit } from "./lib/rpc";
   import { runSmokeTest } from "./lib/smoke";
   import { TreeModel } from "./lib/tree";
 
@@ -23,6 +24,10 @@
   let results = $state<SearchHit[]>([]);
   let busy = $state(false);
   let treeView: TreeView | undefined = $state();
+  let mobs = $state<MobSummary[]>([]);
+  let timelines = $state<number[]>([]);
+  let activeTimeline = $state<number | null>(null);
+  let timelineVersion = $state(0);
 
   function notify(text: string, kind: "error" | "info" = "error") {
     message = { text, kind };
@@ -55,6 +60,11 @@
     tree = model;
     treeVersion++;
     history = await client.history();
+    mobs = await client.mobs();
+    timelines = [];
+    activeTimeline = null;
+    const first = mobs.find((m) => m.kind === "composition" && m.topLevel) ?? mobs.find((m) => m.kind === "composition");
+    if (first) openTimeline(first.id);
     if (next.header !== null && next.header !== undefined) await select(next.header, true);
     await hostCommand("setTitle", { title: `${next.name ?? "AAF Editor"} — AAF Editor` });
   }
@@ -70,8 +80,25 @@
     }
   }
 
+  function openTimeline(mob: number) {
+    if (!timelines.includes(mob)) timelines = [...timelines, mob];
+    activeTimeline = mob;
+  }
+
+  function closeTimeline(mob: number) {
+    timelines = timelines.filter((t) => t !== mob);
+    if (activeTimeline === mob) activeTimeline = timelines.at(-1) ?? null;
+  }
+
+  const mobName = (id: number) => mobs.find((m) => m.id === id)?.name || `Mob ${id}`;
+
   async function applyChanges(changes: ChangeSet) {
     if (!client) return;
+    timelineVersion++;
+    if (changes.objects.some((id) => mobs.some((m) => m.id === id)) || changes.created.length > 0) {
+      mobs = await client.mobs();
+      timelines = timelines.filter((t) => mobs.some((m) => m.id === t));
+    }
     if (tree) {
       await tree.refresh(changes.objects);
       treeVersion++;
@@ -192,6 +219,12 @@
     <button onclick={undo} disabled={!info.canUndo} title={info.undo ? `Undo ${info.undo} (Ctrl+Z)` : "Undo"}>Undo</button>
     <button onclick={redo} disabled={!info.canRedo} title={info.redo ? `Redo ${info.redo} (Ctrl+Shift+Z)` : "Redo"}>Redo</button>
     <span class="sep"></span>
+    <select class="mobs" disabled={!info.open || mobs.length === 0} value="" onchange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; if (v) openTimeline(Number(v)); (e.currentTarget as HTMLSelectElement).value = ""; }}>
+      <option value="">Timelines…</option>
+      {#each mobs as m (m.id)}
+        <option value={String(m.id)}>{m.topLevel ? "★ " : ""}{m.name || "(unnamed)"} — {m.kind}</option>
+      {/each}
+    </select>
     <form class="search" onsubmit={(e) => (e.preventDefault(), search())}>
       <input id="search" type="search" placeholder="Search names and IDs (Ctrl+F)" bind:value={query} disabled={!info.open} />
     </form>
@@ -240,12 +273,27 @@
         {/if}
         <TreeView bind:this={treeView} {tree} version={treeVersion} {selected} onselect={(id) => select(id)} onchanged={() => treeVersion++} />
       </aside>
-      <section class="right">
-        {#if object}
-          <PropertyPanel {client} {object} onselect={(id) => select(id, true)} onerror={(m) => notify(m)} onessence={essence} />
-        {:else}
-          <p class="empty">Select an object.</p>
+      <section class="right" class:split={activeTimeline !== null}>
+        {#if activeTimeline !== null}
+          <div class="timelines">
+            <nav class="tabs">
+              {#each timelines as t (t)}
+                <span class="tab" class:active={t === activeTimeline}>
+                  <button class="link" onclick={() => (activeTimeline = t)}>{mobName(t)}</button>
+                  <button class="icon" title="Close" onclick={() => closeTimeline(t)}>✕</button>
+                </span>
+              {/each}
+            </nav>
+            <TimelineView {client} mob={activeTimeline} version={timelineVersion} {selected} onselect={(id) => select(id, true)} />
+          </div>
         {/if}
+        <div class="properties">
+          {#if object}
+            <PropertyPanel {client} {object} onselect={(id) => select(id, true)} onerror={(m) => notify(m)} onessence={essence} ontimeline={openTimeline} />
+          {:else}
+            <p class="empty">Select an object.</p>
+          {/if}
+        </div>
       </section>
       <footer class="bottom">
         <BottomPanel {diagnostics} {history} onselect={(id) => select(id, true)} onvalidate={validate} ongoto={goto} />
@@ -432,6 +480,44 @@
   .right {
     min-height: 0;
     min-width: 0;
+    display: grid;
+    grid-template-rows: 1fr;
+  }
+  .right.split {
+    grid-template-rows: minmax(180px, 48%) 1fr;
+  }
+  .timelines {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 2px 6px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px 2px 8px;
+    border-radius: 4px 4px 0 0;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .tab.active {
+    background: var(--panel);
+    font-weight: 600;
+  }
+  .properties {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .mobs {
+    max-width: 220px;
   }
   .bottom {
     grid-column: 1 / -1;
