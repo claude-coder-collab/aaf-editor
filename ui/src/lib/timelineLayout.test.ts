@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Timeline, TimelineItem, TimelineTrack } from "./rpc";
-import { hitTest, layout, RULER_HEIGHT, tickStep } from "./timelineLayout";
+import { hitTest, layout, RULER_HEIGHT, RunMerger, tickStep, visibleRange } from "./timelineLayout";
 
 function item(object: number, kind: string, start: number, length: number): TimelineItem {
   return { object, kind, class: kind, start, length, hasLength: true, label: `item ${object}` };
@@ -54,5 +54,53 @@ describe("timeline layout", () => {
     expect(at(70)).toBe(4);
     expect(at(30, l.rows[2])).toBe(6);
     expect(hitTest(l, 50, picture.y + 5, 10, 0, 100)).toBeNull();
+  });
+});
+
+describe("visible ranges", () => {
+  const sequence = track("picture", [25, 1], [item(1, "sourceClip", 0, 10), item(2, "transition", 8, 4), item(3, "sourceClip", 10, 10), item(4, "filler", 20, 5), item(5, "sourceClip", 25, 10)]);
+  const row = layout({ ...timeline, tracks: [sequence] }).rows[0]!;
+
+  it("covers exactly the items overlapping a window", () => {
+    expect(visibleRange(row, 0, 5)).toEqual([0, 1]);
+    expect(visibleRange(row, 12, 18)).toEqual([1, 3]);
+    expect(visibleRange(row, 21, 26)).toEqual([3, 5]);
+    expect(visibleRange(row, 40, 50)).toEqual([5, 5]);
+  });
+
+  it("matches a linear scan for random windows, sorted or not", () => {
+    const shuffled = track("sound", [48000, 1], [item(1, "sourceClip", 50, 10), item(2, "sourceClip", 0, 100), item(3, "marker", 20, 0), item(4, "sourceClip", 70, 5)]);
+    for (const t of [sequence, shuffled]) {
+      const r = layout({ ...timeline, tracks: [t] }).rows[0]!;
+      for (let n = 0; n < 200; n++) {
+        const from = Math.random() * 120 * r.scale;
+        const to = from + Math.random() * 30 * r.scale;
+        const [first, last] = visibleRange(r, from, to);
+        t.items.forEach((it, i) => {
+          const overlaps = (it.start + it.length) * r.scale >= from && it.start * r.scale <= to;
+          if (overlaps) expect(i >= first && i < last).toBe(true);
+        });
+      }
+    }
+    expect(layout({ ...timeline, tracks: [shuffled] }).rows[0]!.sorted).toBe(false);
+  });
+});
+
+describe("RunMerger", () => {
+  it("joins touching rectangles of one colour and keeps others apart", () => {
+    const drawn: [number, number, string][] = [];
+    const merger = new RunMerger((l, w, c) => drawn.push([l, w, c]));
+    merger.add(0, 0.2, "a");
+    merger.add(0.2, 0.3, "a");
+    merger.add(0.9, 0.1, "a");
+    merger.add(1.0, 0.1, "b");
+    merger.add(5, 0.1, "b");
+    merger.flush();
+    merger.flush();
+    expect(drawn).toEqual([
+      [0, 1, "a"],
+      [1.0, 1, "b"],
+      [5, 1, "b"],
+    ]);
   });
 });

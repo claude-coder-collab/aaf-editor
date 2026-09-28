@@ -50,22 +50,31 @@ The native bridge adds little to the core's time, even for the 20 MB response.
 
 ## Timeline canvas (Playwright, in-page)
 
-| | Chromium | WebKit |
-|---|---:|---:|
-| draw at Fit (all 62,951 items in view) | 200–228 ms | 366 ms |
-| draw zoomed in | 50–56 ms | 144 ms |
-| hit test (one mouse move) | 1.3–1.4 ms | 2.4–2.7 ms |
-| JS heap after loading | 497 MB | — |
+| | Chromium before | Chromium now | WebKit before | WebKit now |
+|---|---:|---:|---:|---:|
+| draw at Fit (all 62,951 items in view) | 200–228 ms | 2.4 ms | 366 ms | 3.9 ms |
+| draw zoomed in | 50–56 ms | 0.9 ms | 144 ms | 1.0 ms |
+| hit test (one mouse move) | 1.3–1.4 ms | 0.05 ms | 2.4–2.7 ms | 0.04 ms |
+| JS heap after loading | 497 MB | — | — | — |
+
+**Drawing (PR #15):**
+
+- CSS colours are read once per frame.
+- A per-row index lets drawing and hit-testing visit only the items in view.
+- Runs of clips narrower than 2 px are merged into one rectangle.
+- Rows out of view are skipped.
+- The largest single factor was the timeline being deep reactive Svelte state. Every property read in the draw loop went through a proxy, and making it `$state.raw` cut the Fit draw from about 35 ms to about 2 ms on its own.
 
 The Playwright end-to-end times are dominated by Playwright copying responses between Node and the browser, and do
 not reflect the native editor. Opening to the timeline takes 12–15 s there. Edit to redraw fell from 14–21 s at the
-baseline to 0.9–1.4 s with incremental refresh.
+baseline to 0.9–1.4 s with incremental refresh, and to 0.25–0.4 s with the drawing changes.
 
 ## What this means
 
-After an edit on this file, the native editor now spends about 0.1–0.2 s on the edit, the changed-track refresh and the mob list together. Drawing
-the updated timeline dominates, at 0.2–0.4 s per frame at Fit zoom. Scrolling, hovering and dragging at Fit still
-stutter for the same reason.
+After an edit on this file, the native editor spends about 0.1–0.2 s on the edit, the changed-track refresh and the
+mob list, and a few milliseconds drawing. Scrolling, zooming, hovering and dragging redraw in under 5 ms at any
+zoom, well inside a 60 Hz frame. Opening the file is now the slowest interaction: 0.3 s to load, then about 1.1 s to
+project and send the whole timeline.
 
 ## Recommended next steps, by expected gain
 
@@ -73,12 +82,8 @@ stutter for the same reason.
 2. **Leaner projection payload.** The payload is 320 bytes per item; most of it is repeated strings (class names,
    MobIDs, kinds). Interning them per response, or a compact array form, should cut it several-fold and speed up both
    serialisation and parsing.
-3. **Level of detail when drawing.** At Fit, most clips are narrower than a pixel. Merging adjacent sub-pixel items
-   into one rectangle per pixel column, and caching `getComputedStyle` colours once per frame instead of once per
-   item, should bring Fit drawing well under 16 ms. Drawing while zoomed in also loops over every item; a binary
-   search per row for the visible range fixes that.
-4. **Hit testing** is already fast enough (about 1–3 ms), but the same per-row binary search would make it
-   constant-time.
+3. ~~**Level of detail when drawing.**~~ Done (PR #15).
+4. ~~**Hit testing.**~~ Done (PR #15), with the same per-row search.
 5. **Mob list after edits.** `timeline.mobs` (67 ms now) is refetched whenever an edit touches a mob or creates an
    object, which covers most timeline edits. Refetching only when a mob's name, kind or usage changes avoids it.
 6. **Regression guard.** Once the above lands, add a CI job that generates a smaller stress file (for example 10

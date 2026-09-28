@@ -7,6 +7,10 @@ export interface Row {
   height: number;
   /// Multiply a position in this track's edit units by `scale` to get base-rate units.
   scale: number;
+  /// `maxEnd[i]` is the largest item end among items 0…i, in track units; it never decreases.
+  maxEnd: Float64Array;
+  /// True when item starts never decrease, so the items after a range can be skipped.
+  sorted: boolean;
 }
 
 export interface Layout {
@@ -43,8 +47,16 @@ export function layout(timeline: Timeline): Layout {
     const prefix = track.slotKind === "event" ? "M" : (PREFIX[track.kind] ?? "?");
     const height = track.slotKind === "event" ? 26 : (HEIGHTS[track.kind] ?? 18);
     const scale = rateValue(track.editRate) > 0 && rateValue(baseRate) > 0 ? rateValue(baseRate) / rateValue(track.editRate) : 1;
-    rows.push({ track, label: `${prefix}${n}`, y, height, scale });
-    duration = Math.max(duration, track.length * scale, ...track.items.map((i) => (i.start + i.length) * scale));
+    const maxEnd = new Float64Array(track.items.length);
+    let sorted = true;
+    let end = -Infinity;
+    track.items.forEach((item, i) => {
+      end = Math.max(end, item.start + Math.max(item.length, 0));
+      maxEnd[i] = end;
+      if (i > 0 && item.start < track.items[i - 1]!.start) sorted = false;
+    });
+    rows.push({ track, label: `${prefix}${n}`, y, height, scale, maxEnd, sorted });
+    duration = Math.max(duration, track.length * scale, end * scale);
     y += height + 1;
   }
   return { rows, baseRate, duration, height: y };
@@ -67,6 +79,51 @@ export function tickStep(pixelsPerUnit: number, fps: number, minPixels = 90): nu
   return Math.max(1, Math.round(7200 * fps));
 }
 
+/// The index range [first, last) of a row's items that may overlap base-rate positions `from`…`to`.
+export function visibleRange(row: Row, from: number, to: number): [number, number] {
+  const items = row.track.items;
+  const lo = from / row.scale;
+  const hi = to / row.scale;
+  let first = 0;
+  let last = items.length;
+  while (first < last) {
+    const mid = (first + last) >> 1;
+    if (row.maxEnd[mid]! < lo) first = mid + 1;
+    else last = mid;
+  }
+  if (!row.sorted) return [first, items.length];
+  let end = items.length;
+  let a = first;
+  while (a < end) {
+    const mid = (a + end) >> 1;
+    if (items[mid]!.start <= hi) a = mid + 1;
+    else end = mid;
+  }
+  return [first, end];
+}
+
+/// Merges runs of narrow rectangles of the same colour into single rectangles before they are drawn.
+export class RunMerger {
+  private run: { left: number; right: number; color: string } | null = null;
+
+  constructor(private readonly fill: (left: number, width: number, color: string) => void) {}
+
+  add(left: number, width: number, color: string): void {
+    const right = left + width;
+    if (this.run && this.run.color === color && left <= this.run.right + 0.5) {
+      this.run.right = Math.max(this.run.right, right);
+      return;
+    }
+    this.flush();
+    this.run = { left, right, color };
+  }
+
+  flush(): void {
+    if (this.run) this.fill(this.run.left, Math.max(1, this.run.right - this.run.left), this.run.color);
+    this.run = null;
+  }
+}
+
 export interface Hit {
   row: Row;
   item: TimelineItem;
@@ -79,8 +136,11 @@ export function hitTest(l: Layout, x: number, y: number, pixelsPerUnit: number, 
     return null;
   }
   const position = (x - headerWidth) / pixelsPerUnit + viewStart;
+  const reach = 6 / pixelsPerUnit;
+  const [first, last] = visibleRange(row, position - reach, position + reach);
   let found: TimelineItem | null = null;
-  for (const item of row.track.items) {
+  for (let i = first; i < last; i++) {
+    const item = row.track.items[i]!;
     const start = item.start * row.scale;
     const end = (item.start + Math.max(item.length, 0)) * row.scale;
     const isPoint = item.kind === "marker" || item.kind === "event";

@@ -4,7 +4,7 @@
   import type { ChangeSet, MobSummary, RpcClient, SourceChain, Timeline, TimelineItem } from "../rpc";
   import { dragZone, snap } from "../snap";
   import { formatTimecode, nominalFps } from "../timecode";
-  import { hitTest, layout, rateValue, RULER_HEIGHT, tickStep, type Layout, type Row } from "../timelineLayout";
+  import { hitTest, layout, rateValue, RULER_HEIGHT, RunMerger, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
   import { addPending, mergeTimeline, type Pending } from "../timelineMerge";
 
   interface Props {
@@ -20,7 +20,7 @@
 
   const HEADER = 150;
   const SNAP_PIXELS = 8;
-  let timeline = $state<Timeline | null>(null);
+  let timeline = $state.raw<Timeline | null>(null);
   let error = $state("");
   let canvas: HTMLCanvasElement | undefined = $state();
   let width = $state(800);
@@ -30,9 +30,9 @@
   let scrollTop = $state(0);
   let playhead = $state(0);
   let selectedSlot = $state<number | null>(null);
-  let hover = $state<{ x: number; y: number; item: TimelineItem; row: string } | null>(null);
+  let hover = $state.raw<{ x: number; y: number; item: TimelineItem; row: string } | null>(null);
   let chain = $state<SourceChain | null>(null);
-  let drag = $state<{ zone: "head" | "tail" | "body"; item: TimelineItem; row: Row; startX: number; x: number; y: number; ripple: boolean } | null>(null);
+  let drag = $state.raw<{ zone: "head" | "tail" | "body"; item: TimelineItem; row: Row; startX: number; x: number; y: number; ripple: boolean } | null>(null);
   let sourceMob = $state<number | null>(null);
   let active = $state(false);
   let container: HTMLDivElement | undefined = $state();
@@ -128,17 +128,21 @@
   const toUnits = (x: number) => (x - HEADER) / pixelsPerUnit + viewStart;
   const trackUnits = (row: Row, base: number) => Math.round(base / row.scale);
 
-  function color(name: string): string {
-    return canvas ? getComputedStyle(canvas).getPropertyValue(name).trim() || "#888" : "#888";
+  const PALETTE = ["--text", "--muted", "--border", "--accent", "--danger", "--warn", "--bg", "--panel", "--selection", "--tl-effect", "--tl-code", "--tl-nested", "--tl-audio", "--tl-video", "--tl-transition"] as const;
+  type Palette = Record<(typeof PALETTE)[number], string>;
+
+  function readPalette(): Palette {
+    const style = canvas ? getComputedStyle(canvas) : null;
+    return Object.fromEntries(PALETTE.map((name) => [name, style?.getPropertyValue(name).trim() || "#888"])) as Palette;
   }
 
-  function itemColor(item: TimelineItem, kind: string): string {
+  function itemColor(item: TimelineItem, kind: string, c: Palette): string {
     if (item.kind === "filler") return "transparent";
-    if (item.source && !item.source.original && item.source.mob === null) return color("--danger");
-    if (item.kind === "operationGroup") return color("--tl-effect");
-    if (item.kind === "timecode" || item.kind === "pulldown" || item.kind === "edgecode") return color("--tl-code");
-    if (item.source?.mobKind === "composition" || item.kind === "nestedScope" || item.kind === "sequence") return color("--tl-nested");
-    return kind === "sound" ? color("--tl-audio") : color("--tl-video");
+    if (item.source && !item.source.original && item.source.mob === null) return c["--danger"];
+    if (item.kind === "operationGroup") return c["--tl-effect"];
+    if (item.kind === "timecode" || item.kind === "pulldown" || item.kind === "edgecode") return c["--tl-code"];
+    if (item.source?.mobKind === "composition" || item.kind === "nestedScope" || item.kind === "sequence") return c["--tl-nested"];
+    return kind === "sound" ? c["--tl-audio"] : c["--tl-video"];
   }
 
   function editPoints(): number[] {
@@ -179,24 +183,34 @@
     g.clearRect(0, 0, width, height);
     g.font = "11px system-ui, sans-serif";
     g.textBaseline = "middle";
-    const text = color("--text");
-    const muted = color("--muted");
-    const border = color("--border");
-    const accent = color("--accent");
+    const c = readPalette();
+    const text = c["--text"];
+    const muted = c["--muted"];
+    const border = c["--border"];
+    const accent = c["--accent"];
+    const from = toUnits(HEADER) - 6 / pixelsPerUnit;
+    const to = toUnits(width) + 6 / pixelsPerUnit;
 
     g.save();
     g.translate(0, -scrollTop);
     for (const row of view.rows) {
-      g.fillStyle = row.track.slot === selectedSlot ? color("--selection") : color("--panel");
+      if (row.y + row.height < scrollTop + RULER_HEIGHT || row.y > scrollTop + height) continue;
+      g.fillStyle = row.track.slot === selectedSlot ? c["--selection"] : c["--panel"];
       g.fillRect(HEADER, row.y, width - HEADER, row.height);
-      for (const item of row.track.items) {
+      const top = row.y + 2;
+      const h = row.height - 4;
+      const runs = new RunMerger((left, w, fill) => {
+        g.fillStyle = fill;
+        g.fillRect(left, top, w, h);
+      });
+      const [first, last] = visibleRange(row, from, to);
+      for (let i = first; i < last; i++) {
+        const item = row.track.items[i]!;
         const left = toX(item.start * row.scale);
-        const w = Math.max(item.length * row.scale * pixelsPerUnit, 1);
-        if (left > width || left + w < HEADER) continue;
-        const top = row.y + 2;
-        const h = row.height - 4;
+        const exact = item.length * row.scale * pixelsPerUnit;
         if (item.kind === "marker" || item.kind === "event") {
-          g.fillStyle = item.object === selected ? accent : color("--warn");
+          runs.flush();
+          g.fillStyle = item.object === selected ? accent : c["--warn"];
           g.beginPath();
           g.moveTo(left, top);
           g.lineTo(left + 6, top + h / 2);
@@ -207,7 +221,14 @@
           continue;
         }
         if (item.kind === "transition") continue;
-        const fill = itemColor(item, row.track.kind);
+        const fill = itemColor(item, row.track.kind, c);
+        const highlighted = item.object === selected || drag?.item.object === item.object;
+        if (exact < 2 && !highlighted) {
+          if (fill !== "transparent") runs.add(left, exact, fill);
+          continue;
+        }
+        runs.flush();
+        const w = Math.max(exact, 1);
         if (fill !== "transparent") {
           g.fillStyle = fill;
           g.globalAlpha = drag?.item.object === item.object ? 0.4 : 1;
@@ -235,23 +256,25 @@
           g.restore();
         }
       }
-      for (const item of row.track.items) {
+      runs.flush();
+      for (let i = first; i < last; i++) {
+        const item = row.track.items[i]!;
         if (item.kind !== "transition") continue;
         const left = toX(item.start * row.scale);
         const w = Math.max(item.length * row.scale * pixelsPerUnit, 3);
-        const top = row.y + 2;
-        const h = row.height - 4;
-        g.fillStyle = color("--tl-transition");
+        g.fillStyle = c["--tl-transition"];
         g.globalAlpha = 0.85;
         g.fillRect(left, top, w, h);
         g.globalAlpha = 1;
-        g.strokeStyle = "#fff";
-        g.beginPath();
-        g.moveTo(left, top);
-        g.lineTo(left + w, top + h);
-        g.moveTo(left, top + h);
-        g.lineTo(left + w, top);
-        g.stroke();
+        if (w >= 6) {
+          g.strokeStyle = "#fff";
+          g.beginPath();
+          g.moveTo(left, top);
+          g.lineTo(left + w, top + h);
+          g.moveTo(left, top + h);
+          g.lineTo(left + w, top);
+          g.stroke();
+        }
         if (item.object === selected) {
           g.strokeStyle = accent;
           g.lineWidth = 2;
@@ -259,7 +282,7 @@
           g.lineWidth = 1;
         }
       }
-      g.fillStyle = row.track.slot === selectedSlot ? color("--selection") : color("--bg");
+      g.fillStyle = row.track.slot === selectedSlot ? c["--selection"] : c["--bg"];
       g.fillRect(0, row.y, HEADER, row.height);
       g.fillStyle = text;
       g.fillText(`${row.label}  ${row.track.name || row.track.kind}`, 8, row.y + row.height / 2 - (row.height > 30 ? 6 : 0));
@@ -286,14 +309,14 @@
 
     const px = toX(playhead);
     if (px >= HEADER && px <= width) {
-      g.strokeStyle = color("--danger");
+      g.strokeStyle = c["--danger"];
       g.beginPath();
       g.moveTo(px + 0.5, 0);
       g.lineTo(px + 0.5, height);
       g.stroke();
     }
 
-    g.fillStyle = color("--bg");
+    g.fillStyle = c["--bg"];
     g.fillRect(0, 0, width, RULER_HEIGHT);
     g.strokeStyle = border;
     g.beginPath();
