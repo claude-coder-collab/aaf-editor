@@ -983,7 +983,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             return std::unexpected(op.error());
         }
         auto id = [&](const char* key) -> Result<ObjectId> { return objectParam(key); };
-        auto integer = [&](const char* key) -> Result<long> { return param<std::int64_t>(params, key); };
+        auto integer = [&](const char* key) -> Result<std::int64_t> { return param<std::int64_t>(params, key); };
         Json extra = Json::object();
         edit::Session::Command command;
         std::string description;
