@@ -648,8 +648,72 @@ void Server::attachListener()
     {
         return;
     }
+    compositions_.reset();
     session_->setListener([this](const edit::ChangeSet& changes) -> void {
-        emit("doc.changed", { { "changes", changeSetToJson(changes) }, { "info", info() } });
+        const bool mobs = mobListChanged(changes);
+        emit("doc.changed", { { "changes", changeSetToJson(changes) }, { "info", info() }, { "mobsChanged", mobs } });
+    });
+}
+
+auto Server::mobListChanged(const edit::ChangeSet& changes) -> bool
+{
+    if (!session_)
+    {
+        return true;
+    }
+    const auto& doc = session_->document();
+    const auto& model = doc.model();
+    auto classOf = [&](std::string_view name) -> std::optional<Auid> {
+        const auto* cls = model.findClassByName(name);
+        return cls ? std::optional(cls->id) : std::nullopt;
+    };
+    const auto mob = classOf("Mob");
+    const auto storage = classOf("ContentStorage");
+    const auto reference = classOf("SourceReference");
+    const auto composition = classOf("CompositionMob");
+    const auto* sourceId = model.findProperty("SourceReference", "SourceID");
+    auto is = [&](ObjectId id, const std::optional<Auid>& cls) -> bool { return cls && id < doc.objectCount() && model.isA(doc.object(id).classId, *cls); };
+    const std::set<ObjectId> created(changes.created.begin(), changes.created.end());
+    for (const auto id : changes.objects)
+    {
+        if (is(id, mob) || is(id, storage))
+        {
+            compositions_.reset();
+            return true;
+        }
+    }
+    if (sourceId != nullptr && std::ranges::any_of(changes.properties, [&](const edit::PropertyChange& p) -> bool { return p.pid == sourceId->pid && !created.contains(p.object) && is(p.object, reference); }))
+    {
+        return true;
+    }
+    if (!compositions_)
+    {
+        compositions_.emplace();
+        std::map<Auid, bool> isComposition;
+        for (std::size_t i = 0; i < doc.objectCount(); ++i)
+        {
+            const auto& cls = doc.object(i).classId;
+            auto known = isComposition.find(cls);
+            if (known == isComposition.end())
+            {
+                known = isComposition.emplace(cls, is(i, composition)).first;
+            }
+            if (known->second && doc.isAttached(i))
+            {
+                if (const auto v = doc.value(i, "Mob", "MobID"); v && v->is<MobId>())
+                {
+                    compositions_->insert(v->as<MobId>());
+                }
+            }
+        }
+    }
+    return std::ranges::any_of(changes.objects, [&](ObjectId id) -> bool {
+        if (!is(id, reference))
+        {
+            return false;
+        }
+        const auto v = doc.value(id, "SourceReference", "SourceID");
+        return v && v->is<MobId>() && compositions_->contains(v->as<MobId>());
     });
 }
 

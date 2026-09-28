@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 
 namespace aaf::rpc
@@ -35,10 +36,13 @@ private:
     [[nodiscard]] auto timelineText(const Json& params) -> Result<std::string>;
     void emit(const std::string& method, const Json& params) const;
     void attachListener();
+    /// True if `changes` may alter what `timeline.mobs` returns.
+    [[nodiscard]] auto mobListChanged(const edit::ChangeSet& changes) -> bool;
 
     std::optional<edit::Session> session_;
     std::filesystem::path path_;
     EventSink sink_;
+    std::optional<std::set<MobId>> compositions_;
 };
 
 /// JSON form of a change set: `{"objects":[...], "created":[...], "properties":[{"object","pid"}], "referencedPropertiesChanged"}`.

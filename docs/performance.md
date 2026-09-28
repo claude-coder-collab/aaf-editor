@@ -91,7 +91,10 @@ list and 0.36 s for the timeline.
 2. ~~**Leaner projection payload.**~~ Done (PR #16).
 3. ~~**Level of detail when drawing.**~~ Done (PR #15).
 4. ~~**Hit testing.**~~ Done (PR #15), with the same per-row search.
-5. **Mob list after edits.** `timeline.mobs` (67 ms now) is refetched whenever an edit touches a mob or creates an
-   object, which covers most timeline edits. Refetching only when a mob's name, kind or usage changes avoids it.
-6. **Regression guard.** Once the above lands, add a CI job that generates a smaller stress file (for example 10
-   tracks × 1,000 clips) and fails if open, timeline.get or draw exceed a generous limit.
+5. ~~**Mob list after edits.**~~ Done (PR #17). The server marks `doc.changed` with `mobsChanged`, and the UI
+   refetches the mob list only then. Splits, trims, lifts and moves no longer cost a `timeline.mobs` call (about
+   70 ms on this file).
+6. ~~**Regression guard.**~~ Done (PR #17). The nightly `performance` job in `full.yml` generates a 4 × 3,000-clip
+   file and checks the limits in `tools/perf_limits.json` for the core stages (time and response size) and for
+   drawing and hit testing. With the old quadratic directory lookup put back, open takes 1.2 s against an 800 ms
+   limit and the job fails.

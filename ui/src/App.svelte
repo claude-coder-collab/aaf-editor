@@ -91,9 +91,9 @@
 
   const mobName = (id: number) => mobs.find((m) => m.id === id)?.name || `Mob ${id}`;
 
-  async function applyChanges(changes: ChangeSet) {
+  async function applyChanges(changes: ChangeSet, mobsChanged: boolean) {
     if (!client) return;
-    if (changes.objects.some((id) => mobs.some((m) => m.id === id)) || changes.created.length > 0) {
+    if (mobsChanged) {
       mobs = await client.mobs();
       timelines = timelines.filter((t) => mobs.some((m) => m.id === t));
     }
@@ -190,9 +190,9 @@
     if (!client) return;
     const off = client.onEvent((method, params) => {
       if (method === "doc.changed") {
-        const p = params as { changes: ChangeSet; info: DocInfo };
+        const p = params as { changes: ChangeSet; info: DocInfo; mobsChanged?: boolean };
         info = p.info;
-        void applyChanges(p.changes);
+        void applyChanges(p.changes, p.mobsChanged ?? true);
       } else if (method === "doc.state") {
         info = params as DocInfo;
       } else if (method === "doc.opened") {
