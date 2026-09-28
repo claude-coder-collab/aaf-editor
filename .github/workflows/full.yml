@@ -91,7 +91,7 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
           npx playwright install --with-deps chromium
-          npm run e2e -- --project chromium perf
+          npm run e2e -- perf --project chromium
 
   tsan:
     runs-on: ubuntu-24.04

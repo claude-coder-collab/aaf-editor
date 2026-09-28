@@ -442,7 +442,7 @@ TEST_CASE("doc.changed says when the mob list may have changed", "[rpc][timeline
         return it->second["mobsChanged"].get<bool>();
     };
     const auto mobs = c.result("timeline.mobs");
-    auto byName = [&](std::string_view name) -> Json { return *std::ranges::find_if(mobs, [&](const Json& m) -> bool { return m["name"] == name; }); };
+    auto byName = [&](std::string_view name) -> Json { return *std::ranges::find_if(mobs, [&](const Json& m) -> bool { return m["name"].get<std::string>() == name; }); };
     const auto playout = byName("PLAYOUT 151630146.Copy.01");
     const auto whoosh = byName("WHOSH SLO.wav");
     const auto t = expandTimeline(c.result("timeline.get", { { "mob", playout["id"] } }));
