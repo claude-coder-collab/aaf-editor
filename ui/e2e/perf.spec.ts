@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { expect, test } from "./editor";
 
 const file = process.env.AAF_PERF_FILE;
@@ -44,4 +46,12 @@ test("timeline performance", async ({ editor }, testInfo) => {
   const lines = Object.entries(results).map(([k, v]) => `${k.padEnd(44)} ${Number.isInteger(v) ? v : v.toFixed(2)}`);
   console.log(`\n${testInfo.project.name}\n${lines.join("\n")}`);
   await testInfo.attach("results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
+
+  const limitsFile = process.env.AAF_PERF_LIMITS;
+  if (limitsFile) {
+    const limits = (JSON.parse(readFileSync(limitsFile, "utf8")) as { ui: Record<string, number> }).ui;
+    for (const [name, limit] of Object.entries(limits)) {
+      expect.soft(results[name], name).toBeLessThanOrEqual(limit);
+    }
+  }
 });

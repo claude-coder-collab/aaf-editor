@@ -10,6 +10,7 @@
 #include <format>
 #include <functional>
 #include <random>
+#include <ranges>
 
 using namespace aaf;
 using namespace aaf::rpc;
@@ -429,4 +430,43 @@ TEST_CASE("JsonWriter produces valid compact JSON", "[rpc][json]")
     CHECK(parsed["list"][4].get<std::uint64_t>() == 18446744073709551615ULL);
     CHECK(parsed["raw"]["x"] == 1);
     CHECK(w.str().find(' ') == std::string::npos);
+}
+
+TEST_CASE("doc.changed says when the mob list may have changed", "[rpc][timeline]")
+{
+    Client c;
+    c.result("doc.open", { { "path", sample() } });
+    auto lastFlag = [&]() -> bool {
+        const auto it = std::ranges::find_if(c.events | std::views::reverse, [](const auto& e) -> bool { return e.first == "doc.changed"; });
+        REQUIRE(it != (c.events | std::views::reverse).end());
+        return it->second["mobsChanged"].get<bool>();
+    };
+    const auto mobs = c.result("timeline.mobs");
+    auto byName = [&](std::string_view name) -> Json { return *std::ranges::find_if(mobs, [&](const Json& m) -> bool { return m["name"].get<std::string>() == name; }); };
+    const auto playout = byName("PLAYOUT 151630146.Copy.01");
+    const auto whoosh = byName("WHOSH SLO.wav");
+    const auto t = expandTimeline(c.result("timeline.get", { { "mob", playout["id"] } }));
+    const auto track = *std::ranges::find_if(t["tracks"], [](const Json& tr) -> bool {
+        return tr["kind"] == "sound" && tr["slotKind"] == "timeline" && std::ranges::any_of(tr["items"], [](const Json& i) -> bool { return i["kind"] == "sourceClip" && i["length"].get<std::int64_t>() > 4; });
+    });
+    const auto clip = *std::ranges::find_if(track["items"], [](const Json& i) -> bool { return i["kind"] == "sourceClip" && i["length"].get<std::int64_t>() > 4; });
+
+    c.result("timeline.op", { { "op", "split" }, { "slot", track["slot"] }, { "position", clip["start"].get<std::int64_t>() + 2 } });
+    CHECK_FALSE(lastFlag());
+    c.result("edit.undo");
+    CHECK_FALSE(lastFlag());
+
+    const auto object = c.result("object.get", { { "id", playout["id"] } });
+    c.result("object.setProperty", { { "id", playout["id"] }, { "pid", findProperty(object, "Name")["pid"] }, { "value", { { "t", "string" }, { "v", "Renamed" } } } });
+    CHECK(lastFlag());
+    c.result("edit.undo");
+    CHECK(lastFlag());
+
+    c.result("timeline.op", { { "op", "addTrack" }, { "mob", playout["id"] }, { "kind", "sound" } });
+    CHECK(lastFlag());
+    c.result("edit.undo");
+
+    const auto nested = expandTimeline(c.result("timeline.get", { { "mob", whoosh["id"] } }));
+    c.result("timeline.op", { { "op", "overwriteClip" }, { "slot", track["slot"] }, { "position", clip["start"] }, { "sourceMob", whoosh["id"] }, { "sourceSlot", nested["tracks"][0]["slotId"] }, { "sourceIn", 0 }, { "length", 2 } });
+    CHECK(lastFlag());
 }

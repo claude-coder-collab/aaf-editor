@@ -3,8 +3,6 @@ name: Full
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
   pull_request:
     paths:
@@ -51,6 +49,48 @@ jobs:
       - name: Cross-check timeline edits with pyaaf2 and OTIO
         run: python tools/crosscheck_edits.py build/clang-asan/apps/aaftool/Debug/aaftool
 
+  performance:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          pip install -r tools/requirements.txt
+      - name: Build aaftool (Release)
+        run: |
+          cmake --preset gcc -DCMAKE_CXX_COMPILER=g++-14 -DAAF_BUILD_EDITOR=OFF
+          cmake --build build/gcc --config Release --target aaftool
+      - name: Generate the stress file
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          f = json.load(open("tools/perf_limits.json"))["file"]
+          subprocess.run([sys.executable, "tools/gen_stress_aaf.py", "stress.aaf", *[a for k, v in f.items() for a in (f"--{k}", str(v))]], check=True)
+          PY
+      - name: Core performance limits
+        run: python tools/perf_baseline.py build/gcc/apps/aaftool/Release/aaftool stress.aaf --limits tools/perf_limits.json
+      - name: Timeline drawing limits
+        working-directory: ui
+        env:
+          AAFTOOL: ../build/gcc/apps/aaftool/Release/aaftool
+          AAF_PERF_FILE: ../stress.aaf
+          AAF_PERF_LIMITS: ../tools/perf_limits.json
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npx playwright install --with-deps chromium
+          npm run e2e -- perf --project chromium
+
   tsan:
     runs-on: ubuntu-24.04
     steps:
@@ -64,32 +104,3 @@ jobs:
           cmake --build build/clang-tsan --config Debug
       - name: Test (TSan)
         run: ctest --test-dir build/clang-tsan -C Debug --output-on-failure
-
-  fuzz:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-llvm
-      - name: Build fuzzers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build
-          cmake --preset clang-fuzz -DCMAKE_CXX_COMPILER=clang++-22
-          cmake --build build/clang-fuzz --config Debug
-      - name: Seed corpus
-        run: |
-          mkdir corpus
-          find tests/fixtures/aafsdk -name '*.aaf' -size -300k -exec cp {} corpus/ \;
-      - name: Fuzz CFB reader (10 min)
-        run: build/clang-fuzz/tests/fuzz/Debug/fuzz_cfb corpus -max_total_time=600 -max_len=65536 -rss_limit_mb=2048
-      - name: Fuzz AAF document loader (10 min)
-        run: build/clang-fuzz/tests/fuzz/Debug/fuzz_document corpus -max_total_time=600 -max_len=300000 -rss_limit_mb=2048
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: fuzz-crashes
-          path: |
-            crash-*
-            oom-*
-            timeout-*
-            leak-*

@@ -55,4 +55,20 @@ def test_measure_runs_every_stage(tmp_path: Path) -> None:
     path = tmp_path / "small.aaf"
     gen_stress_aaf.generate(path, 1, 1, 10, 2)
     names = [s.name for s in perf_baseline.measure(tools[0], path, tmp_path)]
-    assert names == ["doc.open", "timeline.mobs", "timeline.get (Stress)", "timeline.op split", "timeline.get after edit", "timeline.get changed only", "edit.undo", "doc.validate", "doc.saveAs"]
+    assert names == ["doc.open", "timeline.mobs", "timeline.get", "timeline.op split", "timeline.get after edit", "timeline.get changed only", "edit.undo", "doc.validate", "doc.saveAs"]
+
+
+def test_check_limits_reports_slow_large_and_missing_stages() -> None:
+    samples = [perf_baseline.Sample("a", 0.2, 100), perf_baseline.Sample("b", 0.01, 5000)]
+    problems = perf_baseline.check_limits(samples, {"a": {"ms": 100}, "b": {"ms": 100, "bytes": 1000}, "c": {"ms": 1}})
+    assert problems == ["a: 200.0 ms > 100 ms", "b: 5,000 bytes > 1,000 bytes", "c: not measured"]
+    assert perf_baseline.check_limits(samples, {"a": {"ms": 500, "bytes": 100}}) == []
+
+
+def test_limits_file_names_every_measured_stage() -> None:
+    import json
+
+    limits = json.loads((Path(__file__).resolve().parents[1] / "perf_limits.json").read_text())
+    assert set(limits["core"]) == {"doc.open", "timeline.mobs", "timeline.get", "timeline.op split", "timeline.get after edit", "timeline.get changed only", "edit.undo", "doc.validate", "doc.saveAs"}
+    assert set(limits["file"]) == {"video", "audio", "clips", "masters", "seed"}
+

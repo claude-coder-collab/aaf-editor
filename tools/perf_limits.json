@@ -1,0 +1,20 @@
+{
+  "file": {"video": 1, "audio": 3, "clips": 3000, "masters": 200, "seed": 1},
+  "core": {
+    "doc.open": {"ms": 400},
+    "timeline.mobs": {"ms": 60, "bytes": 45000},
+    "timeline.get": {"ms": 300, "bytes": 1800000},
+    "timeline.op split": {"ms": 100},
+    "timeline.get after edit": {"ms": 300, "bytes": 1800000},
+    "timeline.get changed only": {"ms": 100, "bytes": 480000},
+    "edit.undo": {"ms": 50},
+    "doc.validate": {"ms": 250},
+    "doc.saveAs": {"ms": 400}
+  },
+  "ui": {
+    "draw at fit (ms)": 25,
+    "draw zoomed in (ms)": 10,
+    "hit test at fit (ms)": 5,
+    "hit test zoomed in (ms)": 5
+  }
+}

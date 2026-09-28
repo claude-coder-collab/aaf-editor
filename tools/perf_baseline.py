@@ -3,6 +3,8 @@
 
 Reports the time and response size of opening the file, listing mobs, projecting the largest composition,
 a split in its middle track followed by a full and an incremental re-projection, undo, validation and saving.
+With `--limits`, fails when a stage is slower or larger than the limits file's "core" section allows
+(see tools/perf_limits.json, which also describes the file the limits were set for).
 """
 
 from __future__ import annotations
@@ -63,11 +65,14 @@ def measure(aaftool: Path, path: Path, workdir: Path) -> list[Sample]:
             return core.samples
         largest, timeline = None, None
         for mob in compositions:
-            candidate = core.call(f"timeline.get ({mob['name']})", "timeline.get", {"mob": mob["id"]})
+            candidate = core.call(f"timeline.get {mob['id']}", "timeline.get", {"mob": mob["id"]})
             if timeline is None or sum(len(t["items"]) for t in candidate["tracks"]) > sum(len(t["items"]) for t in timeline["tracks"]):
                 largest, timeline = mob, candidate
         assert largest is not None and timeline is not None
-        core.samples = [s for s in core.samples if not s.name.startswith("timeline.get") or s.name.endswith(f"({largest['name']})")]
+        core.samples = [s for s in core.samples if not s.name.startswith("timeline.get ") or s.name == f"timeline.get {largest['id']}"]
+        for s in core.samples:
+            if s.name == f"timeline.get {largest['id']}":
+                s.name = "timeline.get"
         tracks = [t for t in timeline["tracks"] if t["slotKind"] == "timeline" and any(i["kind"] == "sourceClip" for i in t["items"])]
         if tracks:
             track = tracks[len(tracks) // 2]
@@ -90,13 +95,36 @@ def report(samples: list[Sample]) -> str:
     return "\n".join(lines)
 
 
+def check_limits(samples: list[Sample], limits: dict[str, dict[str, int]]) -> list[str]:
+    """Returns a description of every stage over its limit, and of every limited stage that did not run."""
+    problems = []
+    seen = {s.name: s for s in samples}
+    for name, limit in limits.items():
+        sample = seen.get(name)
+        if sample is None:
+            problems.append(f"{name}: not measured")
+            continue
+        if "ms" in limit and sample.seconds * 1000 > limit["ms"]:
+            problems.append(f"{name}: {sample.seconds * 1000:.1f} ms > {limit['ms']} ms")
+        if "bytes" in limit and sample.response_bytes > limit["bytes"]:
+            problems.append(f"{name}: {sample.response_bytes:,} bytes > {limit['bytes']:,} bytes")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("aaftool", type=Path)
     parser.add_argument("file", type=Path)
+    parser.add_argument("--limits", type=Path, help="JSON file with a 'core' section of per-stage limits")
     args = parser.parse_args(argv)
     with tempfile.TemporaryDirectory() as tmp:
-        print(report(measure(args.aaftool, args.file, Path(tmp))))
+        samples = measure(args.aaftool, args.file, Path(tmp))
+    print(report(samples))
+    if args.limits:
+        problems = check_limits(samples, json.loads(args.limits.read_text())["core"])
+        for problem in problems:
+            print(f"OVER LIMIT {problem}")
+        return 1 if problems else 0
     return 0
 
 
