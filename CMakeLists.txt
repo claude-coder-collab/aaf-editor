@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(aaf_editor VERSION 0.2.0 DESCRIPTION "AAF library and editor" LANGUAGES CXX)
+project(aaf_editor VERSION 0.2.1 DESCRIPTION "AAF library and editor" LANGUAGES CXX)
 
 if(MSVC)
     set(AAF_CXX_STANDARD 23)
