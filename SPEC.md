@@ -88,7 +88,7 @@ Implements [MS-CFB] v3 (512-byte sectors) and v4 (4096-byte sectors). Status: **
   - Exposed as `DirEntry{id, parent, name (UTF-16), type, clsid, stateBits, creation and modified times, startSector, size, children}`.
   - `children` are listed in tree order, which is sorted order.
   - Slots not reachable from the root are reported as `EntryType::empty`.
-  - Lookups: `find(parent, name)` (CFB name comparison) and `findPath("a/b/c")` (UTF-8).
+  - Lookups: `find(parent, name)` (CFB name comparison) and `findPath("a/b/c")` (UTF-8). `find` binary-searches a storage's children when they are in sorted order (checked once per storage at open) and falls back to a linear scan for malformed files whose trees are not ordered. A linear scan made opening quadratic: an AAF vector of n objects is n sibling storages.
 - **Streams**: `openStream(id)` returns a `StreamReader` with random-access `read(offset, span)` and `readAll(maxSize)`.
   - The reader precomputes the absolute file offset of each sector, or of each 64-byte mini sector (a mini sector never spans two regular sectors).
   - It holds a non-owning pointer to the container's source, so it must not outlive the `Container`.
@@ -109,7 +109,7 @@ Implements [MS-CFB] v3 (512-byte sectors) and v4 (4096-byte sectors). Status: **
 ### 4.2 Writing
 
 - `Builder` describes a tree of storages and streams. Node 0 is the root.
-  - `addStorage` and `addStream` validate names: 1–31 UTF-16 units, no `/ \ : !` or NUL, and unique among siblings under the CFB comparison.
+  - `addStorage` and `addStream` validate names: 1–31 UTF-16 units, no `/ \ : !` or NUL, and unique among siblings under the CFB comparison. Uniqueness is checked in a hash set keyed by parent and upper-cased name, not by scanning siblings.
   - Stream data is either owned bytes or a `SourceStream{container, entryId}`, which is copied lazily in 1 MiB chunks, so essence is never buffered whole.
   - `Builder::fromContainer` copies a whole tree, including CLSIDs, state bits, timestamps and the header CLSID, with every stream referencing its source.
 - **Output**: always a **complete new file**, never an in-place modification. `writeFile` uses `writeFileAtomic`:
@@ -698,12 +698,16 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - Round-trip (M3): `tools/crosscheck.py --roundtrip <aaftool>` rewrites each file with `aaftool roundtrip`, both preserving the layout (as v3) and regenerating it (as v4). It then compares pyaaf2's reading of the output with aaftool's reading of the original. Stream names are ignored for regenerated layouts.
 - Python tool versions are pinned in `tools/requirements.txt` (pyaaf2 1.7.1, pytest).
 - **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
+- **Performance measurement** (manual, not in CI yet; results and analysis in `docs/performance.md`):
+  - `tools/gen_stress_aaf.py OUT [--video 2 --audio 28 --clips 2000 --masters 500 --seed 1]` writes a deterministic synthetic composition with pyaaf2: each track is a sequence of source clips (12–250 frames, about 5% preceded by a filler) referencing a pool of master mobs. The defaults give 30 tracks, 60,000 clips and 26 MB.
+  - `tools/perf_baseline.py AAFTOOL FILE` drives `aaftool serve` and prints the time and response size of doc.open, timeline.mobs, timeline.get of the largest composition, a split in its middle track, the re-projection after it, undo, validate and saveAs.
+  - `ui/e2e/perf.spec.ts` runs only when `AAF_PERF_FILE` is set. It measures open-to-timeline, canvas draw and hit-test time at Fit and zoomed in (through `window.__aafTimeline.measure(n)` and `zoom(factor)`), mouse-move round trips and edit-to-redraw. The Playwright bridge copies each response between Node and the browser, so its end-to-end times overstate the native editor's for large responses; the draw and hit-test times are in-page and comparable.
 - **UI unit tests**: Vitest for the frontend logic and the RPC codec.
 - **UI end-to-end tests** (`ui/e2e`, Playwright 1.63, `npm run e2e`):
   - They drive the built single-file `index.html` against the real C++ core. `AAF_UI_HTML` selects the page (default `ui/dist/index.html`; CI uses the one the editor embeds), and `AAFTOOL` is the `aaftool` executable.
   - The fixture in `e2e/editor.ts` starts one `aaftool serve` per test and binds `window.aafRpc` to it with `exposeFunction`. It delivers each request's events through `window.__aafEvent` before returning the response, in the same order as the native host. `window.aafHost` is a stub: `openDialog` and `saveDialog` return paths the test sets, and `setTitle` calls are recorded.
   - Tests work on private copies of fixtures in the test output directory.
-  - The init script sets `window.__aafTest`, and `TimelineView` then exposes `window.__aafTimeline` with `tracks()` (the projected rows and items) and `itemRect(object)` (an item's rectangle in canvas pixels). Tests use it to click and drag clips on the canvas and to check results.
+  - The init script sets `window.__aafTest`, and `TimelineView` then exposes `window.__aafTimeline` with `tracks()` (the projected rows and items), `itemRect(object)` (an item's rectangle in canvas pixels), and `measure(n)` and `zoom(factor)` for the performance spec. Tests use it to click and drag clips on the canvas and to check results.
   - Covered flows:
     - Inspector: open through the Open button (the window title is set); search and select a mob; rename it (panel, dirty marker, history and timeline name update); Ctrl+Z undo and Redo; inline rejection of an invalid integer; Validate reports 0 errors; Save As a copy, which `aaftool validate` accepts and which contains the edit.
     - Timeline: click-select a clip (the source chain shows); Lift and Undo; split at a playhead set on the ruler with the S key; trim a tail by dragging its edge; add a sound track.

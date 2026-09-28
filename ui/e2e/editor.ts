@@ -79,9 +79,9 @@ export const test = base.extend<{ editor: Editor }>({
     const host: Host = { openPath: null, savePath: null, titles: [] };
     await page.addInitScript(() => (window.__aafTest = true));
     await page.exposeFunction("aafRpc", async (request: string) => {
-      if (process.env.E2E_LOG) console.log(">>", request.slice(0, 200));
+      const started = performance.now();
       const { response, events } = await core.request(request);
-      if (process.env.E2E_LOG) console.log("<<", JSON.stringify(response).slice(0, 200));
+      if (process.env.E2E_LOG) console.log(`${(JSON.parse(request) as { method: string }).method.padEnd(22)} core ${(performance.now() - started).toFixed(0).padStart(6)} ms ${JSON.stringify(response).length.toLocaleString().padStart(12)} bytes`);
       if (events.length > 0) {
         await page.evaluate((list) => list.forEach((e) => window.__aafEvent?.(e)), events);
       }

@@ -99,6 +99,7 @@ private:
     std::vector<std::uint32_t> miniFat_;
     std::vector<std::uint32_t> miniStreamChain_;
     std::vector<DirEntry> entries_;
+    std::vector<bool> sortedChildren_;
 };
 
 /// Follows a sector chain from `start` through `table`, rejecting out-of-range entries and cycles.

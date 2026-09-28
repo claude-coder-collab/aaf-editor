@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -78,6 +79,7 @@ private:
     Version version_;
     Clsid headerClsid_;
     std::vector<BuildNode> nodes_;
+    std::unordered_set<std::u16string> names_;
 };
 
 /// Serialises `builder` as a compound file.

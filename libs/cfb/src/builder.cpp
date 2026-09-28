@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <format>
+#include <iterator>
 #include <optional>
 
 namespace aaf::cfb
@@ -559,8 +560,9 @@ auto Builder::addNode(NodeId parent, BuildNode node) -> Result<NodeId>
     {
         return std::unexpected(r.error());
     }
-    const bool duplicate = std::ranges::any_of(nodes_[parent].children, [&](NodeId id) -> bool { return compareNames(nodes_[id].name, node.name) == 0; });
-    if (duplicate)
+    std::u16string key{ static_cast<char16_t>(parent >> 16U), static_cast<char16_t>(parent & 0xFFFFU) };
+    std::ranges::transform(node.name, std::back_inserter(key), upperCase);
+    if (!names_.insert(std::move(key)).second)
     {
         return fail(Errc::invalid_argument, std::format("duplicate entry name '{}'", toUtf8(node.name)));
     }

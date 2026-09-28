@@ -73,3 +73,13 @@ TEST_CASE("Builder rejects invalid trees", "[cfb][builder]")
     CHECK_FALSE(b.addStorage(999, u"x"));
     CHECK_FALSE(b.addStream(Builder::root(), u"src", SourceStream{}));
 }
+
+TEST_CASE("Builder allows the same name under different storages", "[cfb][builder]")
+{
+    Builder b;
+    const auto first = b.addStorage(Builder::root(), u"a").value();
+    const auto second = b.addStorage(Builder::root(), u"b").value();
+    CHECK(b.addStream(first, u"properties", std::vector<std::byte>{}));
+    CHECK(b.addStream(second, u"Properties", std::vector<std::byte>{}));
+    CHECK_FALSE(b.addStream(second, u"properties", std::vector<std::byte>{}));
+}
