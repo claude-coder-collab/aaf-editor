@@ -295,6 +295,14 @@
         if (!row || !item) return null;
         return { x: toX(item.start * row.scale), y: row.y - scrollTop, width: item.length * row.scale * pixelsPerUnit, height: row.height };
       },
+      measure: (repeat: number) => {
+        const start = performance.now();
+        for (let n = 0; n < repeat; n++) draw();
+        const drawn = performance.now();
+        for (let n = 0; n < repeat; n++) hitTest(view!, width / 2, height / 2 + scrollTop, pixelsPerUnit, viewStart, HEADER);
+        return { draw: (drawn - start) / repeat, pick: (performance.now() - drawn) / repeat };
+      },
+      zoom: (factor: number) => zoom(factor),
     };
     return () => delete window.__aafTimeline;
   });

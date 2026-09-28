@@ -427,6 +427,11 @@ auto Container::loadDirectory(std::uint32_t firstSector) -> Result<void>
             entries_[i].id = static_cast<EntryId>(i);
         }
     }
+    sortedChildren_.assign(count, false);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        sortedChildren_[i] = std::ranges::is_sorted(entries_[i].children, [this](EntryId a, EntryId b) -> bool { return std::is_lt(compareNames(entries_[a].name, entries_[b].name)); });
+    }
     return {};
 }
 
@@ -469,6 +474,11 @@ auto Container::loadMiniStream(std::uint32_t firstMiniFatSector) -> Result<void>
 auto Container::find(EntryId parent, std::u16string_view name) const -> std::optional<EntryId>
 {
     const auto& children = entries_.at(parent).children;
+    if (sortedChildren_[parent])
+    {
+        const auto it = std::ranges::lower_bound(children, name, [](std::u16string_view a, std::u16string_view b) -> bool { return std::is_lt(compareNames(a, b)); }, [this](EntryId id) -> std::u16string_view { return entries_[id].name; });
+        return it != children.end() && compareNames(entries_[*it].name, name) == 0 ? std::optional(*it) : std::nullopt;
+    }
     const auto it = std::ranges::find_if(children, [&](EntryId id) -> bool { return compareNames(entries_[id].name, name) == 0; });
     return it == children.end() ? std::nullopt : std::optional(*it);
 }

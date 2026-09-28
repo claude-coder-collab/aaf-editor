@@ -4,11 +4,11 @@
 #include <aaf/cfb/container.hpp>
 
 #include <catch2/catch_test_macros.hpp>
-
 #include <catch2/generators/catch_generators.hpp>
-#include <compare>
 
 #include <algorithm>
+#include <array>
+#include <compare>
 #include <format>
 #include <random>
 #include <thread>
@@ -228,4 +228,49 @@ TEST_CASE("Streams of a file can be read concurrently", "[cfb][container]")
         CHECK(std::ranges::count(ok, 1) == kStreams);
     }
     std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("find locates every child of a large storage", "[cfb][container]")
+{
+    Builder b;
+    const auto storage = b.addStorage(Builder::root(), u"many").value();
+    for (int n = 0; n < 3000; ++n)
+    {
+        const auto name = std::format("child{}", n);
+        REQUIRE(b.addStorage(storage, std::u16string(name.begin(), name.end())));
+    }
+    auto c = openMemory(writeToMemory(b).value());
+    REQUIRE(c);
+    const auto parent = c->find(0, u"many");
+    REQUIRE(parent);
+    for (int n = 0; n < 3000; n += 7)
+    {
+        const auto name = std::format("CHILD{}", n);
+        const auto found = c->find(*parent, std::u16string(name.begin(), name.end()));
+        REQUIRE(found);
+        CHECK(c->entry(*found).name.size() == name.size());
+    }
+    CHECK_FALSE(c->find(*parent, u"child3000"));
+    CHECK_FALSE(c->find(*parent, u"x"));
+}
+
+TEST_CASE("find works when a directory's siblings are out of order", "[cfb][container]")
+{
+    Builder b;
+    for (const auto* name : { u"aa", u"bb", u"cc" })
+    {
+        REQUIRE(b.addStorage(Builder::root(), name));
+    }
+    auto bytes = writeToMemory(b).value();
+    const std::array<std::byte, 4> aa{ std::byte{ 'a' }, std::byte{ 0 }, std::byte{ 'a' }, std::byte{ 0 } };
+    const auto at = std::ranges::search(bytes, aa);
+    REQUIRE_FALSE(at.empty());
+    at[0] = std::byte{ 'z' };
+    at[2] = std::byte{ 'z' };
+    auto c = openMemory(std::move(bytes));
+    REQUIRE(c);
+    CHECK(c->find(0, u"zz"));
+    CHECK(c->find(0, u"bb"));
+    CHECK(c->find(0, u"cc"));
+    CHECK_FALSE(c->find(0, u"aa"));
 }
