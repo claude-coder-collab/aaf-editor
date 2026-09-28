@@ -4,6 +4,7 @@
 #include <aaf/core/writer.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/edit/session.hpp>
+#include <aaf/rpc/server.hpp>
 #include <aaf/timeline/timeline.hpp>
 
 #include "dump.hpp"
@@ -37,6 +38,8 @@ commands:
                                    load the AAF file and save it again unchanged
   timeline <file> [--mobs] [--mob NAME|ID] [--json]
                                    list mobs, or show a mob's tracks (default: first top-level composition)
+  rpc <file> (--call METHOD PARAMS-JSON)... [--save OUT]
+                                   run editor RPC calls (see SPEC §8.3) and optionally save the result
   extract <file> --list            list embedded essence
   extract <file> <mobid|index> <out>
                                    write an embedded essence stream to a file
@@ -437,7 +440,7 @@ auto itemJson(const aaf::timeline::Item& item) -> nlohmann::ordered_json
     }
     if (item.source)
     {
-        j["source"] = { { "mobId", item.source->mobId.toString() }, { "slotId", item.source->slotId }, { "startTime", item.source->startTime }, { "found", item.source->mob.has_value() }, { "original", item.source->original } };
+        j["source"] = { { "mobId", item.source->mobId.toString() }, { "slotId", item.source->slotId }, { "startTime", item.source->startTime }, { "found", item.source->mob.has_value() }, { "mobKind", aaf::timeline::to_string(item.source->mobKind) }, { "original", item.source->original } };
     }
     if (item.timecode)
     {
@@ -555,6 +558,56 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
     return 0;
 }
 
+auto cmdRpc(std::span<const std::string_view> args) -> int
+{
+    if (args.empty())
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    aaf::rpc::Server server;
+    if (auto opened = server.call("doc.open", { { "path", std::string(args[0]) } }); !opened)
+    {
+        return reportError(opened.error());
+    }
+    for (std::size_t i = 1; i < args.size(); ++i)
+    {
+        if (args[i] == "--call" && i + 2 < args.size())
+        {
+            const auto method = std::string(args[i + 1]);
+            nlohmann::json params;
+            try
+            {
+                params = nlohmann::json::parse(args[i + 2]);
+            } catch (const nlohmann::json::exception& e)
+            {
+                std::println(stderr, "aaftool: invalid JSON for {}: {}", method, e.what());
+                return 2;
+            }
+            auto result = server.call(method, params);
+            if (!result)
+            {
+                return reportError(result.error());
+            }
+            std::println("{}", result->dump());
+            i += 2;
+        }
+        else if (args[i] == "--save" && i + 1 < args.size())
+        {
+            if (auto saved = server.call("doc.saveAs", { { "path", std::string(args[++i]) } }); !saved)
+            {
+                return reportError(saved.error());
+            }
+        }
+        else
+        {
+            std::print(stderr, "{}", kUsage);
+            return 2;
+        }
+    }
+    return 0;
+}
+
 auto run(std::span<char*> argv) -> int
 {
     const std::vector<std::string_view> args(argv.begin() + 1, argv.end());
@@ -588,6 +641,10 @@ auto run(std::span<char*> argv) -> int
     if (args[0] == "roundtrip")
     {
         return cmdRoundtrip(rest);
+    }
+    if (args[0] == "rpc")
+    {
+        return cmdRpc(rest);
     }
     if (args[0] == "timeline")
     {

@@ -105,7 +105,13 @@
     }
     history = await client.history();
     if (selected !== null) {
-      object = await client.object(selected);
+      const current = await client.object(selected);
+      if (current.attached || current.id === 0) {
+        object = current;
+      } else {
+        selected = null;
+        object = null;
+      }
     }
   }
 
@@ -284,7 +290,7 @@
                 </span>
               {/each}
             </nav>
-            <TimelineView {client} mob={activeTimeline} version={timelineVersion} {selected} onselect={(id) => select(id, true)} />
+            <TimelineView {client} mob={activeTimeline} version={timelineVersion} {selected} {mobs} onselect={(id) => select(id, true)} onerror={(m) => notify(m, m.startsWith("Relinked") ? "info" : "error")} />
           </div>
         {/if}
         <div class="properties">

@@ -359,21 +359,40 @@ Status: **projection implemented (M6)** in `libs/timeline/` (namespace `aaf::tim
 
 ### 6.1 Editorial operations
 
-Each operation is a command (§7) that edits the underlying objects:
+Status: **implemented (M7)** in `aaf/timeline/edit.hpp` (namespace `aaf::timeline::ops`).
+
+- **Execution**: every operation runs inside an `edit::Transaction`, so it is validated, atomic and undoable like any other command (§7).
+- **Positions** are in the track's edit units, measured from the start of its sequence (as projected).
+- **Track editing**:
+  - An operation edits the Sequence inside the slot, unwrapping track-level effects.
+  - A slot holding a single SourceClip or Filler is first wrapped in a new Sequence, with the same DataDefinition and Length.
+  - Slots holding Pulldown, Timecode, EdgeCode or NestedScope are rejected, and so are items that are not directly in a track's sequence.
+- **Normalization**: after every operation, adjacent Fillers are merged, zero-length Fillers are removed, and the Sequence's `Length` and those of the wrapping effects are recomputed (sum of segments minus sum of transitions).
 
 | Op | Semantics |
 |---|---|
-| move | Move an item within or between compatible tracks. The vacated space becomes Filler (lift) or closes (ripple, optional). |
-| trim | Adjust in or out; for SourceClips this also adjusts StartTime. Clamp to source length where known. |
-| split | Split a segment at a time, duplicating the object with adjusted StartTime and Length. |
-| delete | Lift (replace with Filler) or ripple. |
-| insert / overwrite | Place a SourceClip referencing an existing mob/slot. |
-| add/remove track | Create or remove a TimelineMobSlot with a Sequence. |
-| rename | Name of mobs, slots and components. |
-| relink | Edit NetworkLocator URLs, or batch find/replace on locator paths. |
-| markers | Add, edit or remove DescriptiveMarkers and comments. |
+| `split(slot, position)` | Splits the **clip** under `position` (a deep copy becomes the right part, with `StartTime` advanced by the left part's length) and returns the right part. Splitting filler is refused, because it would merge straight back; a position inside a transition is refused. |
+| `lift(item)` | Replaces a segment with Filler of the same length. For a Transition, it makes a **cut at the midpoint**: the previous segment is shortened by ⌈L/2⌉, the next by ⌊L/2⌋, and the next clip's StartTime moves by ⌊L/2⌋, so timing is unchanged. |
+| `rippleDelete(item)` | Removes a segment and closes the gap, turning the transitions on either side into cuts first. For a transition, it behaves like lift. |
+| `trim(item, head \| tail, delta, ripple)` | Moves an edge. A **roll** also resizes the neighbour (and adjusts its StartTime for a tail edge); a **ripple** changes only this segment. Segments must keep length ≥ 1 (a filler neighbour may reach 0 and is removed). StartTime must stay ≥ 0, and clips must stay within their source slot's `Length` when it can be resolved. Edges touching a transition are refused ("remove the transition first"). |
+| `place(slot, position, segment, insert)` | Places a detached segment with the same DataDefinition. Insert cuts at `position` and pushes later material. Overwrite cuts at both ends and removes what lies between. A range overlapping a transition is refused. Placing past the end adds Filler first. |
+| `placeClip(slot, position, sourceMob, sourceSlot, sourceIn, length, insert)` | Creates a SourceClip (DataDefinition from the track; SourceID, SourceMobSlotID, StartTime, Length) and places it. The source slot must exist. |
+| `move(item, toSlot, position, ripple)` | Leaves Filler behind (or closes the gap with `ripple`), then overwrites at the target, which may be another track with the same data kind. Transitions cannot be moved. |
+| `addTrack(mob, picture \| sound, name)` | Adds a TimelineMobSlot:<br>• SlotID = highest + 1;<br>• the edit rate of the mob's first timeline slot;<br>• Origin 0;<br>• PhysicalTrackNumber = count of tracks of that kind + 1;<br>• an empty Sequence referencing the file's Picture or Sound DataDefinition (SMPTE AUID preferred, legacy accepted). |
+| `removeTrack(slot)` | Deletes the slot. |
+| `addMarker(mob, position, comment)` | Adds a DescriptiveMarker (Position, Comment, the marker track's DataDefinition, and **DescribedSlots = {first picture track's SlotID}**), in position order. If there is no marker track, it creates an EventMobSlot (PhysicalTrackNumber = existing event slots + 1, the first timeline edit rate) holding a Sequence that references the Descriptive Metadata DataDefinition. Avid does the same, and the OTIO adapter requires both `DescribedSlots` and the event slot's PhysicalTrackNumber. |
+| `relink(find, replace)` | Replaces text in every NetworkLocator `URLString`; returns how many URLs actually changed. |
+| `deepCopy(id)` | Copies an object with its strongly referenced children. Sets are refused. |
 
-Adjacent Fillers are merged after every op. Transitions adjacent to an edited point are kept valid or removed, with a warning.
+- **Not yet supported**: moving or trimming transitions, editing inside effects and nested scopes, and keyframes.
+- **Tests** (`tests/timeline/test_edit_ops.cpp`, on the SDK sample so they run on every PR):
+  - every operation, including refusals;
+  - the stored Length always equal to the projected total;
+  - no adjacent fillers;
+  - 0 validation errors;
+  - exact undo;
+  - a random sequence of 80 operations that is undone to the original objects.
+- **Cross-check** (`tools/crosscheck_edits.py`, nightly): split, overwrite, add-track and add-marker are applied through `aaftool rpc` to every reference file, and the result is saved. The saved file must validate with 0 errors, pyaaf2 must read the same mobs, and OTIO must read every comparable edited track identically to our projection. All 43 files pass.
 
 ## 7. Layer 4: Edit session (`libaafedit`)
 
@@ -439,7 +458,10 @@ aaftool cfb-roundtrip <in> <out> [--v3|--v4]  rewrite the CFB container only (no
 aaftool validate <file> [--json]              diagnostics; exit 1 on errors (M2)
 aaftool roundtrip <in> <out> [--v3|--v4] [--regenerate-layout]
                                               load and save without edits (M3)
-aaftool timeline <file> [--mob NAME|ID]       text timeline
+aaftool timeline <file> [--mobs] [--mob NAME|ID] [--json]
+                                              mob list, or a mob's tracks and items (M6)
+aaftool rpc <file> (--call METHOD PARAMS)... [--save OUT]
+                                              run any §8.3 RPC calls in order, printing each result, then optionally save (M7)
 aaftool extract <file> --list                 list embedded essence: index, MobID, size, mob name
 aaftool extract <file> <mobid|index> <out>    write an embedded essence stream to a file, in 1 MiB chunks
 aaftool set-essence <in> <mobid|index> <data> <out>
@@ -540,7 +562,16 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
     - `timeline.mobs` returns the mob summaries.
     - `timeline.get {mob}` returns `{mob, mobId, name, kind, timecode, warnings, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items}]}`, with each item's fields as in §6 (`nested` is a list of item lists).
     - `timeline.resolve {clip}` returns `{status, links, essence}`.
-    - Timeline edits (`timeline.op`) come with M7.
+    - `timeline.op {op, …}` (M7) runs a §6.1 operation as one undoable step and returns `{changes, id?, count?}`. Operations:
+      - `split {slot, position}` → `id` of the right part;
+      - `lift {item}` and `rippleDelete {item}`;
+      - `trim {item, edge: head|tail, delta, ripple?}`;
+      - `move {item, toSlot, position, ripple?}`;
+      - `insertClip` and `overwriteClip {slot, position, sourceMob, sourceSlot, sourceIn, length}` → `id`;
+      - `addTrack {mob, kind: picture|sound, name?}` → `id`;
+      - `removeTrack {slot}`;
+      - `addMarker {mob, position, comment?}` → `id`;
+      - `relink {find, replace}` → `count`.
 - **Events**: `doc.opened` (info), `doc.changed` (`{changes, info}`, from the session listener) and `doc.state` (info, after a save).
 - **Tagged values** (`toJson` and `valueFromJson`): `{"t":…}` with one of these tags:
   - `null`; `bool`;
@@ -607,6 +638,17 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - wheel or Shift+wheel, and a range slider, to scroll;
     - hover tooltips (kind, label, start and length, source reference, comment);
     - click to select: the object is revealed in the tree and shown in the properties. For source clips the resolved chain appears in the header: mobs, status, and embedded or first locator.
+- **Timeline editing** (M7):
+  - **Playhead**: click the ruler; Left and Right move it by 1 unit, or 10 with Shift. The ruler shows its timecode.
+  - **Selection**: click a track header to select the track; clicking an item selects both it and its track.
+  - **Drag**:
+    - dragging a clip body moves it, including onto another track of the same kind, snapping within 8 px to every edit point and the playhead; Alt makes it a ripple move;
+    - dragging within 6 px of an edge trims it, as a roll, or a ripple with Alt;
+    - a dashed ghost shows the result, and the cursor changes over edges.
+  - **Toolbar**: Split (S), Lift (Delete), Ripple (Shift+Delete), Marker (M, asks for a comment), a source picker with Insert and Overwrite at the playhead on the selected track (using the whole matching source track), +V, +A, −Track and Relink… (find and replace).
+  - Keyboard shortcuts act only while the timeline is active (after a click inside it).
+  - Errors from refused operations appear in the message bar.
+  - After a change, the selection is cleared if the selected object left the document.
 - **Keyboard**:
   - Ctrl/Cmd+O, S, Shift+S;
   - Z and Shift+Z or Y (except inside text fields);
@@ -691,7 +733,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | M4 ✅ | Edit session + primitive commands | Undo/redo symmetry tests pass |
 | M5 ✅ | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
 | M6 ✅ | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
-| M7 | Timeline editing ops (§6.1) | Op tests pass; edited files open in Resolve and Pro Tools |
+| M7 ✅ | Timeline editing ops (§6.1) | Op tests pass; edited files validate and read back identically in pyaaf2 and OTIO (automated). Resolve and Pro Tools stay on the manual release checklist. |
 | M8 | Packaging, release pipeline, docs | A tagged release publishes unsigned binaries for Linux, macOS and Windows (§11) |
 | Later | Create-new-file templates, Edit Protocol conformance checks, OTIO import/export, keyframe editing, essence waveform/thumbnail previews | — |
 
@@ -726,6 +768,8 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | 2026-09-27 | UI actions live in a toolbar and keyboard shortcuts instead of native menus |
 | 2026-09-27 | Track-level effects are unwrapped in the timeline; nested compositions and scopes stay single items |
 | 2026-09-27 | The timeline projection is verified against the OpenTimelineIO AAF adapter's reading of its own sample files |
+| 2026-09-27 | Removing a transition makes a cut at its midpoint, preserving timing |
+| 2026-09-27 | New markers carry DescribedSlots, and new marker slots a PhysicalTrackNumber, as Avid writes them (OTIO requires both) |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

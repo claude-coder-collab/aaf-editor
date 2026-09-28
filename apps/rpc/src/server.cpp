@@ -1,6 +1,7 @@
 #include <aaf/edit/defaults.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/rpc/server.hpp>
+#include <aaf/timeline/edit.hpp>
 #include <aaf/timeline/timeline.hpp>
 
 #include <algorithm>
@@ -597,6 +598,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         "timeline.mobs",
         "timeline.get",
         "timeline.resolve",
+        "timeline.op",
     };
     if (!kMethods.contains(method))
     {
@@ -972,6 +974,181 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             essence = { { "embedded", chain->essence->embedded }, { "essenceData", chain->essence->essenceData == kNoObject ? Json(nullptr) : Json(chain->essence->essenceData) }, { "locators", chain->essence->locators }, { "descriptor", chain->essence->descriptor } };
         }
         return Json{ { "status", std::string(timeline::to_string(chain->status)) }, { "links", std::move(links) }, { "essence", std::move(essence) } };
+    }
+    if (method == "timeline.op")
+    {
+        auto op = param<std::string>(params, "op");
+        if (!op)
+        {
+            return std::unexpected(op.error());
+        }
+        auto id = [&](const char* key) -> Result<ObjectId> { return objectParam(key); };
+        auto integer = [&](const char* key) -> Result<long> { return param<std::int64_t>(params, key); };
+        Json extra = Json::object();
+        edit::Session::Command command;
+        std::string description;
+        if (*op == "split")
+        {
+            auto slot = id("slot");
+            auto position = integer("position");
+            if (!slot || !position)
+            {
+                return invalid("split needs slot and position");
+            }
+            description = "Split";
+            command = [&, slot = *slot, position = *position](edit::Transaction& tx) -> Result<void> {
+                auto right = timeline::ops::split(tx, slot, position);
+                if (!right)
+                {
+                    return std::unexpected(right.error());
+                }
+                extra["id"] = *right;
+                return {};
+            };
+        }
+        else if (*op == "lift" || *op == "rippleDelete")
+        {
+            auto item = id("item");
+            if (!item)
+            {
+                return std::unexpected(item.error());
+            }
+            description = *op == "lift" ? "Lift" : "Ripple delete";
+            const bool ripple = *op == "rippleDelete";
+            command = [item = *item, ripple](edit::Transaction& tx) -> Result<void> { return ripple ? timeline::ops::rippleDelete(tx, item) : timeline::ops::lift(tx, item); };
+        }
+        else if (*op == "trim")
+        {
+            auto item = id("item");
+            auto edge = param<std::string>(params, "edge");
+            auto delta = integer("delta");
+            auto ripple = optionalParam<bool>(params, "ripple", false);
+            if (!item || !edge || !delta || !ripple || (*edge != "head" && *edge != "tail"))
+            {
+                return invalid("trim needs item, edge (head or tail) and delta");
+            }
+            description = *ripple ? "Ripple trim" : "Trim";
+            const auto side = *edge == "head" ? timeline::ops::Edge::head : timeline::ops::Edge::tail;
+            command = [item = *item, side, delta = *delta, ripple = *ripple](edit::Transaction& tx) -> Result<void> { return timeline::ops::trim(tx, item, side, delta, ripple); };
+        }
+        else if (*op == "move")
+        {
+            auto item = id("item");
+            auto slot = id("toSlot");
+            auto position = integer("position");
+            auto ripple = optionalParam<bool>(params, "ripple", false);
+            if (!item || !slot || !position || !ripple)
+            {
+                return invalid("move needs item, toSlot and position");
+            }
+            description = "Move";
+            command = [item = *item, slot = *slot, position = *position, ripple = *ripple](edit::Transaction& tx) -> Result<void> { return timeline::ops::move(tx, item, slot, position, ripple); };
+        }
+        else if (*op == "insertClip" || *op == "overwriteClip")
+        {
+            auto slot = id("slot");
+            auto position = integer("position");
+            auto source = id("sourceMob");
+            auto sourceSlot = param<std::uint32_t>(params, "sourceSlot");
+            auto sourceIn = integer("sourceIn");
+            auto length = integer("length");
+            if (!slot || !position || !source || !sourceSlot || !sourceIn || !length)
+            {
+                return invalid("clip placement needs slot, position, sourceMob, sourceSlot, sourceIn and length");
+            }
+            const bool insert = *op == "insertClip";
+            description = insert ? "Insert clip" : "Overwrite clip";
+            command = [&, slot = *slot, position = *position, source = *source, sourceSlot = *sourceSlot, sourceIn = *sourceIn, length = *length, insert](edit::Transaction& tx) -> Result<void> {
+                auto clip = timeline::ops::placeClip(tx, slot, position, source, sourceSlot, sourceIn, length, insert);
+                if (!clip)
+                {
+                    return std::unexpected(clip.error());
+                }
+                extra["id"] = *clip;
+                return {};
+            };
+        }
+        else if (*op == "addTrack")
+        {
+            auto mob = id("mob");
+            auto kind = param<std::string>(params, "kind");
+            auto name = optionalParam<std::string>(params, "name", {});
+            if (!mob || !kind || !name || (*kind != "picture" && *kind != "sound"))
+            {
+                return invalid("addTrack needs mob and kind (picture or sound)");
+            }
+            description = "Add track";
+            const auto trackKind = *kind == "picture" ? timeline::TrackKind::picture : timeline::TrackKind::sound;
+            command = [&, mob = *mob, trackKind, name = *name](edit::Transaction& tx) -> Result<void> {
+                auto slot = timeline::ops::addTrack(tx, mob, trackKind, name);
+                if (!slot)
+                {
+                    return std::unexpected(slot.error());
+                }
+                extra["id"] = *slot;
+                return {};
+            };
+        }
+        else if (*op == "removeTrack")
+        {
+            auto slot = id("slot");
+            if (!slot)
+            {
+                return std::unexpected(slot.error());
+            }
+            description = "Remove track";
+            command = [slot = *slot](edit::Transaction& tx) -> Result<void> { return timeline::ops::removeTrack(tx, slot); };
+        }
+        else if (*op == "addMarker")
+        {
+            auto mob = id("mob");
+            auto position = integer("position");
+            auto comment = optionalParam<std::string>(params, "comment", {});
+            if (!mob || !position || !comment)
+            {
+                return invalid("addMarker needs mob and position");
+            }
+            description = "Add marker";
+            command = [&, mob = *mob, position = *position, comment = *comment](edit::Transaction& tx) -> Result<void> {
+                auto marker = timeline::ops::addMarker(tx, mob, position, comment);
+                if (!marker)
+                {
+                    return std::unexpected(marker.error());
+                }
+                extra["id"] = *marker;
+                return {};
+            };
+        }
+        else if (*op == "relink")
+        {
+            auto find = param<std::string>(params, "find");
+            auto replace = optionalParam<std::string>(params, "replace", {});
+            if (!find || !replace)
+            {
+                return invalid("relink needs find and replace");
+            }
+            description = "Relink media";
+            command = [&, find = *find, replace = *replace](edit::Transaction& tx) -> Result<void> {
+                auto count = timeline::ops::relink(tx, find, replace);
+                if (!count)
+                {
+                    return std::unexpected(count.error());
+                }
+                extra["count"] = *count;
+                return {};
+            };
+        }
+        else
+        {
+            return invalid(std::format("unknown timeline operation '{}'", *op));
+        }
+        auto changes = run(description, command);
+        if (!changes)
+        {
+            return changes;
+        }
+        extra["changes"] = std::move(*changes);
+        return extra;
     }
     if (method == "essence.extract" || method == "essence.replace")
     {
