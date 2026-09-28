@@ -692,7 +692,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 2. Unknown classes, properties and opaque data survive round-trip. ✅ M3: a test adds an unknown stored form, a vendor storage and a root `SummaryInformation` stream, and all of them survive.
 3. Files written by us open in: pyaaf2 (automated in CI), the AAF SDK InfoDumper (automated if feasible), and Avid Media Composer, Pro Tools and DaVinci Resolve (manual release checklist). ✅ pyaaf2 (M3): `tools/crosscheck.py --roundtrip` passes for all 58 files in both layout modes. InfoDumper is not automated: it would require building the SDK, which is not worth the CI cost.
 4. Editing only touches the objects in the command's ChangeSet. Diffing the graph before and after an edit shows no other changes.
-5. Malformed input never crashes: every fuzz target runs with no findings in the `full.yml` fuzz job (10 minutes per target, under ASan/UBSan).
+5. Malformed input never crashes: every fuzz target runs with no findings in `fuzz.yml` (under ASan/UBSan).
 
 ## 10. Testing
 
@@ -722,7 +722,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - Essence: `tools/crosscheck.py --essence <aaftool>` checks, for every reference file, that every stream written by `aaftool extract` equals pyaaf2's reading of it, and that pyaaf2 reads back a stream replaced by `aaftool set-essence`. The largest case is 4.7 MB of DNxHD in `picchu_seq0100_snippet_embedded.aaf`.
   - Round-trip (M3): `tools/crosscheck.py --roundtrip <aaftool>` rewrites each file with `aaftool roundtrip`, both preserving the layout (as v3) and regenerating it (as v4). It then compares pyaaf2's reading of the output with aaftool's reading of the original. Stream names are ignored for regenerated layouts.
 - Python tool versions are pinned in `tools/requirements.txt` (pyaaf2 1.7.1, pytest).
-- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) each run 10 minutes in `full.yml`, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
+- **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) run in `fuzz.yml` (§11), seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
 - **Performance measurement** (results and analysis in `docs/performance.md`):
   - `tools/gen_stress_aaf.py OUT [--video 2 --audio 28 --clips 2000 --masters 500 --seed 1]` writes a deterministic synthetic composition with pyaaf2: each track is a sequence of source clips (12–250 frames, about 5% preceded by a filler) referencing a pool of master mobs. The defaults give 30 tracks, 60,000 clips and 26 MB.
   - `tools/perf_baseline.py AAFTOOL FILE [--limits tools/perf_limits.json]` drives `aaftool serve` and prints the time and response size of doc.open, timeline.mobs, timeline.get of the largest composition, a split in its middle track, the full and the changed-only re-projection after it, undo, validate and saveAs. With `--limits`, it exits 1 if a stage exceeds its `core` limit (`ms` and/or `bytes`) or did not run.
@@ -755,9 +755,12 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 - **`full.yml`** (push to main, manual, or PRs that change it; no schedule, so unchanged code is not re-tested):
   - ASan/UBSan tests with the external fixtures (cached by manifest hash), and the pyaaf2 cross-checks (object, round-trip and essence);
   - TSan tests (including concurrent stream reads through one `FileSource`);
-  - 10-minute fuzzing;
   - **performance limits**: a GCC Release `aaftool` (without the editor) runs `perf_baseline.py --limits` on the generated limits file, then the Playwright perf spec in Chromium with `AAF_PERF_LIMITS`.
 - UI lint and tests are added with M5.
+- **`fuzz.yml`**:
+  - It runs on pushes to main that change `libs/cfb/**`, `libs/core/**` or `tests/fuzz/**`, on PRs that change the workflow, and manually.
+  - Each libFuzzer target (`fuzz_cfb`, `fuzz_document`, built with the `clang-fuzz` preset) runs for 120 s on a push, or for the manual run's `seconds` input (default 600).
+  - Crash inputs are uploaded on failure.
 - **`release.yml`** (M8) runs on `v*` tags, on manual dispatch, and on PRs that change it, `cmake/Packaging.cmake` or `packaging/`.
   - **Package job** (one per OS): builds Release with `-Werror`, runs all tests and the editor smoke test, then runs **CPack** (`cmake/Packaging.cmake`) and uploads the packages as artifacts.
   - **Version**: `AAF_VERSION` is the tag without its `v`, or `0.0.0-dev.<run>` for untagged builds. It is embedded in `aaftool --version`, `aafedit --version`, the macOS bundle and the package names.
@@ -814,6 +817,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | 2026-09-27 | Changing a set element's key rewrites all weak references to it within the same command |
 | 2026-09-27 | Windows and macOS builds run on every PR; sanitizers, external fixtures and fuzzing stay nightly |
 | 2026-09-28 | `full.yml` has no nightly schedule: it runs on every push to main (and manually), so a schedule only re-tested unchanged code |
+| 2026-09-28 | Fuzzing moved to `fuzz.yml`: 2 minutes per target, only when parser code (`libs/cfb`, `libs/core`, `tests/fuzz`) changes on main; longer runs are manual |
 | 2026-09-27 | Edited stream data is a shared `ByteSource`, so large essence can be replaced from a file without loading it |
 | 2026-09-27 | webview is used through its C API, built as a C++17 static library; its header-only C++ implementation does not compile in C++26 |
 | 2026-09-27 | The UI is built to a single inline HTML file loaded with `set_html`: no local server, no network |

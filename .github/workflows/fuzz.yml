@@ -1,0 +1,54 @@
+name: Fuzz
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "libs/cfb/**"
+      - "libs/core/**"
+      - "tests/fuzz/**"
+  pull_request:
+    paths:
+      - ".github/workflows/fuzz.yml"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Fuzzing time per target, in seconds"
+        default: "600"
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SECONDS_PER_TARGET: ${{ inputs.seconds || '120' }}
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-llvm
+      - name: Build fuzzers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          cmake --preset clang-fuzz -DCMAKE_CXX_COMPILER=clang++-22
+          cmake --build build/clang-fuzz --config Debug
+      - name: Seed corpus
+        run: |
+          mkdir corpus
+          find tests/fixtures/aafsdk -name '*.aaf' -size -300k -exec cp {} corpus/ \;
+      - name: Fuzz CFB reader
+        run: build/clang-fuzz/tests/fuzz/Debug/fuzz_cfb corpus -max_total_time=$SECONDS_PER_TARGET -max_len=65536 -rss_limit_mb=2048
+      - name: Fuzz AAF document loader
+        run: build/clang-fuzz/tests/fuzz/Debug/fuzz_document corpus -max_total_time=$SECONDS_PER_TARGET -max_len=300000 -rss_limit_mb=2048
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-crashes
+          path: |
+            crash-*
+            oom-*
+            timeout-*
+            leak-*
