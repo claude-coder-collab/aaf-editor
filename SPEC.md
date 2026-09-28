@@ -645,7 +645,12 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - **clips with missing sources in red**;
     - the selected object outlined;
     - track headers showing name, rate or track effects.
-    - It scales for the device pixel ratio and reads colours from CSS variables, so both themes work.
+    - It scales for the device pixel ratio and reads colours from CSS variables, so both themes work. The variables are read once per frame.
+  - **Drawing cost** stays within a few milliseconds per frame for 63k items (see `docs/performance.md`):
+    - Each `Row` carries `maxEnd` (running maximum of item ends) and `sorted` (starts never decrease). `visibleRange(row, from, to)` binary-searches the items that may overlap a window, and drawing and `hitTest` visit only those. The search has a 6 px margin so marker diamonds at the edges are included.
+    - Rows scrolled out of view are skipped.
+    - Level of detail: clips narrower than 2 px are merged by `RunMerger` into runs of one colour (touching within 0.5 px), each drawn as one rectangle of at least 1 px. Fillers narrower than 2 px are not drawn, and neither is the X on transitions narrower than 6 px. The selected or dragged item is always drawn on its own.
+    - The projected timeline, the hover and the drag state are `$state.raw`. They are replaced whole, never mutated, and a deep reactive proxy made every property read in the draw loop about 10× slower.
   - **Interaction**:
     - Ctrl+wheel or +/− to zoom around the pointer, and Fit;
     - wheel or Shift+wheel, and a range slider, to scroll;
