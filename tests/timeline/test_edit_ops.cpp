@@ -1,5 +1,6 @@
 #include "fixtures.hpp"
 
+#include <aaf/edit/operations.hpp>
 #include <aaf/edit/session.hpp>
 #include <aaf/timeline/edit.hpp>
 #include <aaf/timeline/timeline.hpp>
@@ -462,4 +463,89 @@ TEST_CASE("Random timeline edits stay valid and undo exactly", "[timeline][ops][
     {
         CHECK_FALSE(doc.isAttached(i));
     }
+}
+
+TEST_CASE("Partial projections of the affected slots reproduce the full projection after every edit", "[timeline][ops]")
+{
+    auto opened = openSession();
+    REQUIRE(opened);
+    auto& session = *opened;
+    const auto& doc = session.document();
+    const auto where = findTrack(doc, 2, false);
+    auto previous = Projector(doc).project(where.mob).value();
+    std::size_t partialUpdates = 0;
+
+    auto check = [&](const Result<edit::ChangeSet>& changes) -> void {
+        INFO((changes ? std::string() : changes.error().message));
+        REQUIRE(changes);
+        const Projector projector(doc);
+        const auto full = projector.project(where.mob).value();
+        const auto slots = projector.affectedSlots(where.mob, changes->objects);
+        if (slots)
+        {
+            const auto partial = projector.project(where.mob, *slots).value();
+            CHECK(partial.partial);
+            CHECK(partial.slots == full.slots);
+            CHECK(partial.tracks.size() == slots->size());
+            CHECK(partial.timecode == full.timecode);
+            std::vector<Track> merged;
+            for (const auto slot : partial.slots)
+            {
+                const auto fresh = std::ranges::find(partial.tracks, slot, &Track::slot);
+                const auto kept = std::ranges::find(previous.tracks, slot, &Track::slot);
+                REQUIRE((fresh != partial.tracks.end() || kept != previous.tracks.end()));
+                merged.push_back(fresh != partial.tracks.end() ? *fresh : *kept);
+            }
+            CHECK(merged == full.tracks);
+            ++partialUpdates;
+        }
+        previous = full;
+    };
+
+    const auto initial = trackOf(doc, where.slot);
+    const auto clip = *std::ranges::find(initial.items, ItemKind::sourceClip, &Item::kind);
+    ObjectId right = kNoObject;
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::split(tx, where.slot, clip.start + clip.length / 2).transform([&](ObjectId id) { right = id; }); }));
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::trim(tx, clip.object, ops::Edge::tail, -1, true); }));
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::lift(tx, right); }));
+    ObjectId added = kNoObject;
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::addTrack(tx, where.mob, initial.kind, "Extra").transform([&](ObjectId id) { added = id; }); }));
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::move(tx, clip.object, added, 10, false); }));
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::addMarker(tx, where.mob, 3, "note").transform([](ObjectId) {}); }));
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> {
+        auto pid = edit::pidOf(doc, where.mob, "Name");
+        return pid ? edit::setProperty(tx, where.mob, *pid, Value(std::string("Renamed"))) : std::unexpected(pid.error());
+    }));
+    check(run(session, [&](edit::Transaction& tx) -> Result<void> { return ops::removeTrack(tx, added); }));
+    for (int n = 0; n < 4; ++n)
+    {
+        check(session.undo());
+    }
+    for (int n = 0; n < 4; ++n)
+    {
+        check(session.redo());
+    }
+    CHECK(partialUpdates >= 14);
+}
+
+TEST_CASE("Changes outside a mob require a full projection", "[timeline][ops]")
+{
+    auto opened = openSession();
+    REQUIRE(opened);
+    const auto& doc = opened->document();
+    const auto where = findTrack(doc, 1, false);
+    const Projector projector(doc);
+    const auto mobs = projector.mobs();
+    const auto other = std::ranges::find_if(mobs, [&](const MobSummary& m) -> bool { return m.object != where.mob; });
+    REQUIRE(other != mobs.end());
+    CHECK_FALSE(projector.affectedSlots(where.mob, std::vector{ other->object }));
+    CHECK_FALSE(projector.affectedSlots(where.mob, std::vector<ObjectId>{ 0 }));
+    const auto none = projector.affectedSlots(where.mob, std::vector{ where.mob });
+    REQUIRE(none);
+    CHECK(none->empty());
+    const auto track = trackOf(doc, where.slot);
+    const auto one = projector.affectedSlots(where.mob, std::vector{ track.items.front().object, track.segment, where.slot });
+    REQUIRE(one);
+    CHECK(*one == std::vector{ where.slot });
+    CHECK_FALSE(projector.project(where.mob, std::vector{ other->object }));
 }

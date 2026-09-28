@@ -2,7 +2,7 @@
 """Time the editor core's stages on one AAF file through `aaftool serve`.
 
 Reports the time and response size of opening the file, listing mobs, projecting the largest composition,
-a split in its middle track followed by the re-projection the UI does after every edit, undo, validation and saving.
+a split in its middle track followed by a full and an incremental re-projection, undo, validation and saving.
 """
 
 from __future__ import annotations
@@ -72,8 +72,9 @@ def measure(aaftool: Path, path: Path, workdir: Path) -> list[Sample]:
         if tracks:
             track = tracks[len(tracks) // 2]
             clip = next(i for i in track["items"][len(track["items"]) // 2 :] + track["items"] if i["kind"] == "sourceClip" and i["length"] > 1)
-            core.call("timeline.op split", "timeline.op", {"op": "split", "slot": track["slot"], "position": clip["start"] + clip["length"] // 2})
+            split = core.call("timeline.op split", "timeline.op", {"op": "split", "slot": track["slot"], "position": clip["start"] + clip["length"] // 2})
             core.call("timeline.get after edit", "timeline.get", {"mob": largest["id"]})
+            core.call("timeline.get changed only", "timeline.get", {"mob": largest["id"], "changed": split["changes"]["objects"]})
             core.call("edit.undo", "edit.undo")
         core.call("doc.validate", "doc.validate")
         core.call("doc.saveAs", "doc.saveAs", {"path": str(workdir / "saved.aaf")})

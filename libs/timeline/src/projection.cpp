@@ -14,6 +14,7 @@ namespace
 {
 
 using detail::Access;
+using detail::ClassFilter;
 
 constexpr int kMaxDepth = 16;
 constexpr std::size_t kMaxChain = 64;
@@ -199,10 +200,12 @@ Projector::Projector(const Document& document) :
     doc_(document)
 {
     const Access a(doc_);
+    const ClassFilter mobs(doc_, "Mob");
+    const ClassFilter essences(doc_, "EssenceData");
     for (std::size_t i = 0; i < doc_.objectCount(); ++i)
     {
-        const bool mob = a.isA(i, "Mob");
-        const bool essence = !mob && a.isA(i, "EssenceData");
+        const bool mob = mobs(i);
+        const bool essence = !mob && essences(i);
         if ((!mob && !essence) || !doc_.isAttached(i))
         {
             continue;
@@ -283,9 +286,10 @@ auto Projector::mobs() const -> std::vector<MobSummary>
 {
     const Access a(doc_);
     std::set<MobId> referenced;
+    const ClassFilter references(doc_, "SourceReference");
     for (std::size_t i = 0; i < doc_.objectCount(); ++i)
     {
-        if (a.isA(i, "SourceReference") && doc_.isAttached(i))
+        if (references(i) && doc_.isAttached(i))
         {
             if (const auto v = a.value(i, "SourceReference", "SourceID"); v && v->is<MobId>())
             {
@@ -487,6 +491,49 @@ auto Projector::buildItem(ObjectId component, std::int64_t start, int depth, std
 
 auto Projector::project(ObjectId mob) const -> Result<MobTimeline>
 {
+    return projectMob(mob, nullptr);
+}
+
+auto Projector::project(ObjectId mob, std::span<const ObjectId> slots) const -> Result<MobTimeline>
+{
+    std::vector<ObjectId> only(slots.begin(), slots.end());
+    std::ranges::sort(only);
+    return projectMob(mob, &only);
+}
+
+auto Projector::affectedSlots(ObjectId mob, std::span<const ObjectId> changed) const -> std::optional<std::vector<ObjectId>>
+{
+    std::vector<ObjectId> slots;
+    for (const auto id : changed)
+    {
+        if (id >= doc_.objectCount() || !doc_.isAttached(id))
+        {
+            continue;
+        }
+        ObjectId current = id;
+        ObjectId below = kNoObject;
+        for (std::size_t steps = 0; current != mob && current != kNoObject && steps <= doc_.objectCount(); ++steps)
+        {
+            below = current;
+            current = doc_.object(current).parent;
+        }
+        if (current != mob)
+        {
+            return std::nullopt;
+        }
+        if (below != kNoObject)
+        {
+            slots.push_back(below);
+        }
+    }
+    std::ranges::sort(slots);
+    const auto duplicates = std::ranges::unique(slots);
+    slots.erase(duplicates.begin(), duplicates.end());
+    return slots;
+}
+
+auto Projector::projectMob(ObjectId mob, const std::vector<ObjectId>* only) const -> Result<MobTimeline>
+{
     const Access a(doc_);
     if (mob >= doc_.objectCount() || !a.isA(mob, "Mob"))
     {
@@ -494,79 +541,107 @@ auto Projector::project(ObjectId mob) const -> Result<MobTimeline>
     }
     MobTimeline t;
     t.mob = mob;
+    t.partial = only != nullptr;
     if (const auto id = a.value(mob, "Mob", "MobID"); id && id->is<MobId>())
     {
         t.mobId = id->as<MobId>();
     }
     t.name = a.string(mob, "Mob", "Name");
     t.kind = mobKind(mob);
-    for (const auto slot : a.children(mob, "Mob", "Slots"))
+    t.slots = a.children(mob, "Mob", "Slots");
+    if (only)
     {
-        Track track;
-        track.slot = slot;
-        track.slotId = static_cast<std::uint32_t>(a.integer(slot, "MobSlot", "SlotID").value_or(0));
-        track.name = a.string(slot, "MobSlot", "SlotName");
-        if (const auto number = a.integer(slot, "MobSlot", "PhysicalTrackNumber"))
+        for (const auto slot : *only)
         {
-            track.physicalNumber = static_cast<std::uint32_t>(*number);
-        }
-        if (a.isA(slot, "TimelineMobSlot"))
-        {
-            track.slotKind = SlotKind::timeline;
-            track.editRate = a.rational(slot, "TimelineMobSlot", "EditRate").value_or(Rational(25, 1));
-            track.origin = a.integer(slot, "TimelineMobSlot", "Origin").value_or(0);
-        }
-        else if (a.isA(slot, "EventMobSlot"))
-        {
-            track.slotKind = SlotKind::event;
-            track.editRate = a.rational(slot, "EventMobSlot", "EditRate").value_or(Rational(25, 1));
-        }
-        else
-        {
-            track.slotKind = SlotKind::fixed;
-        }
-        const auto segment = a.child(slot, "MobSlot", "Segment");
-        if (!segment)
-        {
-            t.warnings.push_back(std::format("slot {} has no segment", track.slotId));
-            t.tracks.push_back(std::move(track));
-            continue;
-        }
-        track.segment = *segment;
-        track.kind = trackKindOf(*segment);
-        ObjectId content = *segment;
-        for (int depth = 0; depth < kMaxDepth && a.isA(content, "OperationGroup"); ++depth)
-        {
-            const auto inputs = a.children(content, "OperationGroup", "InputSegments");
-            if (inputs.empty())
+            if (!std::ranges::contains(t.slots, slot))
             {
-                break;
+                return fail(Errc::invalid_argument, std::format("object {} is not a slot of mob {}", slot, mob));
             }
-            track.effects.push_back({ content, a.definitionName(a.weak(content, "OperationGroup", "Operation")) });
-            content = inputs.front();
         }
-        track.items = buildSequence(content, 0, t.warnings);
-        const auto declared = a.integer(*segment, "Component", "Length");
-        std::int64_t end = 0;
-        for (const auto& item : track.items)
+    }
+    for (const auto slot : t.slots)
+    {
+        const bool wanted = !only || std::ranges::binary_search(*only, slot);
+        if (!wanted)
         {
-            end = std::max(end, item.start + item.length);
+            const auto segment = a.child(slot, "MobSlot", "Segment");
+            if (t.timecode || !segment || trackKindOf(*segment) != TrackKind::timecode)
+            {
+                continue;
+            }
         }
-        track.length = declared.value_or(end);
+        auto track = buildTrack(slot);
         if (!t.timecode && track.kind == TrackKind::timecode)
         {
-            for (const auto& item : track.items)
+            const auto it = std::ranges::find_if(track.items, [](const Item& item) -> bool { return item.timecode.has_value(); });
+            if (it != track.items.end())
             {
-                if (item.timecode)
-                {
-                    t.timecode = item.timecode;
-                    break;
-                }
+                t.timecode = it->timecode;
             }
         }
-        t.tracks.push_back(std::move(track));
+        if (wanted)
+        {
+            t.warnings.insert(t.warnings.end(), track.warnings.begin(), track.warnings.end());
+            t.tracks.push_back(std::move(track));
+        }
     }
     return t;
+}
+
+auto Projector::buildTrack(ObjectId slot) const -> Track
+{
+    const Access a(doc_);
+    Track track;
+    track.slot = slot;
+    track.slotId = static_cast<std::uint32_t>(a.integer(slot, "MobSlot", "SlotID").value_or(0));
+    track.name = a.string(slot, "MobSlot", "SlotName");
+    if (const auto number = a.integer(slot, "MobSlot", "PhysicalTrackNumber"))
+    {
+        track.physicalNumber = static_cast<std::uint32_t>(*number);
+    }
+    if (a.isA(slot, "TimelineMobSlot"))
+    {
+        track.slotKind = SlotKind::timeline;
+        track.editRate = a.rational(slot, "TimelineMobSlot", "EditRate").value_or(Rational(25, 1));
+        track.origin = a.integer(slot, "TimelineMobSlot", "Origin").value_or(0);
+    }
+    else if (a.isA(slot, "EventMobSlot"))
+    {
+        track.slotKind = SlotKind::event;
+        track.editRate = a.rational(slot, "EventMobSlot", "EditRate").value_or(Rational(25, 1));
+    }
+    else
+    {
+        track.slotKind = SlotKind::fixed;
+    }
+    const auto segment = a.child(slot, "MobSlot", "Segment");
+    if (!segment)
+    {
+        track.warnings.push_back(std::format("slot {} has no segment", track.slotId));
+        return track;
+    }
+    track.segment = *segment;
+    track.kind = trackKindOf(*segment);
+    ObjectId content = *segment;
+    for (int depth = 0; depth < kMaxDepth && a.isA(content, "OperationGroup"); ++depth)
+    {
+        const auto inputs = a.children(content, "OperationGroup", "InputSegments");
+        if (inputs.empty())
+        {
+            break;
+        }
+        track.effects.push_back({ content, a.definitionName(a.weak(content, "OperationGroup", "Operation")) });
+        content = inputs.front();
+    }
+    track.items = buildSequence(content, 0, track.warnings);
+    const auto declared = a.integer(*segment, "Component", "Length");
+    std::int64_t end = 0;
+    for (const auto& item : track.items)
+    {
+        end = std::max(end, item.start + item.length);
+    }
+    track.length = declared.value_or(end);
+    return track;
 }
 
 auto Projector::resolve(ObjectId sourceClip) const -> Result<SourceChain>

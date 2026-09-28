@@ -4,6 +4,7 @@
 #include <aaf/timeline/rational.hpp>
 
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,8 @@ struct SourceReference
     MobKind mobKind = MobKind::other;
     /// True if the clip is the end of a source chain (null MobID).
     bool original = false;
+
+    auto operator==(const SourceReference&) const -> bool = default;
 };
 
 struct Timecode
@@ -75,6 +78,8 @@ struct Timecode
     std::int64_t start = 0;
     std::uint32_t fps = 0;
     bool drop = false;
+
+    auto operator==(const Timecode&) const -> bool = default;
 };
 
 struct Item
@@ -95,6 +100,8 @@ struct Item
     std::vector<std::vector<Item>> nested;
     /// Marker comment for descriptive markers and comment markers.
     std::string comment;
+
+    auto operator==(const Item&) const -> bool = default;
 };
 
 /// An effect applied to a whole track (the slot's segment is an OperationGroup wrapping the track's content).
@@ -102,6 +109,8 @@ struct TrackEffect
 {
     ObjectId object = kNoObject;
     std::string name;
+
+    auto operator==(const TrackEffect&) const -> bool = default;
 };
 
 struct Track
@@ -119,6 +128,9 @@ struct Track
     ObjectId segment = kNoObject;
     std::vector<TrackEffect> effects;
     std::vector<Item> items;
+    std::vector<std::string> warnings;
+
+    auto operator==(const Track&) const -> bool = default;
 };
 
 struct MobTimeline
@@ -127,9 +139,14 @@ struct MobTimeline
     MobId mobId;
     std::string name;
     MobKind kind = MobKind::other;
+    /// The projected tracks: every slot, or only the requested ones for a partial projection.
     std::vector<Track> tracks;
+    /// Every slot of the mob, in order, whether projected or not.
+    std::vector<ObjectId> slots;
+    bool partial = false;
     /// Start timecode of the first timecode track, if any.
     std::optional<Timecode> timecode;
+    /// The projected tracks' warnings, concatenated.
     std::vector<std::string> warnings;
 };
 
@@ -189,6 +206,12 @@ public:
 
     [[nodiscard]] auto mobs() const -> std::vector<MobSummary>;
     [[nodiscard]] auto project(ObjectId mob) const -> Result<MobTimeline>;
+    /// Projects only the tracks of `slots` (which must belong to `mob`); the result is marked partial.
+    [[nodiscard]] auto project(ObjectId mob, std::span<const ObjectId> slots) const -> Result<MobTimeline>;
+    /// The slots of `mob` whose tracks may differ after `changed` objects changed. Returns nullopt when a changed
+    /// object lies outside the mob (another mob, a definition, a locator), because any track may show data from it.
+    /// Detached objects are ignored: whatever held them is itself among the changes.
+    [[nodiscard]] auto affectedSlots(ObjectId mob, std::span<const ObjectId> changed) const -> std::optional<std::vector<ObjectId>>;
     /// Follows a source clip's reference through master and source mobs to the physical essence.
     [[nodiscard]] auto resolve(ObjectId sourceClip) const -> Result<SourceChain>;
     [[nodiscard]] auto findMob(const MobId& id) const -> std::optional<ObjectId>;
@@ -196,6 +219,8 @@ public:
 
 private:
     [[nodiscard]] auto mobKind(ObjectId mob) const -> MobKind;
+    [[nodiscard]] auto projectMob(ObjectId mob, const std::vector<ObjectId>* only) const -> Result<MobTimeline>;
+    [[nodiscard]] auto buildTrack(ObjectId slot) const -> Track;
     [[nodiscard]] auto buildItem(ObjectId component, std::int64_t start, int depth, std::vector<std::string>& warnings) const -> Item;
     [[nodiscard]] auto buildSequence(ObjectId segment, int depth, std::vector<std::string>& warnings) const -> std::vector<Item>;
 

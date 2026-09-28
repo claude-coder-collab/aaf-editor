@@ -55,4 +55,4 @@ def test_measure_runs_every_stage(tmp_path: Path) -> None:
     path = tmp_path / "small.aaf"
     gen_stress_aaf.generate(path, 1, 1, 10, 2)
     names = [s.name for s in perf_baseline.measure(tools[0], path, tmp_path)]
-    assert names == ["doc.open", "timeline.mobs", "timeline.get (Stress)", "timeline.op split", "timeline.get after edit", "edit.undo", "doc.validate", "doc.saveAs"]
+    assert names == ["doc.open", "timeline.mobs", "timeline.get (Stress)", "timeline.op split", "timeline.get after edit", "timeline.get changed only", "edit.undo", "doc.validate", "doc.saveAs"]

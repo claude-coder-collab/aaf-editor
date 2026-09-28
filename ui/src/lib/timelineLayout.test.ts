@@ -8,7 +8,7 @@ function item(object: number, kind: string, start: number, length: number): Time
 }
 
 function track(kind: string, rate: [number, number], items: TimelineItem[], slotKind = "timeline"): TimelineTrack {
-  return { slot: 0, slotId: 1, name: "", physicalNumber: null, kind, slotKind, editRate: { num: rate[0], den: rate[1] }, origin: 0, length: Math.max(0, ...items.map((i) => i.start + i.length)), segment: 0, effects: [], items };
+  return { slot: 0, slotId: 1, name: "", physicalNumber: null, kind, slotKind, editRate: { num: rate[0], den: rate[1] }, origin: 0, length: Math.max(0, ...items.map((i) => i.start + i.length)), segment: 0, effects: [], items, warnings: [] };
 }
 
 const timeline: Timeline = {
@@ -16,6 +16,8 @@ const timeline: Timeline = {
   mobId: "",
   name: "t",
   kind: "composition",
+  slots: [],
+  partial: false,
   warnings: [],
   timecode: null,
   tracks: [

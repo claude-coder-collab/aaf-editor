@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -132,7 +133,14 @@ public:
     void addProperty(PropertyDef def, DefinitionSource source);
 
 private:
+    struct NameHash
+    {
+        using is_transparent = void;
+        auto operator()(std::string_view name) const noexcept -> std::size_t { return std::hash<std::string_view>{}(name); }
+    };
+
     std::unordered_map<Auid, ClassDef> classes_;
+    std::unordered_map<std::string, Auid, NameHash, std::equal_to<>> classesByName_;
     std::unordered_map<Auid, TypeDef> types_;
     std::unordered_map<Auid, PropertyDef> properties_;
     std::unordered_map<std::uint16_t, Auid> byPid_;
