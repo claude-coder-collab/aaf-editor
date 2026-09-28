@@ -1,10 +1,14 @@
 #include "fixtures.hpp"
 
+#include <aaf/rpc/json_writer.hpp>
 #include <aaf/rpc/server.hpp>
+#include <aaf/timeline/timeline.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cctype>
 #include <format>
+#include <functional>
 #include <random>
 
 using namespace aaf;
@@ -63,6 +67,51 @@ auto findChild(Client& c, std::int64_t parent, std::string_view cls) -> Json
     }
     FAIL("no child of class " << cls);
     return {};
+}
+
+/// Expands a compact `timeline.get` result the way the UI does: shared sources, default labels, classes and hasLength.
+auto expandTimeline(Json t) -> Json
+{
+    const auto sources = t["sources"];
+    std::function<void(Json&)> expand = [&](Json& items) -> void {
+        for (auto& item : items)
+        {
+            auto kind = item["kind"].get<std::string>();
+            if (!item.contains("class"))
+            {
+                kind.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(kind.front())));
+                item["class"] = kind;
+            }
+            if (!item.contains("hasLength"))
+            {
+                item["hasLength"] = true;
+            }
+            if (item.contains("source"))
+            {
+                auto source = sources.at(item["source"]["ref"].get<std::size_t>());
+                source["slotId"] = item["source"]["slotId"];
+                source["startTime"] = item["source"]["startTime"];
+                item["source"] = source;
+                if (!item.contains("label"))
+                {
+                    item["label"] = source["mobName"];
+                }
+            }
+            if (item.contains("nested"))
+            {
+                for (auto& nested : item["nested"])
+                {
+                    expand(nested);
+                }
+            }
+        }
+    };
+    for (auto& track : t["tracks"])
+    {
+        expand(track["items"]);
+    }
+    t.erase("sources");
+    return t;
 }
 
 auto findProperty(const Json& object, std::string_view name) -> Json
@@ -235,7 +284,7 @@ TEST_CASE("Timelines are available through the RPC API", "[rpc][timeline]")
     REQUIRE(mobs.is_array());
     const auto composition = std::ranges::find_if(mobs, [](const Json& m) { return m["kind"] == "composition"; });
     REQUIRE(composition != mobs.end());
-    const auto t = c.result("timeline.get", { { "mob", (*composition)["id"] } });
+    const auto t = expandTimeline(c.result("timeline.get", { { "mob", (*composition)["id"] } }));
     REQUIRE_FALSE(t["tracks"].empty());
     Json clip = nullptr;
     for (const auto& track : t["tracks"])
@@ -285,10 +334,10 @@ TEST_CASE("Timeline operations are available through the RPC API", "[rpc][timeli
     const auto split = c.result("timeline.op", { { "op", "split" }, { "slot", track["slot"] }, { "position", first["start"].get<std::int64_t>() + first["length"].get<std::int64_t>() / 2 } });
     CHECK(split["id"].is_number());
     CHECK_FALSE(split["changes"]["objects"].empty());
-    const auto full = c.result("timeline.get", { { "mob", mob["id"] } });
+    const auto full = expandTimeline(c.result("timeline.get", { { "mob", mob["id"] } }));
     CHECK_FALSE(full["partial"].get<bool>());
     CHECK(full["slots"].size() == full["tracks"].size());
-    const auto partial = c.result("timeline.get", { { "mob", mob["id"] }, { "changed", split["changes"]["objects"] } });
+    const auto partial = expandTimeline(c.result("timeline.get", { { "mob", mob["id"] }, { "changed", split["changes"]["objects"] } }));
     CHECK(partial["partial"].get<bool>());
     CHECK(partial["slots"] == full["slots"]);
     REQUIRE(partial["tracks"].size() == 1);
@@ -308,4 +357,76 @@ TEST_CASE("Timeline operations are available through the RPC API", "[rpc][timeli
     CHECK(c.request("timeline.op", { { "op", "trim" }, { "item", first["object"] }, { "edge", "middle" }, { "delta", 1 } })["error"]["code"] == -32000);
     CHECK(c.result("edit.history")["items"].size() == 6);
     CHECK(c.result("doc.validate").is_array());
+}
+
+TEST_CASE("The compact timeline form carries every projected field", "[rpc][timeline]")
+{
+    Client c;
+    c.result("doc.open", { { "path", sample() } });
+    auto document = Document::open(sample());
+    REQUIRE(document);
+    const timeline::Projector projector(*document);
+    std::size_t compared = 0;
+    std::function<void(const std::vector<timeline::Item>&, const Json&)> compare = [&](const std::vector<timeline::Item>& items, const Json& json) -> void {
+        REQUIRE(json.size() == items.size());
+        for (std::size_t i = 0; i < items.size(); ++i)
+        {
+            const auto& item = items[i];
+            const auto& j = json[i];
+            CHECK(j["object"] == item.object);
+            CHECK(j["kind"] == std::string(timeline::to_string(item.kind)));
+            CHECK(j["class"] == item.className);
+            CHECK(j["start"] == item.start);
+            CHECK(j["length"] == item.length);
+            CHECK(j["hasLength"] == item.hasLength);
+            CHECK(j["label"] == item.label);
+            CHECK(j.value("effect", "") == item.effect);
+            CHECK(j.value("comment", "") == item.comment);
+            CHECK(j.contains("timecode") == item.timecode.has_value());
+            CHECK(j.contains("source") == item.source.has_value());
+            if (item.source)
+            {
+                const auto& s = j["source"];
+                CHECK(s["mobId"] == item.source->mobId.toString());
+                CHECK(s["mob"] == (item.source->mob ? Json(*item.source->mob) : Json(nullptr)));
+                CHECK(s["mobName"] == item.source->mobName);
+                CHECK(s["mobKind"] == std::string(timeline::to_string(item.source->mobKind)));
+                CHECK(s["original"] == item.source->original);
+                CHECK(s["slotId"] == item.source->slotId);
+                CHECK(s["startTime"] == item.source->startTime);
+            }
+            REQUIRE(j.value("nested", Json::array()).size() == item.nested.size());
+            for (std::size_t n = 0; n < item.nested.size(); ++n)
+            {
+                compare(item.nested[n], j["nested"][n]);
+            }
+            ++compared;
+        }
+    };
+    for (const auto& mob : projector.mobs())
+    {
+        const auto expected = projector.project(mob.object).value();
+        const auto json = expandTimeline(c.result("timeline.get", { { "mob", mob.object } }));
+        CHECK(json["name"] == expected.name);
+        REQUIRE(json["tracks"].size() == expected.tracks.size());
+        for (std::size_t t = 0; t < expected.tracks.size(); ++t)
+        {
+            CHECK(json["tracks"][t]["slot"] == expected.tracks[t].slot);
+            compare(expected.tracks[t].items, json["tracks"][t]["items"]);
+        }
+    }
+    CHECK(compared > 500);
+}
+
+TEST_CASE("JsonWriter produces valid compact JSON", "[rpc][json]")
+{
+    JsonWriter w;
+    w.beginObject().key("a").value(std::int64_t{ -5 }).key("s").value("q\"\\\n\x01é").key("list").beginArray().value(true).null().beginObject().endObject().beginArray().endArray().value(std::uint64_t{ 18446744073709551615ULL }).endArray().key("raw").raw(R"({"x":1})").endObject();
+    const auto parsed = Json::parse(w.str());
+    CHECK(parsed["a"] == -5);
+    CHECK(parsed["s"] == "q\"\\\n\x01é");
+    CHECK(parsed["list"].size() == 5);
+    CHECK(parsed["list"][4].get<std::uint64_t>() == 18446744073709551615ULL);
+    CHECK(parsed["raw"]["x"] == 1);
+    CHECK(w.str().find(' ') == std::string::npos);
 }

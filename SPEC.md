@@ -572,7 +572,9 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   - `available` lists defined properties that are absent. `types` holds every referenced type descriptor (`{id, name, kind, element?, className?, size?, signed?, count?, fields?, elements?}`), so the UI can build editors without further calls.
   - Timeline (M6):
     - `timeline.mobs` returns the mob summaries.
-    - `timeline.get {mob, changed?}` returns `{mob, mobId, name, kind, timecode, warnings, slots, partial, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items, warnings}]}`, with each item's fields as in §6 (`nested` is a list of item lists). `slots` lists every slot id in order.
+    - `timeline.get {mob, changed?}` returns `{mob, mobId, name, kind, partial, slots, warnings, timecode, sources, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items, warnings}]}`. `slots` lists every slot id in order.
+      - **Compact items**: `{object, kind, start, length, class?, hasLength?, label?, source?:{ref, slotId, startTime}, effect?, comment?, timecode?, nested?}`. `sources` lists each referenced source once per response as `{mobId, mob, mobName, mobKind, original}`, and `ref` indexes it; indexes are only meaningful within one response. Omitted fields take defaults: `class` is the kind with its first letter upper-cased, `hasLength` is true, and `label` is the source's `mobName`. `effect` and `comment` are omitted when empty, `nested` (a list of item lists) when there is none.
+      - The result is written straight to text by `TimelineWriter` with `JsonWriter` (`aaf/rpc/json_writer.hpp`: compact JSON, automatic commas, string escaping, integers of any width), not built as a JSON tree. `Server::handle` splices the text into the response; `Server::call` parses it for callers that want a `Json` value.
       - With `changed` (object ids, typically a ChangeSet's `objects`), only the tracks of the affected slots are returned (`partial: true`). If a change lies outside the mob, the whole timeline is returned (`partial: false`).
     - `timeline.resolve {clip}` returns `{status, links, essence}`.
     - `timeline.op {op, …}` (M7) runs a §6.1 operation as one undoable step and returns `{changes, id?, count?}`. Operations:
@@ -604,7 +606,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 
 - **Stack**: TypeScript 5.9 (svelte-check does not support TypeScript 7 yet), Svelte 5 (runes), Vite 8 with `vite-plugin-singlefile`, and Vitest 5 on jsdom. Versions are pinned in `ui/package.json` and the lockfile. `npm run check` runs `svelte-check --fail-on-warnings`, and `npm test` runs Vitest.
 - **Modules**:
-  - `lib/rpc.ts`: `RpcClient` with typed methods and an injectable transport, `hostCommand`, and the protocol types.
+  - `lib/rpc.ts`: `RpcClient` with typed methods and an injectable transport, `hostCommand`, and the protocol types. `RpcClient.timeline` expands the compact `timeline.get` form with `expandTimeline` (`lib/timelineWire.ts`), so components see full items (`class`, `hasLength`, `label` and a complete `source` on every item).
   - `lib/values.ts`: editor kind per type, formatting, parsing with range checks (BigInt for 64-bit values), client-side defaults that mirror the server's, and immutable record and array updates.
   - `lib/tree.ts`: `TreeModel`, a lazy, paged tree (200 per page) with `expand`, `collapse`, `loadMore`, `reveal(path)` and `refresh(changed)`. A refresh reloads changed objects and their parents' child lists, keeping expansion state.
   - `lib/smoke.ts`.

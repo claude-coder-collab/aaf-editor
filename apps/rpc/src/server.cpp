@@ -1,5 +1,6 @@
 #include <aaf/edit/defaults.hpp>
 #include <aaf/edit/operations.hpp>
+#include <aaf/rpc/json_writer.hpp>
 #include <aaf/rpc/server.hpp>
 #include <aaf/timeline/edit.hpp>
 #include <aaf/timeline/timeline.hpp>
@@ -374,85 +375,182 @@ auto matches(const Document& doc, ObjectId id, const std::string& needle) -> boo
     return false;
 }
 
-auto timelineItemJson(const timeline::Item& item) -> Json
+class TimelineWriter
 {
-    Json j = { { "object", item.object }, { "kind", std::string(timeline::to_string(item.kind)) }, { "class", item.className }, { "start", item.start }, { "length", item.length }, { "hasLength", item.hasLength }, { "label", item.label } };
-    if (!item.effect.empty())
+public:
+    auto write(const timeline::MobTimeline& t) -> std::string
     {
-        j["effect"] = item.effect;
-    }
-    if (!item.comment.empty())
-    {
-        j["comment"] = item.comment;
-    }
-    if (item.source)
-    {
-        j["source"] = {
-            { "mobId", item.source->mobId.toString() },
-            { "slotId", item.source->slotId },
-            { "startTime", item.source->startTime },
-            { "mob", item.source->mob ? Json(*item.source->mob) : Json(nullptr) },
-            { "mobName", item.source->mobName },
-            { "mobKind", std::string(timeline::to_string(item.source->mobKind)) },
-            { "original", item.source->original },
-        };
-    }
-    if (item.timecode)
-    {
-        j["timecode"] = { { "start", item.timecode->start }, { "fps", item.timecode->fps }, { "drop", item.timecode->drop } };
-    }
-    if (!item.nested.empty())
-    {
-        Json nested = Json::array();
-        for (const auto& track : item.nested)
+        for (const auto& track : t.tracks)
         {
-            Json list = Json::array();
-            for (const auto& child : track)
-            {
-                list.push_back(timelineItemJson(child));
-            }
-            nested.push_back(std::move(list));
+            collect(track.items);
         }
-        j["nested"] = std::move(nested);
+        w_.beginObject();
+        w_.key("mob").value(t.mob);
+        w_.key("mobId").value(t.mobId.toString());
+        w_.key("name").value(t.name);
+        w_.key("kind").value(timeline::to_string(t.kind));
+        w_.key("partial").value(t.partial);
+        w_.key("slots").beginArray();
+        for (const auto slot : t.slots)
+        {
+            w_.value(slot);
+        }
+        w_.endArray();
+        strings("warnings", t.warnings);
+        w_.key("timecode");
+        timecode(t.timecode);
+        w_.key("sources").beginArray();
+        for (const auto* source : sources_)
+        {
+            w_.beginObject();
+            w_.key("mobId").value(source->mobId.toString());
+            w_.key("mob");
+            source->mob ? w_.value(*source->mob) : w_.null();
+            w_.key("mobName").value(source->mobName);
+            w_.key("mobKind").value(timeline::to_string(source->mobKind));
+            w_.key("original").value(source->original);
+            w_.endObject();
+        }
+        w_.endArray();
+        w_.key("tracks").beginArray();
+        for (const auto& track : t.tracks)
+        {
+            writeTrack(track);
+        }
+        w_.endArray();
+        w_.endObject();
+        return w_.take();
     }
-    return j;
-}
 
-auto timelineJson(const timeline::MobTimeline& t) -> Json
-{
-    Json tracks = Json::array();
-    for (const auto& track : t.tracks)
+private:
+    void collect(const std::vector<timeline::Item>& items)
     {
-        Json items = Json::array();
-        for (const auto& item : track.items)
+        for (const auto& item : items)
         {
-            items.push_back(timelineItemJson(item));
+            if (item.source && refs_.try_emplace(item.source->mobId, sources_.size()).second)
+            {
+                sources_.push_back(&*item.source);
+            }
+            for (const auto& nested : item.nested)
+            {
+                collect(nested);
+            }
         }
-        Json effects = Json::array();
+    }
+
+    void strings(std::string_view name, const std::vector<std::string>& list)
+    {
+        w_.key(name).beginArray();
+        for (const auto& text : list)
+        {
+            w_.value(text);
+        }
+        w_.endArray();
+    }
+
+    void timecode(const std::optional<timeline::Timecode>& tc)
+    {
+        if (!tc)
+        {
+            w_.null();
+            return;
+        }
+        w_.beginObject().key("start").value(tc->start).key("fps").value(tc->fps).key("drop").value(tc->drop).endObject();
+    }
+
+    void writeTrack(const timeline::Track& track)
+    {
+        w_.beginObject();
+        w_.key("slot").value(track.slot);
+        w_.key("slotId").value(track.slotId);
+        w_.key("name").value(track.name);
+        w_.key("physicalNumber");
+        track.physicalNumber ? w_.value(*track.physicalNumber) : w_.null();
+        w_.key("kind").value(timeline::to_string(track.kind));
+        w_.key("slotKind").value(timeline::to_string(track.slotKind));
+        w_.key("editRate").beginObject().key("num").value(track.editRate.numerator()).key("den").value(track.editRate.denominator()).endObject();
+        w_.key("origin").value(track.origin);
+        w_.key("length").value(track.length);
+        w_.key("segment").value(track.segment);
+        w_.key("effects").beginArray();
         for (const auto& effect : track.effects)
         {
-            effects.push_back({ { "object", effect.object }, { "name", effect.name } });
+            w_.beginObject().key("object").value(effect.object).key("name").value(effect.name).endObject();
         }
-        tracks.push_back({
-            { "slot", track.slot },
-            { "slotId", track.slotId },
-            { "name", track.name },
-            { "physicalNumber", track.physicalNumber.transform([](std::uint32_t n) -> Json { return n; }).value_or(Json(nullptr)) },
-            { "kind", std::string(timeline::to_string(track.kind)) },
-            { "slotKind", std::string(timeline::to_string(track.slotKind)) },
-            { "editRate", { { "num", track.editRate.numerator() }, { "den", track.editRate.denominator() } } },
-            { "origin", track.origin },
-            { "length", track.length },
-            { "segment", track.segment },
-            { "effects", std::move(effects) },
-            { "items", std::move(items) },
-            { "warnings", track.warnings },
-        });
+        w_.endArray();
+        items(track.items);
+        strings("warnings", track.warnings);
+        w_.endObject();
     }
-    Json j = { { "mob", t.mob }, { "mobId", t.mobId.toString() }, { "name", t.name }, { "kind", std::string(timeline::to_string(t.kind)) }, { "tracks", std::move(tracks) }, { "slots", t.slots }, { "partial", t.partial }, { "warnings", t.warnings } };
-    j["timecode"] = t.timecode ? Json{ { "start", t.timecode->start }, { "fps", t.timecode->fps }, { "drop", t.timecode->drop } } : Json(nullptr);
-    return j;
-}
+
+    void items(const std::vector<timeline::Item>& list)
+    {
+        w_.key("items").beginArray();
+        for (const auto& item : list)
+        {
+            writeItem(item);
+        }
+        w_.endArray();
+    }
+
+    void writeItem(const timeline::Item& item)
+    {
+        const auto kind = timeline::to_string(item.kind);
+        w_.beginObject();
+        w_.key("object").value(item.object);
+        w_.key("kind").value(kind);
+        w_.key("start").value(item.start);
+        w_.key("length").value(item.length);
+        if (item.className.size() != kind.size() || item.className.empty() || std::toupper(static_cast<unsigned char>(kind.front())) != item.className.front() || std::string_view(item.className).substr(1) != kind.substr(1))
+        {
+            w_.key("class").value(item.className);
+        }
+        if (!item.hasLength)
+        {
+            w_.key("hasLength").value(false);
+        }
+        if (!item.source || item.label != item.source->mobName)
+        {
+            w_.key("label").value(item.label);
+        }
+        if (item.source)
+        {
+            w_.key("source").beginObject().key("ref").value(refs_.at(item.source->mobId)).key("slotId").value(item.source->slotId).key("startTime").value(item.source->startTime).endObject();
+        }
+        if (!item.effect.empty())
+        {
+            w_.key("effect").value(item.effect);
+        }
+        if (!item.comment.empty())
+        {
+            w_.key("comment").value(item.comment);
+        }
+        if (item.timecode)
+        {
+            w_.key("timecode");
+            timecode(item.timecode);
+        }
+        if (!item.nested.empty())
+        {
+            w_.key("nested").beginArray();
+            for (const auto& nested : item.nested)
+            {
+                w_.beginArray();
+                for (const auto& child : nested)
+                {
+                    writeItem(child);
+                }
+                w_.endArray();
+            }
+            w_.endArray();
+        }
+        w_.endObject();
+    }
+
+    JsonWriter w_;
+    std::map<MobId, std::size_t> refs_;
+    std::vector<const timeline::SourceReference*> sources_;
+};
 
 }
 
@@ -608,6 +706,10 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
     if (method == "doc.info")
     {
         return info();
+    }
+    if (method == "timeline.get")
+    {
+        return timelineText(params).transform([](const std::string& text) -> Json { return Json::parse(text); });
     }
     if (method == "doc.open")
     {
@@ -927,28 +1029,6 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         }
         return out;
     }
-    if (method == "timeline.get")
-    {
-        auto mob = objectParam("mob");
-        if (!mob)
-        {
-            return std::unexpected(mob.error());
-        }
-        const bool incremental = params.contains("changed") && !params.at("changed").is_null();
-        auto changed = incremental ? param<std::vector<ObjectId>>(params, "changed") : Result<std::vector<ObjectId>>{};
-        if (!changed)
-        {
-            return std::unexpected(changed.error());
-        }
-        const timeline::Projector projector(doc);
-        const auto slots = incremental ? projector.affectedSlots(*mob, *changed) : std::nullopt;
-        auto t = slots ? projector.project(*mob, *slots) : projector.project(*mob);
-        if (!t)
-        {
-            return std::unexpected(t.error());
-        }
-        return timelineJson(*t);
-    }
     if (method == "timeline.resolve")
     {
         auto clip = objectParam("clip");
@@ -1202,6 +1282,39 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
     return fail(Errc::not_found, std::format("unknown method '{}'", method));
 }
 
+auto Server::timelineText(const Json& params) -> Result<std::string>
+{
+    auto session = requireSession();
+    if (!session)
+    {
+        return std::unexpected(session.error());
+    }
+    const auto& doc = (*session)->document();
+    auto mob = param<ObjectId>(params, "mob");
+    if (mob && *mob >= doc.objectCount())
+    {
+        return invalid(std::format("object {} does not exist", *mob));
+    }
+    if (!mob)
+    {
+        return std::unexpected(mob.error());
+    }
+    const bool incremental = params.contains("changed") && !params.at("changed").is_null();
+    auto changed = incremental ? param<std::vector<ObjectId>>(params, "changed") : Result<std::vector<ObjectId>>{};
+    if (!changed)
+    {
+        return std::unexpected(changed.error());
+    }
+    const timeline::Projector projector(doc);
+    const auto slots = incremental ? projector.affectedSlots(*mob, *changed) : std::nullopt;
+    auto t = slots ? projector.project(*mob, *slots) : projector.project(*mob);
+    if (!t)
+    {
+        return std::unexpected(t.error());
+    }
+    return TimelineWriter().write(*t);
+}
+
 auto Server::handle(std::string_view request) -> std::string
 {
     Json id = nullptr;
@@ -1224,10 +1337,10 @@ auto Server::handle(std::string_view request) -> std::string
     id = parsed.value("id", Json());
     const auto method = parsed["method"].get<std::string>();
     const auto params = parsed.value("params", Json::object());
-    Result<Json> result = fail(Errc::io, "internal error");
+    Result<std::string> result = fail(Errc::io, "internal error");
     try
     {
-        result = call(method, params);
+        result = method == "timeline.get" ? timelineText(params) : call(method, params).transform([](const Json& j) -> std::string { return j.dump(); });
     } catch (const std::exception& e)
     {
         result = fail(Errc::io, e.what());
@@ -1250,7 +1363,7 @@ auto Server::handle(std::string_view request) -> std::string
         }
         return Json{ { "jsonrpc", "2.0" }, { "id", id }, { "error", { { "code", code }, { "message", error.message }, { "data", { { "kind", std::string(to_string(error.code)) } } } } } }.dump();
     }
-    return Json{ { "jsonrpc", "2.0" }, { "id", id }, { "result", std::move(*result) } }.dump();
+    return std::format(R"({{"id":{},"jsonrpc":"2.0","result":{}}})", id.dump(), *result);
 }
 
 }

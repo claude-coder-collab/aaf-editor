@@ -1,5 +1,6 @@
 add_library(aaf_rpc
     src/json_value.cpp
+    src/json_writer.cpp
     src/server.cpp
 )
 add_library(aaf::rpc ALIAS aaf_rpc)
