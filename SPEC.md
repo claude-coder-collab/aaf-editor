@@ -51,7 +51,9 @@ aaf-editor/
   ui/           Svelte 5 + TypeScript frontend (Vite), built to one HTML file embedded in aafedit
   tests/        Catch2 unit tests (tests/<lib>/), helpers (tests/support/), fixtures, fuzz targets (tests/fuzz/)
   tools/        Python scripts (fixture generation, spec checks)
-  docs/reference/  AAF specification PDFs (local only, gitignored; fetched by tools/fetch_specs.py)
+  docs/         user docs (aaftool.md, building.md, images/); reference/ holds the AAF specification PDFs (local only, gitignored; fetched by tools/fetch_specs.py)
+  packaging/    release notes template, Linux desktop entry
+  cmake/        ProjectOptions (warnings, sanitizers), Dependencies (nlohmann/json), Packaging (CPack)
   model/        built-in AAF baseline metamodel data (generated source)
 ```
 
@@ -709,19 +711,22 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - TSan tests (including concurrent stream reads through one `FileSource`);
   - 10-minute fuzzing.
 - UI lint and tests are added with M5.
-- **Tags `v*`**: a release workflow builds on a three-OS matrix and publishes a GitHub Release with these assets:
+- **`release.yml`** (M8) runs on `v*` tags, on manual dispatch, and on PRs that change it, `cmake/Packaging.cmake` or `packaging/`.
+  - **Package job** (one per OS): builds Release with `-Werror`, runs all tests and the editor smoke test, then runs **CPack** (`cmake/Packaging.cmake`) and uploads the packages as artifacts.
+  - **Version**: `AAF_VERSION` is the tag without its `v`, or `0.0.0-dev.<run>` for untagged builds. It is embedded in `aaftool --version`, `aafedit --version`, the macOS bundle and the package names.
+  - **Publish job** (tags only): writes `SHA256SUMS.txt`, fills in `packaging/RELEASE_NOTES.md` (downloads, install steps, how to open unsigned apps), and runs `gh release create`.
 
   | OS | Runner | Artifacts |
   |---|---|---|
-  | Linux x86_64 | `ubuntu-latest` (built on the oldest supported Ubuntu LTS image, for glibc compatibility) | `aaf-editor-<ver>-linux-x86_64.AppImage`, `aaf-editor-<ver>-linux-x86_64.tar.gz` (editor + `aaftool`) |
-  | macOS arm64 + x86_64 | `macos-latest` | `aaf-editor-<ver>-macos-universal.dmg` (`.app` bundle), `aaftool-<ver>-macos-universal.tar.gz` |
-  | Windows x86_64 | `windows-latest` (MSVC) | `aaf-editor-<ver>-windows-x86_64.zip` (editor + `aaftool`, portable) |
+  | Linux x86_64 | `ubuntu-24.04` | `aaf-editor-<ver>-linux-x86_64.deb` and `.tar.gz` (both contain `usr/bin/aafedit`, `usr/bin/aaftool`, a desktop entry, `LICENSE`, `README.md` and `NOTICE`) |
+  | macOS arm64 + x86_64 | `macos-latest` | `aaf-editor-<ver>-macos-universal.dmg` (`aafedit.app`, `bin/aaftool` and the docs), and `aaftool-<ver>-macos-universal.tar.gz` |
+  | Windows x86_64 | `windows-latest` (MSVC) | `aaf-editor-<ver>-windows-x86_64.zip`: portable `bin\aafedit.exe` and `bin\aaftool.exe`, with the static MSVC runtime |
 
-  - **No code signing and no notarization.** The release notes explain how to open unsigned apps (macOS: right-click → Open, or `xattr -dr com.apple.quarantine`; Windows: SmartScreen "More info → Run anyway").
-  - Windows uses the WebView2 runtime that ships with Windows 10 and 11. The loader is statically linked, and the runtime is not bundled.
-  - Linux requires WebKitGTK at runtime (documented). The AppImage bundles it where feasible.
-  - A `SHA256SUMS.txt` is attached to every release. The version comes from the tag and is embedded in the binaries.
-  - Releases are the only jobs that build packaging artifacts. PR CI builds no packages.
+  - **No code signing and no notarization.** The release notes explain how to open unsigned apps: on macOS, right-click → Open, or `xattr -dr com.apple.quarantine`; on Windows, SmartScreen "More info → Run anyway".
+  - **Linux**: packages are built on Ubuntu 24.04 because the code needs GCC 14's C++23 library (`<print>`, `std::expected`), so the minimum is Debian 13 or Ubuntu 24.04. The `.deb` dependencies are computed by `dpkg-shlibdeps` (WebKitGTK 4.1, GTK 3, glib, libstdc++ ≥ 14). **No AppImage**: WebKitGTK's helper processes cannot be bundled reliably, and a `.deb` or `.tar.gz` that uses the system WebKitGTK is dependable. Verified: the `.deb` installs, and the installed `aafedit` passes the smoke test.
+  - **macOS**: built as a universal binary (`CMAKE_OSX_ARCHITECTURES=arm64;x86_64`) with a deployment target of 13.3, which libc++'s `std::format` and `<print>` need.
+  - **Windows**: uses the WebView2 runtime that ships with Windows 10 and 11. webview's built-in loader is linked statically, so no DLL is needed, and the static MSVC runtime means no redistributable is needed either.
+  - **Packages** contain only the project's files: fetched dependencies install nothing.
 
 ## 12. Milestones
 
@@ -770,6 +775,8 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | 2026-09-27 | The timeline projection is verified against the OpenTimelineIO AAF adapter's reading of its own sample files |
 | 2026-09-27 | Removing a transition makes a cut at its midpoint, preserving timing |
 | 2026-09-27 | New markers carry DescribedSlots, and new marker slots a PhysicalTrackNumber, as Avid writes them (OTIO requires both) |
+| 2026-09-27 | Linux ships as `.deb` and `.tar.gz` built on Ubuntu 24.04, with no AppImage (WebKitGTK cannot be bundled reliably); macOS as a universal build for 13.3+; Windows with the static runtime |
+| 2026-09-27 | The release workflow also runs, without publishing, on PRs that change packaging, so packaging problems show up before a tag |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

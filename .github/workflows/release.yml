@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "cmake/Packaging.cmake"
+      - "packaging/**"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            preset: gcc
+            platform: linux-x86_64
+          - os: macos-latest
+            preset: clang
+            platform: macos-universal
+          - os: windows-latest
+            preset: msvc
+            platform: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libwebkit2gtk-4.1-dev xvfb dpkg-dev
+      - name: Install Ninja
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Configure
+        shell: bash
+        run: |
+          extra=()
+          case "${{ runner.os }}" in
+            macOS) extra=(-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3) ;;
+            Windows) extra=(-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DWEBVIEW_USE_STATIC_MSVC_RUNTIME=ON) ;;
+          esac
+          cmake --preset ${{ matrix.preset }} -DAAF_VERSION=${{ steps.version.outputs.version }} -DAAF_WARNINGS_AS_ERRORS=ON "${extra[@]}"
+      - name: Build
+        run: cmake --build build/${{ matrix.preset }} --config Release
+      - name: Test
+        run: ctest --test-dir build/${{ matrix.preset }} -C Release --output-on-failure
+      - name: Editor smoke test
+        shell: bash
+        run: |
+          sample=tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf
+          case "${{ runner.os }}" in
+            Linux) xvfb-run -a build/gcc/apps/editor/Release/aafedit --smoke-test "$sample" ;;
+            macOS) build/clang/apps/editor/Release/aafedit.app/Contents/MacOS/aafedit --smoke-test "$sample" ;;
+            Windows) build/msvc/apps/editor/Release/aafedit.exe --smoke-test "$sample" ;;
+          esac
+      - name: Package
+        shell: bash
+        run: |
+          cd build/${{ matrix.preset }}
+          cpack -C Release -B "$GITHUB_WORKSPACE/dist"
+          rm -rf "$GITHUB_WORKSPACE/dist/_CPack_Packages"
+          if [[ "${{ runner.os }}" == macOS ]]; then
+            lipo -info apps/aaftool/Release/aaftool
+            tar -C apps/aaftool/Release -czf "$GITHUB_WORKSPACE/dist/aaftool-${{ steps.version.outputs.version }}-macos-universal.tar.gz" aaftool
+          fi
+          ls -la "$GITHUB_WORKSPACE/dist"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and notes
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/RELEASE_NOTES.md > release-notes.md
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "AAF Editor ${GITHUB_REF_NAME#v}" --notes-file release-notes.md

@@ -172,11 +172,11 @@
     width: 100%;
     max-width: 48ch;
   }
-  input.id {
-    max-width: 40ch;
-  }
   input.umid {
-    max-width: 92ch;
+    max-width: min(92ch, calc(100% - 28px));
+  }
+  input.id {
+    max-width: min(40ch, calc(100% - 28px));
   }
   .mono {
     font-family: var(--mono);

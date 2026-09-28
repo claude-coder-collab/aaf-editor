@@ -1,0 +1,20 @@
+AAF Editor
+Copyright (c) 2026 aaf-editor contributors. Licensed under the MIT licence (see LICENSE).
+
+This software includes or is built with the following third-party components:
+
+- webview (https://github.com/webview/webview), MIT licence.
+  Copyright (c) 2017 Serge Zaitsev, (c) 2022 Steffen André Langnes.
+- portable-file-dialogs (https://github.com/samhocevar/portable-file-dialogs), WTFPL.
+  Copyright (c) 2018-2024 Sam Hocevar.
+- nlohmann/json (https://github.com/nlohmann/json), MIT licence.
+  Copyright (c) 2013-2025 Niels Lohmann.
+- The AAF baseline object model tables (model/baseline.json and the generated C++) are derived from
+  pyaaf2 (https://github.com/markreidvfx/pyaaf2), MIT licence. Copyright (c) 2017 Mark Reid.
+  See model/NOTICE in the source distribution.
+- The user interface is built with Svelte (https://svelte.dev), MIT licence.
+  Copyright (c) 2016-2025 Svelte contributors.
+
+The source repository additionally contains sample AAF files from the AAF SDK 1.2.0 for testing
+(tests/fixtures/aafsdk), distributed under the AAF SDK Public Source License v2.0; they are not part
+of the binary packages.
