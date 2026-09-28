@@ -48,6 +48,8 @@ jobs:
         run: python tools/crosscheck.py --roundtrip build/clang-asan/apps/aaftool/Debug/aaftool
       - name: Cross-check embedded essence with pyaaf2
         run: python tools/crosscheck.py --essence build/clang-asan/apps/aaftool/Debug/aaftool
+      - name: Cross-check timeline edits with pyaaf2 and OTIO
+        run: python tools/crosscheck_edits.py build/clang-asan/apps/aaftool/Debug/aaftool
 
   tsan:
     runs-on: ubuntu-24.04

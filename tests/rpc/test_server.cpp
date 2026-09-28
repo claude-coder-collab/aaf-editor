@@ -255,3 +255,46 @@ TEST_CASE("Timelines are available through the RPC API", "[rpc][timeline]")
     CHECK_FALSE(chain["links"].empty());
     CHECK(c.request("timeline.get", { { "mob", 0 } })["error"]["code"] == -32000);
 }
+
+TEST_CASE("Timeline operations are available through the RPC API", "[rpc][timeline]")
+{
+    Client c;
+    c.result("doc.open", { { "path", sample() } });
+    const auto mobs = c.result("timeline.mobs");
+    Json track = nullptr;
+    Json mob = nullptr;
+    for (const auto& m : mobs)
+    {
+        if (m["kind"] != "composition" || !track.is_null())
+        {
+            continue;
+        }
+        const auto t = c.result("timeline.get", { { "mob", m["id"] } });
+        for (const auto& candidate : t["tracks"])
+        {
+            const auto clips = std::ranges::count_if(candidate["items"], [](const Json& i) { return i["kind"] == "sourceClip"; });
+            if (clips >= 2 && candidate["effects"].empty() && track.is_null())
+            {
+                track = candidate;
+                mob = m;
+            }
+        }
+    }
+    REQUIRE_FALSE(track.is_null());
+    const auto first = *std::ranges::find_if(track["items"], [](const Json& i) { return i["kind"] == "sourceClip" && i["length"].get<std::int64_t>() > 2; });
+    const auto split = c.result("timeline.op", { { "op", "split" }, { "slot", track["slot"] }, { "position", first["start"].get<std::int64_t>() + first["length"].get<std::int64_t>() / 2 } });
+    CHECK(split["id"].is_number());
+    CHECK_FALSE(split["changes"]["objects"].empty());
+    c.result("timeline.op", { { "op", "lift" }, { "item", split["id"] } });
+    c.result("timeline.op", { { "op", "trim" }, { "item", first["object"] }, { "edge", "tail" }, { "delta", -1 }, { "ripple", true } });
+    const auto added = c.result("timeline.op", { { "op", "addTrack" }, { "mob", mob["id"] }, { "kind", "sound" }, { "name", "Music" } });
+    CHECK(added["id"].is_number());
+    const auto marker = c.result("timeline.op", { { "op", "addMarker" }, { "mob", mob["id"] }, { "position", 5 }, { "comment", "Check this" } });
+    CHECK(marker["id"].is_number());
+    const auto relinked = c.result("timeline.op", { { "op", "relink" }, { "find", "/" }, { "replace", "\\" } });
+    CHECK(relinked["count"].get<int>() > 0);
+    CHECK(c.request("timeline.op", { { "op", "explode" } })["error"]["code"] == -32000);
+    CHECK(c.request("timeline.op", { { "op", "trim" }, { "item", first["object"] }, { "edge", "middle" }, { "delta", 1 } })["error"]["code"] == -32000);
+    CHECK(c.result("edit.history")["items"].size() == 6);
+    CHECK(c.result("doc.validate").is_array());
+}
