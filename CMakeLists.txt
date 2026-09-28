@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(aaf_editor VERSION 0.1.0 DESCRIPTION "AAF library and editor" LANGUAGES CXX)
+project(aaf_editor VERSION 0.2.0 DESCRIPTION "AAF library and editor" LANGUAGES CXX)
 
 if(MSVC)
     set(AAF_CXX_STANDARD 23)
@@ -13,7 +13,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
-set(AAF_VERSION "${PROJECT_VERSION}" CACHE STRING "Version string embedded in binaries and packages")
+set(AAF_VERSION "" CACHE STRING "Version string embedded in binaries and packages (empty: the project version)")
+if(NOT AAF_VERSION)
+    set(AAF_VERSION "${PROJECT_VERSION}")
+endif()
 
 include(cmake/ProjectOptions.cmake)
 include(cmake/Dependencies.cmake)
