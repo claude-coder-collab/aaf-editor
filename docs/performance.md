@@ -94,7 +94,7 @@ list and 0.36 s for the timeline.
 5. ~~**Mob list after edits.**~~ Done (PR #17). The server marks `doc.changed` with `mobsChanged`, and the UI
    refetches the mob list only then. Splits, trims, lifts and moves no longer cost a `timeline.mobs` call (about
    70 ms on this file).
-6. ~~**Regression guard.**~~ Done (PR #17). The nightly `performance` job in `full.yml` generates a 4 × 3,000-clip
+6. ~~**Regression guard.**~~ Done (PR #17). The `performance` job in `full.yml` (run on every push to main) generates a 4 × 3,000-clip
    file and checks the limits in `tools/perf_limits.json` for the core stages (time and response size) and for
    drawing and hit testing. With either old quadratic CFB bug put back, open or save takes about 1.3 s against a
    400 ms limit and the job fails. The runner measured about twice as fast as the development machine.

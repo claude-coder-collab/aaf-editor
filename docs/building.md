@@ -51,7 +51,7 @@ Tests that need them are tagged `[external]` and are skipped when the files are 
 
 ## Cross-checks
 
-These scripts compare our results with pyaaf2 and OpenTimelineIO. They run nightly in CI.
+These scripts compare our results with pyaaf2 and OpenTimelineIO. They run in CI (`full.yml`) on every push to main.
 
 ```
 python3 tools/crosscheck_cfb.py <aaftool>          # container rewrite
