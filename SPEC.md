@@ -1,6 +1,6 @@
 # AAF Editor — Specification
 
-Status: draft v0.2 (2026-09-27). Licence: MIT. This document is the source of truth. Update it whenever a design decision changes, so that another engineer or agent can re-implement the project from it alone.
+Status: v0.1.0 released (2026-09-27); milestones M1–M8 complete. Licence: MIT. This document is the source of truth. Update it whenever a design decision changes, so that another engineer or agent can re-implement the project from it alone.
 
 ## 1. Goal
 
@@ -739,7 +739,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | M5 ✅ | Webview host, RPC, tree and property inspector | Edit and save any property from the UI |
 | M6 ✅ | Timeline projection + read-only timeline view | Fixtures render correctly, with selection sync |
 | M7 ✅ | Timeline editing ops (§6.1) | Op tests pass; edited files validate and read back identically in pyaaf2 and OTIO (automated). Resolve and Pro Tools stay on the manual release checklist. |
-| M8 | Packaging, release pipeline, docs | A tagged release publishes unsigned binaries for Linux, macOS and Windows (§11) |
+| M8 ✅ | Packaging, release pipeline, docs | Done: [v0.1.0](https://github.com/claude-coder-collab/aaf-editor/releases/tag/v0.1.0) published unsigned `.deb`, `.tar.gz`, `.dmg` (universal), `.zip` and `SHA256SUMS.txt` from CI |
 | Later | Create-new-file templates, Edit Protocol conformance checks, OTIO import/export, keyframe editing, essence waveform/thumbnail previews | — |
 
 ## 13. Decisions log
