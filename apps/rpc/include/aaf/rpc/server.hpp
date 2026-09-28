@@ -32,6 +32,7 @@ private:
     [[nodiscard]] auto requireSession() -> Result<edit::Session*>;
     [[nodiscard]] auto info() const -> Json;
     [[nodiscard]] auto run(const std::string& description, const edit::Session::Command& command) -> Result<Json>;
+    [[nodiscard]] auto timelineText(const Json& params) -> Result<std::string>;
     void emit(const std::string& method, const Json& params) const;
     void attachListener();
 

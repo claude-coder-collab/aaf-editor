@@ -53,7 +53,7 @@ line per request: `{"response": ..., "events": [...]}`. The UI's end-to-end test
 
 Useful methods:
 
-- `timeline.mobs`, `timeline.get {mob}` and `timeline.resolve {clip}`;
+- `timeline.mobs`, `timeline.get {mob}` (compact form: sources listed once and referenced by index, see SPEC §8.3; `aaftool timeline --json` prints the full form) and `timeline.resolve {clip}`;
 - `timeline.op` with `split`, `lift`, `rippleDelete`, `trim`, `move`, `insertClip`, `overwriteClip`, `addTrack`, `removeTrack`, `addMarker` or `relink`;
 - `object.get`, `object.setProperty`, `object.create` and `object.delete`;
 - `search.query` and `doc.validate`.

@@ -12,17 +12,17 @@ audio layout.
 
 ## Core (`tools/perf_baseline.py`, through `aaftool serve`)
 
-| Stage | Baseline | CFB fixes | Incremental | Response now |
-|---|---:|---:|---:|---:|
-| doc.open | 4,330 ms | 332 ms | 339 ms | — |
-| timeline.mobs | 152 ms | 152 ms | 67 ms | 87 KB |
-| timeline.get (whole composition) | 1,367 ms | 1,382 ms | 900 ms | 20.2 MB |
-| timeline.op split | 95 ms | 90 ms | 65 ms | 1 KB |
-| timeline.get after the edit | 1,348 ms | 1,368 ms | 861 ms | 20.2 MB |
-| timeline.get of the changed track only | — | — | 84 ms | 675 KB |
-| edit.undo | 37 ms | 31 ms | 14 ms | 1 KB |
-| doc.validate | 232 ms | 225 ms | 213 ms | — |
-| doc.saveAs | 4,178 ms | 412 ms | 415 ms | — |
+| Stage | Baseline | CFB fixes | Incremental | Compact payload | Response now |
+|---|---:|---:|---:|---:|---:|
+| doc.open | 4,330 ms | 332 ms | 339 ms | 336 ms | — |
+| timeline.mobs | 152 ms | 152 ms | 67 ms | 73 ms | 87 KB |
+| timeline.get (whole composition) | 1,367 ms | 1,382 ms | 900 ms | 271 ms | 7.1 MB |
+| timeline.op split | 95 ms | 90 ms | 65 ms | 31 ms | 1 KB |
+| timeline.get after the edit | 1,348 ms | 1,368 ms | 861 ms | 279 ms | 7.1 MB |
+| timeline.get of the changed track only | — | — | 84 ms | 18 ms | 317 KB |
+| edit.undo | 37 ms | 31 ms | 14 ms | 10 ms | 1 KB |
+| doc.validate | 232 ms | 225 ms | 213 ms | 205 ms | — |
+| doc.saveAs | 4,178 ms | 412 ms | 415 ms | 451 ms | — |
 
 **CFB fixes (PR #13):** both slow stages were quadratic name handling in the CFB layer. An AAF vector of n objects
 is stored as n sibling storages, so a 2,000-clip sequence has 2,000 siblings.
@@ -38,13 +38,22 @@ is stored as n sibling storages, so a 2,000-clip sequence has 2,000 siblings.
   - `MetaModel::findClassByName` uses an index instead of a scan;
   - `MetaModel::isA` no longer allocates a set on every call.
 
+**Compact payload (PR #16):**
+
+- Each referenced source mob is listed once per response and referenced by index.
+- Default classes, labels and `hasLength` are omitted.
+- The result is written directly as text instead of building a JSON tree and then serialising it.
+- The response is 2.8× smaller and 3.3× faster to produce.
+
 ## Native editor (WebKitGTK, timed inside the page through the real bridge)
 
-| Call | Baseline | Now |
-|---|---:|---:|
-| timeline.get (62,951 items) | 1,277 ms | 1,145 ms |
-| timeline.op addTrack | 111 ms | 39 ms |
-| refresh after the edit | 1,355 ms (whole timeline) | 68 ms (changed track only) |
+| Call | Baseline | Incremental | Compact payload |
+|---|---:|---:|---:|
+| doc.open | — | — | 433–448 ms |
+| timeline.get (62,951 items), including expansion in the page | 1,277 ms | 1,145 ms | 353–365 ms |
+| layout of the expanded timeline | — | — | 6–7 ms |
+| timeline.op addTrack | 111 ms | 39 ms | — |
+| refresh after the edit | 1,355 ms (whole timeline) | 68 ms (changed track only) | — |
 
 The native bridge adds little to the core's time, even for the 20 MB response.
 
@@ -73,15 +82,13 @@ baseline to 0.9–1.4 s with incremental refresh, and to 0.25–0.4 s with the d
 
 After an edit on this file, the native editor spends about 0.1–0.2 s on the edit, the changed-track refresh and the
 mob list, and a few milliseconds drawing. Scrolling, zooming, hovering and dragging redraw in under 5 ms at any
-zoom, well inside a 60 Hz frame. Opening the file is now the slowest interaction: 0.3 s to load, then about 1.1 s to
-project and send the whole timeline.
+zoom, well inside a 60 Hz frame. Opening the file shows the timeline in about 0.9 s: 0.45 s to load, 0.07 s for the mob
+list and 0.36 s for the timeline.
 
 ## Recommended next steps, by expected gain
 
 1. ~~**Send only what changed.**~~ Done (PR #14).
-2. **Leaner projection payload.** The payload is 320 bytes per item; most of it is repeated strings (class names,
-   MobIDs, kinds). Interning them per response, or a compact array form, should cut it several-fold and speed up both
-   serialisation and parsing.
+2. ~~**Leaner projection payload.**~~ Done (PR #16).
 3. ~~**Level of detail when drawing.**~~ Done (PR #15).
 4. ~~**Hit testing.**~~ Done (PR #15), with the same per-row search.
 5. **Mob list after edits.** `timeline.mobs` (67 ms now) is refetched whenever an edit touches a mob or creates an
