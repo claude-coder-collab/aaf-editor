@@ -464,6 +464,9 @@ aaftool timeline <file> [--mobs] [--mob NAME|ID] [--json]
                                               mob list, or a mob's tracks and items (M6)
 aaftool rpc <file> (--call METHOD PARAMS)... [--save OUT]
                                               run any §8.3 RPC calls in order, printing each result, then optionally save (M7)
+aaftool serve                                 answer §8.3 JSON-RPC requests from stdin, one per line; each reply is one line
+                                              {"response": <JSON-RPC response or null>, "events": [{"method", "params"}...]}
+                                              holding the events the request produced (used by the UI end-to-end tests)
 aaftool extract <file> --list                 list embedded essence: index, MobID, size, mob name
 aaftool extract <file> <mobid|index> <out>    write an embedded essence stream to a file, in 1 MiB chunks
 aaftool set-essence <in> <mobid|index> <data> <out>
@@ -695,15 +698,25 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - Round-trip (M3): `tools/crosscheck.py --roundtrip <aaftool>` rewrites each file with `aaftool roundtrip`, both preserving the layout (as v3) and regenerating it (as v4). It then compares pyaaf2's reading of the output with aaftool's reading of the original. Stream names are ignored for regenerated layouts.
 - Python tool versions are pinned in `tools/requirements.txt` (pyaaf2 1.7.1, pytest).
 - **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
-- **UI**: Vitest for the frontend logic and the RPC codec. Playwright smoke test against a headless build of the UI with a mock bridge.
+- **UI unit tests**: Vitest for the frontend logic and the RPC codec.
+- **UI end-to-end tests** (`ui/e2e`, Playwright 1.63, `npm run e2e`):
+  - They drive the built single-file `index.html` against the real C++ core. `AAF_UI_HTML` selects the page (default `ui/dist/index.html`; CI uses the one the editor embeds), and `AAFTOOL` is the `aaftool` executable.
+  - The fixture in `e2e/editor.ts` starts one `aaftool serve` per test and binds `window.aafRpc` to it with `exposeFunction`. It delivers each request's events through `window.__aafEvent` before returning the response, in the same order as the native host. `window.aafHost` is a stub: `openDialog` and `saveDialog` return paths the test sets, and `setTitle` calls are recorded.
+  - Tests work on private copies of fixtures in the test output directory.
+  - The init script sets `window.__aafTest`, and `TimelineView` then exposes `window.__aafTimeline` with `tracks()` (the projected rows and items) and `itemRect(object)` (an item's rectangle in canvas pixels). Tests use it to click and drag clips on the canvas and to check results.
+  - Covered flows:
+    - Inspector: open through the Open button (the window title is set); search and select a mob; rename it (panel, dirty marker, history and timeline name update); Ctrl+Z undo and Redo; inline rejection of an invalid integer; Validate reports 0 errors; Save As a copy, which `aaftool validate` accepts and which contains the edit.
+    - Timeline: click-select a clip (the source chain shows); Lift and Undo; split at a playhead set on the ruler with the S key; trim a tail by dragging its edge; add a sound track.
+  - Browsers: the engines behind each platform's webview. Chromium and WebKit on Linux, WebKit on macOS (as in WKWebView), and Edge on Windows (as in WebView2). The projects are `chromium`, `webkit` and `msedge`.
 
 ## 11. CI/CD (GitHub Actions, frugal)
 
 - **`ci.yml`** (every PR and push to main):
-  - lint: clang-format 22 check, pytest for `tools/`, the generated-model check, and the UI's `svelte-check` and Vitest (Node 24);
+  - lint: clang-format 22 check, pytest for `tools/`, the generated-model check, and the UI's `svelte-check`, Vitest and an e2e type check (`tsc -p e2e`) (Node 24);
   - Linux GCC 14 Debug and Clang 22 Release, with `-Werror`, unit tests, and clang-tidy (`.clang-tidy`, warnings as errors) on the Clang job;
   - Windows MSVC and macOS AppleClang Release builds and tests;
-  - every build job (both Linux jobs, Windows and macOS) builds `aafedit` and runs its `--smoke-test` (Linux under `xvfb-run`).
+  - every build job (both Linux jobs, Windows and macOS) builds `aafedit` and runs its `--smoke-test` (Linux under `xvfb-run`);
+  - UI end-to-end tests (§10) run against the Release `aaftool` and the embedded page: Chromium and WebKit on the Linux Clang job, Edge on Windows and WebKit on macOS. On failure, the Playwright HTML report is uploaded (kept for 7 days).
 - The sanitizer, TSan and fuzz jobs build without the editor (`AAF_BUILD_EDITOR=OFF`).
   - LLVM 22 comes from apt.llvm.org (`.github/actions/setup-llvm`).
 - **`full.yml`** (push to main, nightly at 03:17 UTC, manual, or PRs that change it):
@@ -777,6 +790,8 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | 2026-09-27 | New markers carry DescribedSlots, and new marker slots a PhysicalTrackNumber, as Avid writes them (OTIO requires both) |
 | 2026-09-27 | Linux ships as `.deb` and `.tar.gz` built on Ubuntu 24.04, with no AppImage (WebKitGTK cannot be bundled reliably); macOS as a universal build for 13.3+; Windows with the static runtime |
 | 2026-09-27 | The release workflow also runs, without publishing, on PRs that change packaging, so packaging problems show up before a tag |
+
+| 2026-09-28 | UI end-to-end tests run the real page in Playwright against `aaftool serve` rather than in the native webviews, which cannot be automated on all three platforms. The engines are matched per platform (§10) |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 
