@@ -13,6 +13,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+set(AAF_VERSION "${PROJECT_VERSION}" CACHE STRING "Version string embedded in binaries and packages")
+
 include(cmake/ProjectOptions.cmake)
 include(cmake/Dependencies.cmake)
 
@@ -35,3 +37,5 @@ endif()
 if(AAF_BUILD_FUZZERS)
     add_subdirectory(tests/fuzz)
 endif()
+
+include(cmake/Packaging.cmake)

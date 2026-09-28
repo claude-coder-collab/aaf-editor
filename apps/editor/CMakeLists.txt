@@ -72,14 +72,14 @@ set_target_properties(webview_core_static PROPERTIES CXX_STANDARD 17)
 
 add_executable(aafedit WIN32 MACOSX_BUNDLE main.cpp view.cpp worker.cpp ${ui_cpp})
 target_link_libraries(aafedit PRIVATE aaf::rpc aaf::project_options webview::core_static portable_file_dialogs)
-target_compile_definitions(aafedit PRIVATE AAF_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(aafedit PRIVATE AAF_VERSION="${AAF_VERSION}")
 if(MSVC)
     target_link_options(aafedit PRIVATE /ENTRY:mainCRTStartup)
 endif()
 set_target_properties(aafedit PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "AAF Editor"
     MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.claude-coder-collab.aaf-editor"
-    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+    MACOSX_BUNDLE_BUNDLE_VERSION ${AAF_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${AAF_VERSION}
 )
 install(TARGETS aafedit RUNTIME DESTINATION bin BUNDLE DESTINATION .)

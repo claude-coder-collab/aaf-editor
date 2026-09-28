@@ -1,0 +1,39 @@
+include(GNUInstallDirs)
+set(CMAKE_INSTALL_DOCDIR "${CMAKE_INSTALL_DATAROOTDIR}/doc/aaf-editor")
+
+install(FILES ${PROJECT_SOURCE_DIR}/LICENSE ${PROJECT_SOURCE_DIR}/README.md ${PROJECT_SOURCE_DIR}/NOTICE
+    DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/aaf-editor.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    set(aaf_platform "linux-${CMAKE_SYSTEM_PROCESSOR}")
+    set(CPACK_GENERATOR "TGZ;DEB")
+elseif(APPLE)
+    set(aaf_platform "macos-universal")
+    set(CPACK_GENERATOR "DragNDrop")
+elseif(WIN32)
+    set(aaf_platform "windows-x86_64")
+    set(CPACK_GENERATOR "ZIP")
+else()
+    set(aaf_platform "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+    set(CPACK_GENERATOR "TGZ")
+endif()
+string(TOLOWER "${aaf_platform}" aaf_platform)
+
+set(CPACK_PACKAGE_NAME "aaf-editor")
+set(CPACK_PACKAGE_VENDOR "aaf-editor contributors")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Editor and command-line tool for AAF (Advanced Authoring Format) files")
+set(CPACK_PACKAGE_VERSION "${AAF_VERSION}")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/claude-coder-collab/aaf-editor")
+set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_FILE_NAME "aaf-editor-${AAF_VERSION}-${aaf_platform}")
+set(CPACK_STRIP_FILES ON)
+
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "aaf-editor contributors <333922006+claude-coder-collab@users.noreply.github.com>")
+set(CPACK_DEBIAN_PACKAGE_SECTION "video")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.deb")
+
+set(CPACK_DMG_VOLUME_NAME "AAF Editor ${AAF_VERSION}")
+
+include(CPack)

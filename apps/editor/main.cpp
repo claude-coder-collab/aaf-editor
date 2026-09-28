@@ -25,7 +25,7 @@ namespace
 
 using aaf::rpc::Json;
 
-constexpr const char* kUsage = "usage: aafedit [file.aaf] [--debug] [--smoke-test file.aaf]\n";
+constexpr const char* kUsage = "usage: aafedit [file.aaf] [--debug] [--smoke-test file.aaf] [--version]\n";
 
 auto fileFilter(bool anyFile) -> std::vector<std::string>
 {
@@ -47,6 +47,7 @@ struct Options
     std::string file;
     std::string smokeFile;
     bool debug = false;
+    bool version = false;
 };
 
 auto parse(std::span<char*> argv) -> std::optional<Options>
@@ -58,6 +59,10 @@ auto parse(std::span<char*> argv) -> std::optional<Options>
         if (arg == "--debug")
         {
             options.debug = true;
+        }
+        else if (arg == "--version")
+        {
+            options.version = true;
         }
         else if (arg == "--smoke-test" && i + 1 < argv.size())
         {
@@ -114,6 +119,11 @@ auto run(std::span<char*> argv) -> int
     {
         (void) std::fputs(kUsage, stderr);
         return 2;
+    }
+    if (options->version)
+    {
+        printLine(stdout, std::string("aafedit ") + AAF_VERSION);
+        return 0;
     }
     aafedit::View view(options->debug);
     view.setTitle("AAF Editor");

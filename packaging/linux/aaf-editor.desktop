@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AAF Editor
+Comment=Inspect and edit AAF (Advanced Authoring Format) files
+Exec=aafedit %f
+Terminal=false
+Categories=AudioVideo;Video;AudioVideoEditing;
