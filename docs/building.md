@@ -30,7 +30,7 @@ The sanitizer presets are `clang-asan` (AddressSanitizer and UndefinedBehaviorSa
 | `AAF_BUILD_EDITOR` | ON | The `aafedit` desktop editor. It is skipped with a warning when npm, or WebKitGTK on Linux, is missing. |
 | `AAF_UI_DIST` | — | A directory with a prebuilt `index.html`, used instead of building the UI with npm. |
 | `AAF_WARNINGS_AS_ERRORS` | OFF | `-Werror` or `/WX`; CI turns it on. |
-| `AAF_VERSION` | the project version | The version embedded in binaries and packages. |
+| `AAF_VERSION` | empty (the project version) | The version embedded in binaries and packages. |
 
 ## UI development
 

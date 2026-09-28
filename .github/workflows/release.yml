@@ -111,7 +111,7 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           cd ..
-          sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/RELEASE_NOTES.md > release-notes.md
+          python3 tools/release_notes.py "$GITHUB_REF_NAME" > release-notes.md
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

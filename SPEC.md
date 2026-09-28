@@ -1,6 +1,6 @@
 # AAF Editor — Specification
 
-Status: v0.1.0 released (2026-09-27); milestones M1–M8 complete. Licence: MIT. This document is the source of truth. Update it whenever a design decision changes, so that another engineer or agent can re-implement the project from it alone.
+Status: v0.2.0 (2026-09-28; performance work, e2e tests) after v0.1.0 (2026-09-27); milestones M1–M8 complete. Changes per version are in `CHANGELOG.md`. Licence: MIT. This document is the source of truth. Update it whenever a design decision changes, so that another engineer or agent can re-implement the project from it alone.
 
 ## 1. Goal
 
@@ -45,7 +45,7 @@ aaf-editor/
     timeline/   libaaftl      timeline projection + editorial operations
     edit/       libaafedit    command/undo engine, document session
   apps/
-    aaftool/    CLI: cfb, cfb-roundtrip, dump, validate, roundtrip, extract, set-essence
+    aaftool/    CLI: cfb, cfb-roundtrip, dump, validate, roundtrip, timeline, rpc, serve, extract, set-essence
     rpc/        aaf::rpc JSON-RPC server over an edit session (nlohmann/json)
     editor/     aafedit: webview host (C API wrapper, worker thread, native dialogs)
   ui/           Svelte 5 + TypeScript frontend (Vite), built to one HTML file embedded in aafedit
@@ -55,6 +55,7 @@ aaf-editor/
   packaging/    release notes template, Linux desktop entry
   cmake/        ProjectOptions (warnings, sanitizers), Dependencies (nlohmann/json), Packaging (CPack)
   model/        built-in AAF baseline metamodel data (generated source)
+  CHANGELOG.md  changes per version; its section for a tag becomes the release's "What's new"
 ```
 
 Dependency direction: `cfb ← core ← timeline ← edit ← apps`. The libraries have no third-party runtime dependencies. The apps additionally depend on the webview library and nlohmann/json (fetched with CMake `FetchContent`, pinned by tag).
@@ -764,7 +765,10 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 - **`release.yml`** (M8) runs on `v*` tags, on manual dispatch, and on PRs that change it, `cmake/Packaging.cmake` or `packaging/`.
   - **Package job** (one per OS): builds Release with `-Werror`, runs all tests and the editor smoke test, then runs **CPack** (`cmake/Packaging.cmake`) and uploads the packages as artifacts.
   - **Version**: `AAF_VERSION` is the tag without its `v`, or `0.0.0-dev.<run>` for untagged builds. It is embedded in `aaftool --version`, `aafedit --version`, the macOS bundle and the package names.
-  - **Publish job** (tags only): writes `SHA256SUMS.txt`, fills in `packaging/RELEASE_NOTES.md` (downloads, install steps, how to open unsigned apps), and runs `gh release create`.
+  - **Publish job** (tags only): writes `SHA256SUMS.txt`, builds the notes with `tools/release_notes.py <tag>` and runs `gh release create`.
+    - The notes are `packaging/RELEASE_NOTES.md` (downloads, install steps, how to open unsigned apps) with the tag's `CHANGELOG.md` section inserted as "What's new" after the first line.
+    - A missing or empty section fails the job. A pytest test also requires a section for the `CMakeLists.txt` project version, so a forgotten entry fails in the PR.
+  - **Releasing**: bump `project(... VERSION)` in `CMakeLists.txt` and `ui/package.json` (`npm version X --no-git-tag-version`), add the `CHANGELOG.md` section (one line per paragraph or bullet, because GitHub renders single newlines in release notes as line breaks), merge, then push the tag `vX`.
 
   | OS | Runner | Artifacts |
   |---|---|---|

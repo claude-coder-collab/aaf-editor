@@ -1,0 +1,31 @@
+# Changelog
+
+## 0.2.0
+
+### Faster on large files
+
+On a 60,000-clip, 30-track composition:
+
+- **Opening and saving.** Opening takes 0.3 s instead of 4.3 s, and saving 0.4 s instead of 4.2 s. Name lookups in the compound-file layer were quadratic in the number of clips on a track.
+- **Timeline after an edit.** Only the tracks an edit changed are re-projected and sent, so the timeline updates in under 0.1 s instead of 1.5–2 s. The mob list is fetched again only when an edit can change it.
+- **Opening a timeline.** The timeline is sent in a compact form, 7 MB instead of 20 MB, and appears about 0.9 s after opening the file instead of about 5.7 s.
+- **Drawing.** The timeline redraws in a few milliseconds at any zoom, instead of 50–375 ms. Only visible clips are drawn, clips narrower than a pixel are merged, and hit testing uses the same index.
+
+### Fixes
+
+- Moving or placing a clip onto a track added with **+V** or **+A** was refused in files that use the legacy (Avid) picture and sound data definitions. Legacy and SMPTE definitions of the same kind are now interchangeable, and new tracks use the data definition the mob's other tracks already use.
+
+### Changes for scripts
+
+- `timeline.get` (through `aaftool rpc` or the editor's RPC) returns a compact form: referenced sources are listed once in `sources` and items refer to them by index, and default fields are omitted. It also accepts `changed: [object ids]` to return only the affected tracks (SPEC §8.3). `aaftool timeline --json` is unchanged.
+- New `aaftool serve`: JSON-RPC requests on stdin, one response and its events per line on stdout.
+
+### Development
+
+- Playwright end-to-end tests drive the real editor page against `aaftool serve`: Chromium and WebKit on Linux, WebKit on macOS, and Edge on Windows.
+- Performance tools: `tools/gen_stress_aaf.py`, `tools/perf_baseline.py`, and limits in `tools/perf_limits.json`, checked on every push to main. Results are in `docs/performance.md`.
+- CI: no nightly schedule. Fuzzing has moved to `fuzz.yml` and runs when parser code changes, or manually.
+
+## 0.1.0
+
+First release: the `aaf` library (compound files, the stored format, metamodel, editing with undo, and the timeline projection and operations), `aaftool`, and the `aafedit` desktop editor with an object inspector and a timeline.
