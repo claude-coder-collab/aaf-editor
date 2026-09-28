@@ -307,3 +307,18 @@ TEST_CASE("Encoding inverts decoding for every stored value", "[core][value][fix
     CHECK(stats.mismatches.empty());
     CHECK(stats.checked > 1000);
 }
+
+TEST_CASE("Properties and classes renamed by a file are still found by their baseline names", "[core][metamodel]")
+{
+    const auto opened = Document::open(fixturesDir() / "aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf");
+    REQUIRE(opened);
+    const auto& model = opened->model();
+    const auto* byFileName = model.findProperty("OperationGroup", "OperationDefinition");
+    const auto* byBaselineName = model.findProperty("OperationGroup", "Operation");
+    REQUIRE(byFileName != nullptr);
+    CHECK(byBaselineName == byFileName);
+    CHECK(byFileName->name == "OperationDefinition");
+    CHECK(model.findProperty("OperationGroup", "NoSuchProperty") == nullptr);
+    CHECK(model.findProperty("Mob", "Operation") == nullptr);
+    CHECK(MetaModel::baseline().findProperty("OperationGroup", "OperationDefinition") == nullptr);
+}

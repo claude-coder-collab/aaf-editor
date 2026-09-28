@@ -31,10 +31,65 @@ struct Entry
     ObjectId id = kNoObject;
     bool transition = false;
     bool filler = false;
+    /// A source clip, or single-input effects around one (see ClipChain).
     bool clip = false;
+    /// Why the clip's length cannot be changed, if it cannot.
+    std::string locked;
     std::int64_t start = 0;
     std::int64_t length = 0;
 };
+
+/// A source clip, or a chain of single-input effects around one, edited as one unit.
+struct ClipChain
+{
+    /// The effects from the track inwards; empty for a plain source clip.
+    std::vector<ObjectId> effects;
+    ObjectId clip = kNoObject;
+    /// Set when changing the length would change what the effects do: speed changes map clip time differently,
+    /// and keyframe times are relative to the effect's length.
+    std::string locked;
+};
+
+auto clipChain(const Access& a, ObjectId id) -> std::optional<ClipChain>
+{
+    ClipChain chain;
+    ObjectId node = id;
+    for (int depth = 0; depth < kMaxDepth && a.isA(node, "OperationGroup"); ++depth)
+    {
+        const auto inputs = a.children(node, "OperationGroup", "InputSegments");
+        if (inputs.size() != 1)
+        {
+            return std::nullopt;
+        }
+        const auto definition = a.weak(node, "OperationGroup", "Operation");
+        const auto name = a.definitionName(definition);
+        const auto warp = definition ? a.value(*definition, "OperationDefinition", "IsTimeWarp") : std::nullopt;
+        if (chain.locked.empty() && warp && warp->is<bool>() && warp->as<bool>())
+        {
+            chain.locked = std::format("the clip has a speed change ({}), which cannot be trimmed or split yet", name.empty() ? "effect" : name);
+        }
+        const auto parameters = a.children(node, "OperationGroup", "Parameters");
+        if (chain.locked.empty() && std::ranges::any_of(parameters, [&](ObjectId p) -> bool { return a.isA(p, "VaryingValue"); }))
+        {
+            chain.locked = std::format("the clip has keyframed effect parameters ({}), which cannot be trimmed or split yet", name.empty() ? "effect" : name);
+        }
+        chain.effects.push_back(node);
+        node = inputs.front();
+    }
+    if (!a.isA(node, "SourceClip"))
+    {
+        return std::nullopt;
+    }
+    chain.clip = node;
+    return chain;
+}
+
+/// The source clip that decides where a segment's material comes from: itself, or the clip inside its effects.
+auto sourceClipOf(const Access& a, ObjectId id) -> ObjectId
+{
+    const auto chain = clipChain(a, id);
+    return chain ? chain->clip : id;
+}
 
 auto pidOf(const Access& a, std::string_view cls, std::string_view name) -> Result<std::uint16_t>
 {
@@ -73,6 +128,29 @@ auto setLength(edit::Transaction& tx, ObjectId id, std::int64_t length) -> Resul
     return setInt(tx, id, "Component", "Length", length);
 }
 
+/// Sets a segment's length; for a clip inside effects, the effects and the clip all get the new length.
+auto setSegmentLength(edit::Transaction& tx, ObjectId id, std::int64_t length) -> Result<void>
+{
+    const Access a(tx.document());
+    const auto chain = clipChain(a, id);
+    if (!chain || chain->effects.empty())
+    {
+        return setLength(tx, id, length);
+    }
+    if (!chain->locked.empty())
+    {
+        return fail(Errc::unsupported, chain->locked);
+    }
+    for (const auto effect : chain->effects)
+    {
+        if (auto r = setLength(tx, effect, length); !r)
+        {
+            return r;
+        }
+    }
+    return setLength(tx, chain->clip, length);
+}
+
 /// Copies the DataDefinition weak reference of `from` onto `to`.
 auto copyDataDefinition(edit::Transaction& tx, ObjectId from, ObjectId to) -> Result<void>
 {
@@ -105,7 +183,8 @@ auto entries(const Access& a, ObjectId sequence) -> std::vector<Entry>
     std::int64_t cursor = 0;
     for (const auto id : components(a, sequence))
     {
-        Entry e{ id, a.isA(id, "Transition"), a.isA(id, "Filler"), a.isA(id, "SourceClip"), cursor, lengthOf(a, id) };
+        const auto chain = clipChain(a, id);
+        Entry e{ id, a.isA(id, "Transition"), a.isA(id, "Filler"), chain.has_value(), chain ? chain->locked : std::string{}, cursor, lengthOf(a, id) };
         if (e.transition)
         {
             e.start = cursor - e.length;
@@ -349,9 +428,10 @@ auto normalize(edit::Transaction& tx, const TrackRef& track) -> Result<void>
     return {};
 }
 
-auto adjustStart(edit::Transaction& tx, ObjectId clip, std::int64_t delta) -> Result<void>
+auto adjustStart(edit::Transaction& tx, ObjectId segment, std::int64_t delta) -> Result<void>
 {
     const Access a(tx.document());
+    const auto clip = sourceClipOf(a, segment);
     const auto start = a.integer(clip, "SourceClip", "StartTime").value_or(0) + delta;
     if (start < 0)
     {
@@ -387,8 +467,9 @@ auto sourceLength(const Access& a, ObjectId clip) -> std::optional<std::int64_t>
     return std::nullopt;
 }
 
-auto checkWithinSource(const Access& a, ObjectId clip) -> Result<void>
+auto checkWithinSource(const Access& a, ObjectId segment) -> Result<void>
 {
+    const auto clip = sourceClipOf(a, segment);
     if (!a.isA(clip, "SourceClip"))
     {
         return {};
@@ -419,11 +500,11 @@ auto cutTransition(edit::Transaction& tx, const TrackRef& track, std::size_t ind
     {
         return fail(Errc::invalid_argument, "the segments around the transition are too short");
     }
-    if (auto r = setLength(tx, previous.id, previous.length - (length - half)); !r)
+    if (auto r = setSegmentLength(tx, previous.id, previous.length - (length - half)); !r)
     {
         return r;
     }
-    if (auto r = setLength(tx, next.id, next.length - half); !r)
+    if (auto r = setSegmentLength(tx, next.id, next.length - half); !r)
     {
         return r;
     }
@@ -489,13 +570,17 @@ auto cutAt(edit::Transaction& tx, const TrackRef& track, std::int64_t position) 
             {
                 return fail(Errc::unsupported, std::format("a {} cannot be split", a.className(e.id)));
             }
+            if (!e.locked.empty())
+            {
+                return fail(Errc::unsupported, e.locked);
+            }
             auto right = deepCopy(tx, e.id);
             if (!right)
             {
                 return propagate(right);
             }
             const auto left = position - e.start;
-            for (const auto& r : { setLength(tx, e.id, left), setLength(tx, *right, e.length - left) })
+            for (const auto& r : { setSegmentLength(tx, e.id, left), setSegmentLength(tx, *right, e.length - left) })
             {
                 if (!r)
                 {
@@ -620,15 +705,17 @@ auto deepCopy(edit::Transaction& tx, ObjectId id) -> Result<ObjectId>
                 return propagate(r);
             }
         }
-        else if (const auto* vector = std::get_if<StrongRefVectorProperty>(&p.payload))
+        else if (std::holds_alternative<StrongRefVectorProperty>(p.payload) || std::holds_alternative<StrongRefSetProperty>(p.payload))
         {
+            const auto* vector = std::get_if<StrongRefVectorProperty>(&p.payload);
+            const auto& objects = vector ? vector->objects : std::get<StrongRefSetProperty>(p.payload).objects;
             if (auto r = edit::ensureCollection(tx, *copy, p.pid); !r)
             {
                 return propagate(r);
             }
-            for (std::size_t i = 0; i < vector->objects.size(); ++i)
+            for (std::size_t i = 0; i < objects.size(); ++i)
             {
-                auto child = deepCopy(tx, vector->objects[i]);
+                auto child = deepCopy(tx, objects[i]);
                 if (!child)
                 {
                     return child;
@@ -638,10 +725,6 @@ auto deepCopy(edit::Transaction& tx, ObjectId id) -> Result<ObjectId>
                     return propagate(r);
                 }
             }
-        }
-        else if (std::holds_alternative<StrongRefSetProperty>(p.payload))
-        {
-            return fail(Errc::unsupported, "objects holding strong reference sets cannot be copied");
         }
         else
         {
@@ -790,7 +873,7 @@ auto trim(edit::Transaction& tx, ObjectId item, Edge edge, std::int64_t delta, b
     {
         return fail(Errc::invalid_argument, "the segment would become empty");
     }
-    if (auto r = setLength(tx, item, length); !r)
+    if (auto r = setSegmentLength(tx, item, length); !r)
     {
         return r;
     }
@@ -809,7 +892,7 @@ auto trim(edit::Transaction& tx, ObjectId item, Edge edge, std::int64_t delta, b
         {
             return fail(Errc::invalid_argument, "the neighbouring segment would become empty");
         }
-        if (auto r = setLength(tx, other.id, otherLength); !r)
+        if (auto r = setSegmentLength(tx, other.id, otherLength); !r)
         {
             return r;
         }

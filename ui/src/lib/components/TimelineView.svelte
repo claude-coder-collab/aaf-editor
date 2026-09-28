@@ -4,7 +4,7 @@
   import type { ChangeSet, MobSummary, RpcClient, SourceChain, Timeline, TimelineItem } from "../rpc";
   import { dragZone, snap } from "../snap";
   import { formatTimecode, nominalFps } from "../timecode";
-  import { hitTest, layout, rateValue, RULER_HEIGHT, RunMerger, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
+  import { badgeText, hitTest, holds, layout, rateValue, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
   import { addPending, mergeTimeline, type Pending } from "../timelineMerge";
 
   interface Props {
@@ -20,6 +20,10 @@
 
   const HEADER = 150;
   const SNAP_PIXELS = 8;
+  /// Distance of an effects badge from its clip's left edge; clicks nearer the edge trim instead.
+  const BADGE_INSET = 8;
+  /// Where each effects badge was last drawn (canvas x), by item, so clicks on a badge select the effect.
+  const badges = new Map<number, { x0: number; x1: number }>();
   let timeline = $state.raw<Timeline | null>(null);
   let error = $state("");
   let canvas: HTMLCanvasElement | undefined = $state();
@@ -44,8 +48,8 @@
   const tcStart = $derived(timeline?.timecode?.start ?? 0);
   const contentWidth = $derived(view ? view.duration * pixelsPerUnit : 0);
   const selectedRow = $derived(view?.rows.find((r) => r.track.slot === selectedSlot) ?? null);
-  const selectedItemRow = $derived(view?.rows.find((r) => r.track.items.some((i) => i.object === selected)) ?? null);
-  const selectedItem = $derived(selectedItemRow?.track.items.find((i) => i.object === selected) ?? null);
+  const selectedItemRow = $derived(view?.rows.find((r) => r.track.items.some((i) => holds(i, selected))) ?? null);
+  const selectedItem = $derived(selectedItemRow?.track.items.find((i) => holds(i, selected)) ?? null);
   const editRow = $derived(selectedItemRow ?? selectedRow);
   const sources = $derived(mobs.filter((m) => m.kind === "master" || m.kind === "source"));
 
@@ -139,7 +143,7 @@
   function itemColor(item: TimelineItem, kind: string, c: Palette): string {
     if (item.kind === "filler") return "transparent";
     if (item.source && !item.source.original && item.source.mob === null) return c["--danger"];
-    if (item.kind === "operationGroup") return c["--tl-effect"];
+    if (item.kind === "operationGroup" && item.clip === undefined) return c["--tl-effect"];
     if (item.kind === "timecode" || item.kind === "pulldown" || item.kind === "edgecode") return c["--tl-code"];
     if (item.source?.mobKind === "composition" || item.kind === "nestedScope" || item.kind === "sequence") return c["--tl-nested"];
     return kind === "sound" ? c["--tl-audio"] : c["--tl-video"];
@@ -190,6 +194,7 @@
     const accent = c["--accent"];
     const from = toUnits(HEADER) - 6 / pixelsPerUnit;
     const to = toUnits(width) + 6 / pixelsPerUnit;
+    badges.clear();
 
     g.save();
     g.translate(0, -scrollTop);
@@ -222,7 +227,8 @@
         }
         if (item.kind === "transition") continue;
         const fill = itemColor(item, row.track.kind, c);
-        const highlighted = item.object === selected || drag?.item.object === item.object;
+        const isSelected = holds(item, selected);
+        const highlighted = isSelected || drag?.item.object === item.object;
         if (exact < 2 && !highlighted) {
           if (fill !== "transparent") runs.add(left, exact, fill);
           continue;
@@ -240,11 +246,29 @@
           g.strokeRect(left + 0.5, top + 0.5, w - 1, h - 1);
           g.setLineDash([]);
         }
-        if (item.object === selected) {
+        if (isSelected) {
           g.strokeStyle = accent;
           g.lineWidth = 2;
           g.strokeRect(left + 1, top + 1, w - 2, h - 2);
           g.lineWidth = 1;
+        }
+        const previous = i > 0 ? row.track.items[i - 1] : undefined;
+        const covered = previous?.kind === "transition" ? Math.max(0, toX((previous.start + previous.length) * row.scale) - left) : 0;
+        const visible = w - covered;
+        let textLeft = left + covered + 5;
+        const badge = visible >= 40 ? badgeText(item, visible - 60, (s) => g.measureText(s).width) : null;
+        if (badge) {
+          const x0 = left + covered + BADGE_INSET;
+          const bw = g.measureText(badge).width + 8;
+          const effectSelected = item.effects?.some((e) => e.object === selected) ?? false;
+          g.fillStyle = effectSelected ? accent : "rgb(0 0 0 / 0.35)";
+          g.beginPath();
+          g.roundRect(x0, top + h / 2 - 7, bw, 14, 3);
+          g.fill();
+          g.fillStyle = "#fff";
+          g.fillText(badge, x0 + 4, top + h / 2);
+          badges.set(item.object, { x0, x1: x0 + bw });
+          textLeft = x0 + bw + 5;
         }
         if (w > 30 && item.kind !== "filler") {
           g.save();
@@ -252,7 +276,7 @@
           g.rect(left + 4, top, w - 8, h);
           g.clip();
           g.fillStyle = "#fff";
-          g.fillText(item.label, left + 5, top + h / 2);
+          g.fillText(item.label, textLeft, top + h / 2);
           g.restore();
         }
       }
@@ -349,7 +373,7 @@
   $effect(() => {
     if (!window.__aafTest) return;
     window.__aafTimeline = {
-      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length })) })) ?? [],
+      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length, clip: i.clip, effects: i.effects?.map((e) => e.name) })) })) ?? [],
       itemRect: (object: number) => {
         const row = view?.rows.find((r) => r.track.items.some((i) => i.object === object));
         const item = row?.track.items.find((i) => i.object === object);
@@ -364,6 +388,14 @@
         return { draw: (drawn - start) / repeat, pick: (performance.now() - drawn) / repeat };
       },
       zoom: (factor: number) => zoom(factor),
+      show: (object: number, pixels: number) => {
+        const row = view?.rows.find((r) => r.track.items.some((i) => i.object === object));
+        const item = row?.track.items.find((i) => i.object === object);
+        if (!row || !item || item.length <= 0) return;
+        pixelsPerUnit = Math.min(200, pixels / (item.length * row.scale));
+        viewStart = Math.max(0, item.start * row.scale - 40 / pixelsPerUnit);
+        scrollTop = Math.max(0, row.y - RULER_HEIGHT - 4);
+      },
     };
     return () => delete window.__aafTimeline;
   });
@@ -406,8 +438,14 @@
     }
     const hit = pick(event);
     if (!hit) return;
-    onselect(hit.item.object);
     selectedSlot = hit.row.track.slot;
+    const badge = badges.get(hit.item.object);
+    const effect = hit.item.effects?.[0];
+    if (badge && effect && event.offsetX >= badge.x0 && event.offsetX <= badge.x1) {
+      onselect(effect.object);
+      return;
+    }
+    onselect(selectionTarget(hit.item));
     const editable = hit.row.track.slotKind === "timeline" && (hit.item.kind === "sourceClip" || hit.item.kind === "filler" || hit.item.kind === "operationGroup");
     if (!editable) return;
     const left = toX(hit.item.start * hit.row.scale);
@@ -420,7 +458,7 @@
     const d = drag;
     drag = null;
     if (!d || Math.abs(d.x - d.startX) < 3) {
-      if (d?.item.kind === "sourceClip") chain = await client.resolve(d.item.object).catch(() => null);
+      if (d && (d.item.kind === "sourceClip" || d.item.clip !== undefined)) chain = await client.resolve(selectionTarget(d.item)).catch(() => null);
       return;
     }
     const target = dragTarget(d);
@@ -535,7 +573,8 @@
   }
 
   function describe(item: TimelineItem, rowLabel: string): string {
-    const lines = [`${rowLabel} · ${item.class}: ${item.label}`, `start ${item.start}, length ${item.hasLength ? item.length : "—"}`];
+    const lines = [`${rowLabel} · ${item.clip !== undefined ? "SourceClip" : item.class}: ${item.label}`, `start ${item.start}, length ${item.hasLength ? item.length : "—"}`];
+    if (item.effects?.length) lines.push(`effects: ${item.effects.map((e) => e.name || "effect").join(", ")}`);
     if (item.source) {
       lines.push(item.source.original ? "original source" : `${item.source.mob === null ? "MISSING " : ""}${item.source.mobKind} mob, slot ${item.source.slotId}, from ${item.source.startTime}`);
     }

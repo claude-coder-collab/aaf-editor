@@ -240,6 +240,7 @@ This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core
   - **Property definitions**: `Identification`, `Name`, `Type`, `IsOptional`, `LocalIdentification` and `IsUniqueIdentifier`. `Type` may be stored either as AUID data or as a weak reference; both are accepted.
   - **Type definitions** are interpreted per `TypeDefinition*` class.
   - **Merge rule**: file definitions replace baseline fields where both exist, with one exception: the **baseline property type wins**. A conflicting file type is recorded as a load note. This matters because AAF SDK files declare `MemberNames` and `ElementNames` as `aafString` but store NUL-separated string arrays, which is what the baseline type `aafStringArray` describes. Extendible enumerations take the union of their elements. A file PID that differs from a fixed baseline PID is a load warning. Every definition records its source (`baseline`, `file` or `both`).
+- **Names differ between files**: Avid files call `OperationGroup::Operation` "OperationDefinition", `OperationDefinition::OperationCategory` "Category", `PluginDefinition::PluginCategory` "CategoryClass" and `FileDescriptor::LinkedSlotID` "LinkedTrackID", and the merge keeps the file's names. `findProperty(class, name)` and `findClassByName` therefore also accept the baseline name, resolving it to the same definition by AUID. Without that, effect names were blank, and pyaaf2 fails the same way (`KeyError: 'Operation'`).
 - **Lookups**: `findClassByName` uses a name index (first definition of a name wins, and a stale entry falls back to a scan). `isA` walks parents with a step bound (the class count) instead of a visited set, so it allocates nothing.
 - Type categories to support: Integer (1/2/4/8, signed and unsigned), Character, String, Enum, ExtEnum, Record, FixedArray, VarArray, Set, Rename, StrongObjRef, WeakObjRef, Stream, Indirect, Opaque.
 - If a property cannot be decoded (unknown PID and no definition), it is kept as **opaque bytes with its stored form** and written back unchanged.
@@ -344,7 +345,8 @@ Status: **projection implemented (M6)** in `libs/timeline/` (namespace `aaf::tim
   - `editRate` and `origin`;
   - `length`: the segment's `Length`, else the end of the last item.
   - A **track-level effect** (the slot's segment is an OperationGroup, for example Avid's "Audio Pan" on a whole track) is unwrapped: `effects` lists the group or groups, and `items` are the content of the first input. This matches how editors and OTIO present such tracks.
-- **Items**: `{object, kind, className, start, length, hasLength, label, source?, effect, timecode?, nested, comment}`.
+- **Items**: `{object, kind, className, start, length, hasLength, label, source?, effect, timecode?, nested, comment, clip?, effects}`.
+  - **Clips inside effects**: an OperationGroup whose only input is a SourceClip, possibly through further single-input OperationGroups (Avid's Audio Gain, Pan, colour correction or Motion Control), is still the item. Its `clip` is the SourceClip, and `effects` lists `{object, name}` from the track inwards. It takes the clip's `label` and `source`, so it is shown as the clip; `nested` still holds the full structure. Multi-input effects, and effects around sequences or nested scopes, are unchanged.
   - **Layout**: a Sequence is laid out with a cursor. A segment starts at the cursor and advances it by its length. A **Transition starts at `cursor − length` and moves the cursor back by its length**, so it overlaps the end of the previous segment and the start of the next. Events (markers) use their own `Position`.
   - **Kinds**: sourceClip, filler, transition, operationGroup, essenceGroup, selector, nestedScope, scopeReference, pulldown, sequence, timecode, edgecode, marker (DescriptiveMarker or CommentMarker), event and other.
   - **Nesting**: effect inputs, essence group choices, a selector's selected segment and its alternates, nested scope slots, and pulldown inputs become `nested` item lists, up to 16 levels deep; deeper nesting is reported as a warning.
@@ -386,15 +388,21 @@ Status: **implemented (M7)** in `aaf/timeline/edit.hpp` (namespace `aaf::timelin
 | `place(slot, position, segment, insert)` | Places a detached segment with the same DataDefinition. Insert cuts at `position` and pushes later material. Overwrite cuts at both ends and removes what lies between. A range overlapping a transition is refused. Placing past the end adds Filler first. |
 | `placeClip(slot, position, sourceMob, sourceSlot, sourceIn, length, insert)` | Creates a SourceClip (DataDefinition from the track; SourceID, SourceMobSlotID, StartTime, Length) and places it. The source slot must exist. |
 | `move(item, toSlot, position, ripple)` | Leaves Filler behind (or closes the gap with `ripple`), then overwrites at the target, which may be another track with the same data kind. Transitions cannot be moved. |
-
-`place`, `placeClip` and `move` accept a segment whose DataDefinition differs from the track's when both are picture or both are sound. Avid files use the legacy picture and sound definitions, and tracks may use either.
 | `addTrack(mob, picture \| sound, name)` | Adds a TimelineMobSlot:<br>• SlotID = highest + 1;<br>• the edit rate of the mob's first timeline slot;<br>• Origin 0;<br>• PhysicalTrackNumber = count of tracks of that kind + 1;<br>• an empty Sequence referencing the DataDefinition of the mob's existing tracks of that kind, else the file's Picture or Sound DataDefinition (SMPTE AUID preferred, legacy accepted). |
 | `removeTrack(slot)` | Deletes the slot. |
 | `addMarker(mob, position, comment)` | Adds a DescriptiveMarker (Position, Comment, the marker track's DataDefinition, and **DescribedSlots = {first picture track's SlotID}**), in position order. If there is no marker track, it creates an EventMobSlot (PhysicalTrackNumber = existing event slots + 1, the first timeline edit rate) holding a Sequence that references the Descriptive Metadata DataDefinition. Avid does the same, and the OTIO adapter requires both `DescribedSlots` and the event slot's PhysicalTrackNumber. |
 | `relink(find, replace)` | Replaces text in every NetworkLocator `URLString`; returns how many URLs actually changed. |
-| `deepCopy(id)` | Copies an object with its strongly referenced children. Sets are refused. |
+| `deepCopy(id)` | Copies an object with its strongly referenced children, including strong-reference sets (elements keep their keys, which only need to be unique within their set). |
 
-- **Not yet supported**: moving or trimming transitions, editing inside effects and nested scopes, and keyframes.
+`place`, `placeClip` and `move` accept a segment whose DataDefinition differs from the track's when both are picture or both are sound. Avid files use the legacy picture and sound definitions, and tracks may use either.
+
+**Clips inside effects** (`ClipChain` in `edit_ops.cpp`): a SourceClip, or a chain of single-input OperationGroups ending in one, is edited as one clip.
+- The outermost group is the item in the sequence. `lift`, `rippleDelete` and `move` treat it like any clip.
+- Length changes (`split`, `trim`, removing a transition) are applied to every group in the chain and to the clip. `StartTime` changes and source-length checks apply to the clip.
+- A chain is **locked** against length changes when a group's OperationDefinition has `IsTimeWarp` (speed changes map clip time differently), or when it has a `VaryingValue` parameter (keyframe times are relative to the group's length). `split` and `trim` then fail with a message naming the effect.
+- Avid stores `OperationGroup.Parameters` as a strong-reference **set** keyed by 0x1B01, where the specification has a vector. Copies keep that form, and a split file saves and reloads with 0 errors.
+
+- **Not yet supported**: moving or trimming transitions, editing inside nested scopes and multi-input effects, and trimming or splitting clips with speed changes or keyframed effects.
 - **Tests** (`tests/timeline/test_edit_ops.cpp`, on the SDK sample so they run on every PR):
   - every operation, including refusals;
   - the stored Length always equal to the projected total;
@@ -574,7 +582,7 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   - Timeline (M6):
     - `timeline.mobs` returns the mob summaries.
     - `timeline.get {mob, changed?}` returns `{mob, mobId, name, kind, partial, slots, warnings, timecode, sources, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items, warnings}]}`. `slots` lists every slot id in order.
-      - **Compact items**: `{object, kind, start, length, class?, hasLength?, label?, source?:{ref, slotId, startTime}, effect?, comment?, timecode?, nested?}`. `sources` lists each referenced source once per response as `{mobId, mob, mobName, mobKind, original}`, and `ref` indexes it; indexes are only meaningful within one response. Omitted fields take defaults: `class` is the kind with its first letter upper-cased, `hasLength` is true, and `label` is the source's `mobName`. `effect` and `comment` are omitted when empty, `nested` (a list of item lists) when there is none.
+      - **Compact items**: `{object, kind, start, length, class?, hasLength?, label?, source?:{ref, slotId, startTime}, effect?, comment?, timecode?, nested?, clip?, effects?}`. `sources` lists each referenced source once per response as `{mobId, mob, mobName, mobKind, original}`, and `ref` indexes it; indexes are only meaningful within one response. Omitted fields take defaults: `class` is the kind with its first letter upper-cased, `hasLength` is true, and `label` is the source's `mobName`. `effect` and `comment` are omitted when empty, `nested` (a list of item lists) when there is none. `clip` and `effects` (`[{object, name}]`) are present together, for clips inside effects.
       - The result is written straight to text by `TimelineWriter` with `JsonWriter` (`aaf/rpc/json_writer.hpp`: compact JSON, automatic commas, string escaping, integers of any width), not built as a JSON tree. `Server::handle` splices the text into the response; `Server::call` parses it for callers that want a `Json` value.
       - With `changed` (object ids, typically a ChangeSet's `objects`), only the tracks of the affected slots are returned (`partial: true`). If a change lies outside the mob, the whole timeline is returned (`partial: false`).
     - `timeline.resolve {clip}` returns `{status, links, essence}`.
@@ -604,7 +612,7 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   - `bytes` (`v` in hex).
 
   A round-trip test covers every tag. The TypeScript mirror is `ui/src/lib/rpc.ts`.
-- `labelOf(doc, id)` gives the `Name` property if it is set, else the unique identifier, else the class name.
+- `labelOf(doc, id)` gives the `Name` property if it is set, else the unique identifier, else, for an OperationGroup, its operation definition's label ("Audio Gain"), else the class name.
 
 ### 8.4 UI (`ui/`)
 
@@ -647,6 +655,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - **Ruler**: timecode from the mob's timecode start, fps and drop-frame flag (`timecode.ts`: SMPTE drop-frame formatting and parsing, tested). Ticks are spaced at least 90 px apart, stepping through 1/2/5/10 frames, then 1 s … 1 h.
   - **Drawing**:
     - clips coloured by kind: video, audio, effect, code, and nested for NestedScope or clips of compositions;
+    - **clips inside effects** are drawn as their clip (colour, label, missing source in red) with an effects badge: "fx Audio Gain, Pan" when it fits within the clip less 60 px, else "fx", and none below 40 px. The badge starts 8 px in (clicks nearer the edge trim), after any transition covering the clip's head, as does the label. The badge is filled with the accent colour while one of its effects is selected;
     - fillers as dashed outlines;
     - transitions as orange boxes with an X;
     - markers as diamonds;
@@ -663,7 +672,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - Ctrl+wheel or +/− to zoom around the pointer, and Fit;
     - wheel or Shift+wheel, and a range slider, to scroll;
     - hover tooltips (kind, label, start and length, source reference, comment);
-    - click to select: the object is revealed in the tree and shown in the properties. For source clips the resolved chain appears in the header: mobs, status, and embedded or first locator.
+    - click to select: the object is revealed in the tree and shown in the properties. On a clip inside effects, the body selects the **clip** and the badge selects the outermost **effect** (`selectionTarget`; badge rectangles are recorded while drawing). The item counts as selected when the selection is the item, its clip or any of its effects (`holds`), so toolbar edits act on the whole item. The tooltip adds an "effects:" line. For source clips the resolved chain appears in the header: mobs, status, and embedded or first locator.
 - **Timeline editing** (M7):
   - **Playhead**: click the ruler; Left and Right move it by 1 unit, or 10 with Shift. The ruler shows its timecode.
   - **Selection**: click a track header to select the track; clicking an item selects both it and its track.
@@ -737,10 +746,10 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - They drive the built single-file `index.html` against the real C++ core. `AAF_UI_HTML` selects the page (default `ui/dist/index.html`; CI uses the one the editor embeds), and `AAFTOOL` is the `aaftool` executable.
   - The fixture in `e2e/editor.ts` starts one `aaftool serve` per test and binds `window.aafRpc` to it with `exposeFunction`. It delivers each request's events through `window.__aafEvent` before returning the response, in the same order as the native host. `window.aafHost` is a stub: `openDialog` and `saveDialog` return paths the test sets, and `setTitle` calls are recorded.
   - Tests work on private copies of fixtures in the test output directory.
-  - The init script sets `window.__aafTest`, and `TimelineView` then exposes `window.__aafTimeline` with `tracks()` (the projected rows and items), `itemRect(object)` (an item's rectangle in canvas pixels), and `measure(n)` and `zoom(factor)` for the performance spec. Tests use it to click and drag clips on the canvas and to check results.
+  - The init script sets `window.__aafTest`, and `TimelineView` then exposes `window.__aafTimeline` with `tracks()` (the projected rows and items), `itemRect(object)` (an item's rectangle in canvas pixels), `measure(n)` and `zoom(factor)` for the performance spec, and `show(object, pixels)`, which zooms so an item is `pixels` wide and scrolls it into view. `tracks()` items include `clip` and `effects` (names). Tests use it to click and drag clips on the canvas and to check results.
   - Covered flows:
     - Inspector: open through the Open button (the window title is set); search and select a mob; rename it (panel, dirty marker, history and timeline name update); Ctrl+Z undo and Redo; inline rejection of an invalid integer; Validate reports 0 errors; Save As a copy, which `aaftool validate` accepts and which contains the edit.
-    - Timeline: click-select a clip (the source chain shows); Lift and Undo; split at a playhead set on the ruler with the S key; trim a tail by dragging its edge; add a sound track.
+    - Timeline: click-select a clip (the source chain shows); Lift and Undo; split at a playhead set on the ruler with the S key; trim a tail by dragging its edge; add a sound track; on an Audio Gain clip away from transitions, clicking the body selects the SourceClip (with its source chain) and clicking the badge selects the OperationGroup, labelled "Audio Gain".
   - Browsers: the engines behind each platform's webview. Chromium and WebKit on Linux, WebKit on macOS (as in WKWebView), and Edge on Windows (as in WebView2). The projects are `chromium`, `webkit` and `msedge`.
 
 ## 11. CI/CD (GitHub Actions, frugal)

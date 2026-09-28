@@ -109,8 +109,11 @@ public:
     [[nodiscard]] auto findType(const Auid& id) const -> const TypeDef*;
     [[nodiscard]] auto findProperty(const Auid& id) const -> const PropertyDef*;
     [[nodiscard]] auto findPropertyByPid(std::uint16_t pid) const -> const PropertyDef*;
+    /// Looks up a class by name. A file may rename standard classes in its MetaDictionary, so the baseline name
+    /// also finds the class.
     [[nodiscard]] auto findClassByName(std::string_view name) const -> const ClassDef*;
-    /// Looks up a property by owning class name and property name (not searching superclasses).
+    /// Looks up a property by owning class name and property name (not searching superclasses). The baseline name
+    /// also works when the file renames the property (Avid files call OperationGroup's Operation "OperationDefinition").
     [[nodiscard]] auto findProperty(std::string_view className, std::string_view propertyName) const -> const PropertyDef*;
 
     /// True if `id` is `ancestor` or derives from it.

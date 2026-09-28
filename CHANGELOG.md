@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Timeline
+
+- **Clips inside effects are shown as clips.** A clip wrapped in effects such as Audio Gain, Pan or colour correction is drawn as the clip, with an "fx" badge naming the effects, instead of as a block labelled with the effect. Clicking the clip selects the clip; clicking the badge selects the effect so its parameters can be edited. The tooltip lists the effects.
+- Splitting and trimming such clips keep the effects: both halves of a split keep them, and lengths and source offsets are updated through the effects to the clip. Clips with speed changes or keyframed effect parameters can still be moved, lifted and deleted, but splitting or trimming them is refused with an explanation, because it would change their timing.
+
+### Fixes
+
+- Effect and transition names were blank ("Effect") in Avid files, which call the property that links an effect to its definition "OperationDefinition" rather than "Operation". Property and class lookups now accept the standard name when a file renames it.
+- Splitting failed for Avid effects, whose parameters are stored as a keyed set rather than a list.
+- Effects are labelled with their effect name in the tree and property panel instead of "OperationGroup".
+
 ## 0.2.0
 
 ### Faster on large files

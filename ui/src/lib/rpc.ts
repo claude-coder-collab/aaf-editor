@@ -140,6 +140,11 @@ export interface TimelineItem {
   source?: { mobId: string; slotId: number; startTime: number; mob: number | null; mobName: string; mobKind: string; original: boolean };
   timecode?: { start: number; fps: number; drop: boolean };
   nested?: TimelineItem[][];
+  /// For an effect whose only input is a source clip (possibly through further such effects): that clip. The item
+  /// then carries the clip's label and source.
+  clip?: number;
+  /// The effects around `clip`, from the track inwards.
+  effects?: { object: number; name: string }[];
 }
 
 export interface TimelineTrack {
@@ -214,10 +219,11 @@ declare global {
     __aafSmoke?: { file: string };
     __aafTest?: boolean;
     __aafTimeline?: {
-      tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number }[] }[];
+      tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number; clip?: number; effects?: string[] }[] }[];
       itemRect: (object: number) => { x: number; y: number; width: number; height: number } | null;
       measure: (repeat: number) => { draw: number; pick: number };
       zoom: (factor: number) => void;
+      show: (object: number, pixels: number) => void;
     };
   }
 }

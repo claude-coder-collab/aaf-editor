@@ -430,6 +430,19 @@ auto Projector::buildItem(ObjectId component, std::int64_t start, int depth, std
             {
                 nestedFrom(input);
             }
+            if (item.nested.size() == 1 && item.nested.front().size() == 1)
+            {
+                const auto& inner = item.nested.front().front();
+                const bool clip = inner.kind == ItemKind::sourceClip;
+                if (clip || (inner.kind == ItemKind::operationGroup && inner.clip))
+                {
+                    item.clip = clip ? inner.object : *inner.clip;
+                    item.effects.push_back({ component, item.effect });
+                    item.effects.insert(item.effects.end(), inner.effects.begin(), inner.effects.end());
+                    item.label = inner.label;
+                    item.source = inner.source;
+                }
+            }
             break;
         case ItemKind::essenceGroup:
             item.label = "Essence group";

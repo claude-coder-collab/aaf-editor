@@ -84,3 +84,27 @@ test("adds a sound track", async ({ editor }) => {
   await expect.poll(async () => (await tracks(editor)).length).toBe(before + 1);
   expect((await tracks(editor)).at(-1)!.kind).toBe("sound");
 });
+
+test("shows a clip inside effects as the clip, with its effects on a badge", async ({ editor }) => {
+  const { page } = editor;
+  await editor.open(editor.copy(SAMPLE));
+  await page.locator("select.mobs").selectOption({ label: "PLAYOUT 151630146.Copy.01 — composition" });
+  await expect(page.locator(".timeline .controls strong")).toHaveText("PLAYOUT 151630146.Copy.01");
+  await expect.poll(async () => (await tracks(editor)).some((t) => t.items.some((i) => i.effects?.includes("Audio Gain")))).toBe(true);
+  const wrapped = (await tracks(editor))
+    .flatMap((t) => t.items.filter((i, n) => i.effects?.[0] === "Audio Gain" && i.clip !== undefined && t.items[n - 1]?.kind !== "transition" && t.items[n + 1]?.kind !== "transition"))[0]!;
+  await page.evaluate((id) => window.__aafTimeline!.show(id, 300), wrapped.object);
+  const canvas = (await page.locator(".timeline canvas").boundingBox())!;
+  const box = await clipBox(editor, wrapped.object);
+  expect(box.x).toBeGreaterThanOrEqual(canvas.x + 150);
+  expect(box.y + box.height).toBeLessThanOrEqual(canvas.y + canvas.height);
+
+  await page.mouse.click(box.x + box.width * 0.75, box.y + box.height / 2);
+  await expect(page.locator(".panel .subtitle")).toContainText(`SourceClip · object ${wrapped.clip}`);
+  await expect(page.locator(".timeline .chain")).toBeVisible();
+
+  await page.mouse.click(box.x + 14, box.y + box.height / 2);
+  await expect(page.locator(".panel .subtitle")).toContainText(`OperationGroup · object ${wrapped.object}`);
+  await expect(page.locator(".panel h2")).toHaveText("Audio Gain");
+});
+

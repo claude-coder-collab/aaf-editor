@@ -165,7 +165,18 @@ auto MetaModel::findClassByName(std::string_view name) const -> const ClassDef*
         }
     }
     const auto it = std::ranges::find_if(classes_, [name](const auto& entry) -> auto { return entry.second.name == name; });
-    return it == classes_.end() ? nullptr : &it->second;
+    if (it != classes_.end())
+    {
+        return &it->second;
+    }
+    if (this != &baseline())
+    {
+        if (const auto* standard = baseline().findClassByName(name))
+        {
+            return findClass(standard->id);
+        }
+    }
+    return nullptr;
 }
 
 auto MetaModel::findProperty(std::string_view className, std::string_view propertyName) const -> const PropertyDef*
@@ -181,6 +192,13 @@ auto MetaModel::findProperty(std::string_view className, std::string_view proper
         if (p != nullptr && p->name == propertyName)
         {
             return p;
+        }
+    }
+    if (this != &baseline())
+    {
+        if (const auto* standard = baseline().findProperty(className, propertyName); standard != nullptr && std::ranges::contains(cls->properties, standard->id))
+        {
+            return findProperty(standard->id);
         }
     }
     return nullptr;
