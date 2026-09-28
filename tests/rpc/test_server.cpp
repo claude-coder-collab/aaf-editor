@@ -374,7 +374,7 @@ TEST_CASE("The compact timeline form carries every projected field", "[rpc][time
             const auto& item = items[i];
             const auto& j = json[i];
             CHECK(j["object"] == item.object);
-            CHECK(j["kind"] == timeline::to_string(item.kind));
+            CHECK(j["kind"] == std::string(timeline::to_string(item.kind)));
             CHECK(j["class"] == item.className);
             CHECK(j["start"] == item.start);
             CHECK(j["length"] == item.length);
@@ -390,7 +390,7 @@ TEST_CASE("The compact timeline form carries every projected field", "[rpc][time
                 CHECK(s["mobId"] == item.source->mobId.toString());
                 CHECK(s["mob"] == (item.source->mob ? Json(*item.source->mob) : Json(nullptr)));
                 CHECK(s["mobName"] == item.source->mobName);
-                CHECK(s["mobKind"] == timeline::to_string(item.source->mobKind));
+                CHECK(s["mobKind"] == std::string(timeline::to_string(item.source->mobKind)));
                 CHECK(s["original"] == item.source->original);
                 CHECK(s["slotId"] == item.source->slotId);
                 CHECK(s["startTime"] == item.source->startTime);
