@@ -27,7 +27,6 @@
   let mobs = $state<MobSummary[]>([]);
   let timelines = $state<number[]>([]);
   let activeTimeline = $state<number | null>(null);
-  let timelineVersion = $state(0);
 
   function notify(text: string, kind: "error" | "info" = "error") {
     message = { text, kind };
@@ -94,7 +93,6 @@
 
   async function applyChanges(changes: ChangeSet) {
     if (!client) return;
-    timelineVersion++;
     if (changes.objects.some((id) => mobs.some((m) => m.id === id)) || changes.created.length > 0) {
       mobs = await client.mobs();
       timelines = timelines.filter((t) => mobs.some((m) => m.id === t));
@@ -290,7 +288,7 @@
                 </span>
               {/each}
             </nav>
-            <TimelineView {client} mob={activeTimeline} version={timelineVersion} {selected} {mobs} onselect={(id) => select(id, true)} onerror={(m) => notify(m, m.startsWith("Relinked") ? "info" : "error")} />
+            <TimelineView {client} mob={activeTimeline} {selected} {mobs} onselect={(id) => select(id, true)} onerror={(m) => notify(m, m.startsWith("Relinked") ? "info" : "error")} />
           </div>
         {/if}
         <div class="properties">

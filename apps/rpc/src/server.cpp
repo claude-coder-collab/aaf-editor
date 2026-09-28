@@ -446,9 +446,10 @@ auto timelineJson(const timeline::MobTimeline& t) -> Json
             { "segment", track.segment },
             { "effects", std::move(effects) },
             { "items", std::move(items) },
+            { "warnings", track.warnings },
         });
     }
-    Json j = { { "mob", t.mob }, { "mobId", t.mobId.toString() }, { "name", t.name }, { "kind", std::string(timeline::to_string(t.kind)) }, { "tracks", std::move(tracks) }, { "warnings", t.warnings } };
+    Json j = { { "mob", t.mob }, { "mobId", t.mobId.toString() }, { "name", t.name }, { "kind", std::string(timeline::to_string(t.kind)) }, { "tracks", std::move(tracks) }, { "slots", t.slots }, { "partial", t.partial }, { "warnings", t.warnings } };
     j["timecode"] = t.timecode ? Json{ { "start", t.timecode->start }, { "fps", t.timecode->fps }, { "drop", t.timecode->drop } } : Json(nullptr);
     return j;
 }
@@ -933,8 +934,15 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         {
             return std::unexpected(mob.error());
         }
+        const bool incremental = params.contains("changed") && !params.at("changed").is_null();
+        auto changed = incremental ? param<std::vector<ObjectId>>(params, "changed") : Result<std::vector<ObjectId>>{};
+        if (!changed)
+        {
+            return std::unexpected(changed.error());
+        }
         const timeline::Projector projector(doc);
-        auto t = projector.project(*mob);
+        const auto slots = incremental ? projector.affectedSlots(*mob, *changed) : std::nullopt;
+        auto t = slots ? projector.project(*mob, *slots) : projector.project(*mob);
         if (!t)
         {
             return std::unexpected(t.error());

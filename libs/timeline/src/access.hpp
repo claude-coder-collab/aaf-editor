@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace aaf::timeline::detail
@@ -134,6 +135,36 @@ public:
 
     const Document& doc_;
     const MetaModel& model_;
+};
+
+/// Answers "is this object a `className`?" for many objects, deciding once per distinct class.
+class ClassFilter
+{
+public:
+    ClassFilter(const Document& document, std::string_view className) :
+        doc_(document),
+        target_(document.model().findClassByName(className))
+    {
+    }
+
+    [[nodiscard]] auto operator()(ObjectId id) const -> bool
+    {
+        if (target_ == nullptr || id >= doc_.objectCount())
+        {
+            return false;
+        }
+        const auto& cls = doc_.object(id).classId;
+        if (const auto it = known_.find(cls); it != known_.end())
+        {
+            return it->second;
+        }
+        return known_.emplace(cls, doc_.model().isA(cls, target_->id)).first->second;
+    }
+
+private:
+    const Document& doc_;
+    const ClassDef* target_;
+    mutable std::unordered_map<Auid, bool> known_;
 };
 
 }

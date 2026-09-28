@@ -1,20 +1,22 @@
 <script lang="ts">
-  import type { MobSummary, RpcClient, SourceChain, Timeline, TimelineItem } from "../rpc";
+  import { untrack } from "svelte";
+
+  import type { ChangeSet, MobSummary, RpcClient, SourceChain, Timeline, TimelineItem } from "../rpc";
   import { dragZone, snap } from "../snap";
   import { formatTimecode, nominalFps } from "../timecode";
   import { hitTest, layout, rateValue, RULER_HEIGHT, tickStep, type Layout, type Row } from "../timelineLayout";
+  import { addPending, mergeTimeline, type Pending } from "../timelineMerge";
 
   interface Props {
     client: RpcClient;
     mob: number;
-    version: number;
     selected: number | null;
     mobs: MobSummary[];
     onselect: (id: number) => void;
     onerror: (message: string) => void;
   }
 
-  let { client, mob, version, selected, mobs, onselect, onerror }: Props = $props();
+  let { client, mob, selected, mobs, onselect, onerror }: Props = $props();
 
   const HEADER = 150;
   const SNAP_PIXELS = 8;
@@ -47,17 +49,53 @@
   const editRow = $derived(selectedItemRow ?? selectedRow);
   const sources = $derived(mobs.filter((m) => m.kind === "master" || m.kind === "source"));
 
+  let pending: Pending = null;
+  let fetching = false;
+
+  function invalidate(objects: readonly number[] | null) {
+    pending = addPending(pending, objects);
+    void fetchPending();
+  }
+
+  async function fetchPending() {
+    if (fetching) return;
+    fetching = true;
+    try {
+      while (pending) {
+        const work = pending;
+        pending = null;
+        const id = mob;
+        const base = timeline?.mob === id ? timeline : null;
+        try {
+          const next = await client.timeline(id, work.full || !base ? undefined : [...work.objects]);
+          if (id !== mob) continue;
+          const merged = mergeTimeline(timeline?.mob === id ? timeline : null, next);
+          if (merged) {
+            timeline = merged;
+            error = "";
+          } else {
+            pending = addPending(pending, null);
+          }
+        } catch (e) {
+          error = e instanceof Error ? e.message : String(e);
+        }
+      }
+    } finally {
+      fetching = false;
+    }
+  }
+
   $effect(() => {
-    void version;
-    const id = mob;
-    client
-      .timeline(id)
-      .then((t) => {
-        timeline = t;
-        error = "";
-      })
-      .catch((e: unknown) => (error = e instanceof Error ? e.message : String(e)));
+    void mob;
+    untrack(() => invalidate(null));
   });
+
+  $effect(() =>
+    client.onEvent((method, params) => {
+      if (method === "doc.changed") invalidate((params as { changes: ChangeSet }).changes.objects);
+      else if (method === "doc.opened") invalidate(null);
+    }),
+  );
 
   $effect(() => {
     void mob;

@@ -580,8 +580,7 @@ auto cmdServe(std::span<const std::string_view> args) -> int
         }
         events = nlohmann::json::array();
         const auto response = server.handle(line);
-        const nlohmann::json out = { { "response", response.empty() ? nlohmann::json(nullptr) : nlohmann::json::parse(response) }, { "events", events } };
-        std::cout << out.dump() << '\n'
+        std::cout << R"({"response":)" << (response.empty() ? "null" : response) << R"(,"events":)" << events.dump() << "}\n"
                   << std::flush;
     }
     return 0;

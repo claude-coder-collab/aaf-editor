@@ -157,6 +157,13 @@ auto MetaModel::findPropertyByPid(std::uint16_t pid) const -> const PropertyDef*
 
 auto MetaModel::findClassByName(std::string_view name) const -> const ClassDef*
 {
+    if (const auto indexed = classesByName_.find(name); indexed != classesByName_.end())
+    {
+        if (const auto* cls = findClass(indexed->second); cls != nullptr && cls->name == name)
+        {
+            return cls;
+        }
+    }
     const auto it = std::ranges::find_if(classes_, [name](const auto& entry) -> auto { return entry.second.name == name; });
     return it == classes_.end() ? nullptr : &it->second;
 }
@@ -181,9 +188,8 @@ auto MetaModel::findProperty(std::string_view className, std::string_view proper
 
 auto MetaModel::isA(const Auid& id, const Auid& ancestor) const -> bool
 {
-    std::unordered_set<Auid> seen;
     Auid current = id;
-    while (!current.isNull() && seen.insert(current).second)
+    for (std::size_t steps = 0; !current.isNull() && steps <= classes_.size(); ++steps)
     {
         if (current == ancestor)
         {
@@ -283,6 +289,7 @@ void MetaModel::addClass(ClassDef def, DefinitionSource source)
 {
     const auto id = def.id;
     sources_[id] = source;
+    classesByName_.try_emplace(def.name, id);
     classes_.insert_or_assign(id, std::move(def));
 }
 

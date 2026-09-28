@@ -153,6 +153,7 @@ export interface TimelineTrack {
   segment: number;
   effects: { object: number; name: string }[];
   items: TimelineItem[];
+  warnings: string[];
 }
 
 export interface Timeline {
@@ -160,7 +161,11 @@ export interface Timeline {
   mobId: string;
   name: string;
   kind: string;
+  /// Every track, or only the changed ones when `partial` is set.
   tracks: TimelineTrack[];
+  /// Every slot of the mob, in order.
+  slots: number[];
+  partial: boolean;
   warnings: string[];
   timecode: { start: number; fps: number; drop: boolean } | null;
 }
@@ -265,7 +270,7 @@ export class RpcClient {
   search = (text: string, cls = "", limit = 200) => this.call<SearchHit[]>("search.query", { text, class: cls, limit });
   mobs = () => this.call<MobSummary[]>("timeline.mobs");
   timelineOp = (params: Record<string, unknown>) => this.call<{ changes: ChangeSet; id?: number; count?: number }>("timeline.op", params);
-  timeline = (mob: number) => this.call<Timeline>("timeline.get", { mob });
+  timeline = (mob: number, changed?: number[]) => this.call<Timeline>("timeline.get", changed ? { mob, changed } : { mob });
   resolve = (clip: number) => this.call<SourceChain>("timeline.resolve", { clip });
   extractEssence = (id: number, path: string) => this.call<{ size: number }>("essence.extract", { id, path });
   replaceEssence = (id: number, path: string) => this.call<ChangeSet>("essence.replace", { id, path });

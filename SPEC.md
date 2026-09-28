@@ -239,6 +239,7 @@ This maps CFB to AAF objects. Status: **reading implemented (M2)** in `libs/core
   - **Property definitions**: `Identification`, `Name`, `Type`, `IsOptional`, `LocalIdentification` and `IsUniqueIdentifier`. `Type` may be stored either as AUID data or as a weak reference; both are accepted.
   - **Type definitions** are interpreted per `TypeDefinition*` class.
   - **Merge rule**: file definitions replace baseline fields where both exist, with one exception: the **baseline property type wins**. A conflicting file type is recorded as a load note. This matters because AAF SDK files declare `MemberNames` and `ElementNames` as `aafString` but store NUL-separated string arrays, which is what the baseline type `aafStringArray` describes. Extendible enumerations take the union of their elements. A file PID that differs from a fixed baseline PID is a load warning. Every definition records its source (`baseline`, `file` or `both`).
+- **Lookups**: `findClassByName` uses a name index (first definition of a name wins, and a stale entry falls back to a scan). `isA` walks parents with a step bound (the class count) instead of a visited set, so it allocates nothing.
 - Type categories to support: Integer (1/2/4/8, signed and unsigned), Character, String, Enum, ExtEnum, Record, FixedArray, VarArray, Set, Rename, StrongObjRef, WeakObjRef, Stream, Indirect, Opaque.
 - If a property cannot be decoded (unknown PID and no definition), it is kept as **opaque bytes with its stored form** and written back unchanged.
 
@@ -321,7 +322,10 @@ Later milestones: MobIDs unique; definitions referenced by components exist in t
 
 ## 6. Layer 3: Timeline projection (`libaaftl`)
 
-Status: **projection implemented (M6)** in `libs/timeline/` (namespace `aaf::timeline`, headers `aaf/timeline/{rational,timeline}.hpp`); editing is M7. It is a read-only view derived from the object graph, **never stored separately**. `Projector` builds a MobID index (mobs and EssenceData) on construction, so a new one is constructed after each edit; that takes milliseconds.
+Status: **projection implemented (M6)** in `libs/timeline/` (namespace `aaf::timeline`, headers `aaf/timeline/{rational,timeline}.hpp`); editing is M7. It is a read-only view derived from the object graph, **never stored separately**. `Projector` builds a MobID index (mobs and EssenceData) on construction, so a new one is constructed after each edit (about 20 ms for 66k objects; class membership is decided once per class with `ClassFilter`).
+- **Partial projection**: `project(mob, slots)` projects only the given slots (which must belong to the mob). The result has `partial = true`. Its `slots` lists every slot of the mob in order, `warnings` holds only the projected tracks' warnings (each `Track` carries its own), and `timecode` is still computed from the first timecode track.
+- `affectedSlots(mob, changed)` maps changed objects to the mob's slots by walking parents. Detached objects are skipped, because whatever held them is also among the changes. A change to the mob itself adds no slot. It returns nullopt if any changed object lies outside the mob: clips show data from the mobs they reference, and effects show definitions, so any track could differ.
+- The projection types have defaulted `==`, which tests use to check partial results against full ones.
 
 - **Time**: `Rational` is exact 64-bit arithmetic, always in lowest terms with a positive denominator.
   - `add`, `subtract`, `multiply` and `divide` return `Result` and fail on overflow. The checks are portable: no `__int128` or compiler builtins, because MSVC has neither.
@@ -333,6 +337,7 @@ Status: **projection implemented (M6)** in `libs/timeline/` (namespace `aaf::tim
   - Sort order: top-level first, then by kind, then by name.
 - **Tracks** (`project(mob)`): one per slot, in slot order, with:
   - `slotId`, `name`, `physicalNumber`;
+  - `warnings`: problems met while projecting this track.
   - `kind`: picture, sound, timecode, edgecode, descriptive metadata, data or other. It comes from the segment's DataDefinition weak key, matched against the known SMPTE and legacy AUIDs (listed in `projection.cpp`); an unknown key falls back to the definition's `Name`.
   - `slotKind`: timeline, event or static;
   - `editRate` and `origin`;
@@ -380,7 +385,9 @@ Status: **implemented (M7)** in `aaf/timeline/edit.hpp` (namespace `aaf::timelin
 | `place(slot, position, segment, insert)` | Places a detached segment with the same DataDefinition. Insert cuts at `position` and pushes later material. Overwrite cuts at both ends and removes what lies between. A range overlapping a transition is refused. Placing past the end adds Filler first. |
 | `placeClip(slot, position, sourceMob, sourceSlot, sourceIn, length, insert)` | Creates a SourceClip (DataDefinition from the track; SourceID, SourceMobSlotID, StartTime, Length) and places it. The source slot must exist. |
 | `move(item, toSlot, position, ripple)` | Leaves Filler behind (or closes the gap with `ripple`), then overwrites at the target, which may be another track with the same data kind. Transitions cannot be moved. |
-| `addTrack(mob, picture \| sound, name)` | Adds a TimelineMobSlot:<br>• SlotID = highest + 1;<br>• the edit rate of the mob's first timeline slot;<br>• Origin 0;<br>• PhysicalTrackNumber = count of tracks of that kind + 1;<br>• an empty Sequence referencing the file's Picture or Sound DataDefinition (SMPTE AUID preferred, legacy accepted). |
+
+`place`, `placeClip` and `move` accept a segment whose DataDefinition differs from the track's when both are picture or both are sound. Avid files use the legacy picture and sound definitions, and tracks may use either.
+| `addTrack(mob, picture \| sound, name)` | Adds a TimelineMobSlot:<br>• SlotID = highest + 1;<br>• the edit rate of the mob's first timeline slot;<br>• Origin 0;<br>• PhysicalTrackNumber = count of tracks of that kind + 1;<br>• an empty Sequence referencing the DataDefinition of the mob's existing tracks of that kind, else the file's Picture or Sound DataDefinition (SMPTE AUID preferred, legacy accepted). |
 | `removeTrack(slot)` | Deletes the slot. |
 | `addMarker(mob, position, comment)` | Adds a DescriptiveMarker (Position, Comment, the marker track's DataDefinition, and **DescribedSlots = {first picture track's SlotID}**), in position order. If there is no marker track, it creates an EventMobSlot (PhysicalTrackNumber = existing event slots + 1, the first timeline edit rate) holding a Sequence that references the Descriptive Metadata DataDefinition. Avid does the same, and the OTIO adapter requires both `DescribedSlots` and the event slot's PhysicalTrackNumber. |
 | `relink(find, replace)` | Replaces text in every NetworkLocator `URLString`; returns how many URLs actually changed. |
@@ -565,7 +572,8 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   - `available` lists defined properties that are absent. `types` holds every referenced type descriptor (`{id, name, kind, element?, className?, size?, signed?, count?, fields?, elements?}`), so the UI can build editors without further calls.
   - Timeline (M6):
     - `timeline.mobs` returns the mob summaries.
-    - `timeline.get {mob}` returns `{mob, mobId, name, kind, timecode, warnings, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items}]}`, with each item's fields as in §6 (`nested` is a list of item lists).
+    - `timeline.get {mob, changed?}` returns `{mob, mobId, name, kind, timecode, warnings, slots, partial, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items, warnings}]}`, with each item's fields as in §6 (`nested` is a list of item lists). `slots` lists every slot id in order.
+      - With `changed` (object ids, typically a ChangeSet's `objects`), only the tracks of the affected slots are returned (`partial: true`). If a change lies outside the mob, the whole timeline is returned (`partial: false`).
     - `timeline.resolve {clip}` returns `{status, links, essence}`.
     - `timeline.op {op, …}` (M7) runs a §6.1 operation as one undoable step and returns `{changes, id?, count?}`. Operations:
       - `split {slot, position}` → `id` of the right part;
@@ -654,6 +662,10 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - Keyboard shortcuts act only while the timeline is active (after a click inside it).
   - Errors from refused operations appear in the message bar.
   - After a change, the selection is cleared if the selected object left the document.
+  - **Refreshing**:
+    - `TimelineView` listens for `doc.changed` itself and accumulates the changed objects (`timelineMerge.ts`: `addPending`).
+    - While no fetch is running, it asks `timeline.get` with `changed` and merges the reply into the timeline it shows (`mergeTimeline`: changed tracks replaced, the others kept, order from `slots`).
+    - Changes arriving during a fetch are fetched next. A reply that cannot be merged (a slot the view never saw, or a different mob) triggers a full fetch, as do switching mob and `doc.opened`.
 - **Keyboard**:
   - Ctrl/Cmd+O, S, Shift+S;
   - Z and Shift+Z or Y (except inside text fields);
@@ -700,7 +712,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 - **Corruption**: unit tests cover a bad header, truncation, FAT cycles, directory cycles and 900 deterministic random mutations. `tests/fuzz/fuzz_cfb.cpp` (libFuzzer: open, read every stream, rewrite) and `tests/fuzz/fuzz_document.cpp` (load an AAF document, decode every data property, validate, then save it and require that the output reloads) each run 10 minutes nightly, seeded from the SDK fixtures. The M2 baseline was 16.7k document executions in 5 minutes with no findings; each input is a whole AAF file. The M1 baseline was 1.48 M executions in 5 minutes with no findings.
 - **Performance measurement** (manual, not in CI yet; results and analysis in `docs/performance.md`):
   - `tools/gen_stress_aaf.py OUT [--video 2 --audio 28 --clips 2000 --masters 500 --seed 1]` writes a deterministic synthetic composition with pyaaf2: each track is a sequence of source clips (12–250 frames, about 5% preceded by a filler) referencing a pool of master mobs. The defaults give 30 tracks, 60,000 clips and 26 MB.
-  - `tools/perf_baseline.py AAFTOOL FILE` drives `aaftool serve` and prints the time and response size of doc.open, timeline.mobs, timeline.get of the largest composition, a split in its middle track, the re-projection after it, undo, validate and saveAs.
+  - `tools/perf_baseline.py AAFTOOL FILE` drives `aaftool serve` and prints the time and response size of doc.open, timeline.mobs, timeline.get of the largest composition, a split in its middle track, the full and the changed-only re-projection after it, undo, validate and saveAs.
   - `ui/e2e/perf.spec.ts` runs only when `AAF_PERF_FILE` is set. It measures open-to-timeline, canvas draw and hit-test time at Fit and zoomed in (through `window.__aafTimeline.measure(n)` and `zoom(factor)`), mouse-move round trips and edit-to-redraw. The Playwright bridge copies each response between Node and the browser, so its end-to-end times overstate the native editor's for large responses; the draw and hit-test times are in-page and comparable.
 - **UI unit tests**: Vitest for the frontend logic and the RPC codec.
 - **UI end-to-end tests** (`ui/e2e`, Playwright 1.63, `npm run e2e`):

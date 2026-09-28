@@ -33,6 +33,7 @@ class Core {
   private readonly process: ChildProcessWithoutNullStreams;
   private readonly waiting: ((line: string) => void)[] = [];
   private queue = Promise.resolve();
+  private closed = false;
 
   constructor() {
     this.process = spawn(aaftoolPath(), ["serve"], { stdio: ["pipe", "pipe", "pipe"] });
@@ -40,9 +41,11 @@ class Core {
   }
 
   request(line: string): Promise<{ response: unknown; events: Event[] }> {
+    if (this.closed) return new Promise(() => {});
     const next = this.queue.then(
       () =>
         new Promise<{ response: unknown; events: Event[] }>((done) => {
+          if (this.closed) return;
           this.waiting.push((out) => done(JSON.parse(out)));
           this.process.stdin.write(line.replace(/\n/g, " ") + "\n");
         }),
@@ -52,6 +55,7 @@ class Core {
   }
 
   close(): void {
+    this.closed = true;
     this.process.stdin.end();
     this.process.kill();
   }

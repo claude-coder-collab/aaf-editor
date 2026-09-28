@@ -523,7 +523,17 @@ auto sameDataDefinition(const Access& a, ObjectId x, ObjectId y) -> bool
 {
     const auto kx = a.weakKey(x, "Component", "DataDefinition");
     const auto ky = a.weakKey(y, "Component", "DataDefinition");
-    return kx && ky && *kx == *ky;
+    if (!kx || !ky)
+    {
+        return false;
+    }
+    if (*kx == *ky)
+    {
+        return true;
+    }
+    const Projector projector(a.doc_);
+    const auto kind = projector.trackKindOf(x);
+    return (kind == TrackKind::picture || kind == TrackKind::sound) && kind == projector.trackKindOf(y);
 }
 
 auto findDataDefinition(const Access& a, std::initializer_list<Auid> preferred, std::string_view nameHint) -> std::optional<ObjectId>
@@ -1008,24 +1018,36 @@ auto addTrack(edit::Transaction& tx, ObjectId mob, TrackKind kind, const std::st
     {
         return fail(Errc::invalid_argument, "tracks can only be added to a mob");
     }
+    if (kind != TrackKind::picture && kind != TrackKind::sound)
+    {
+        return fail(Errc::unsupported, "only picture and sound tracks can be added");
+    }
+    const Projector projector(tx.document());
     std::optional<ObjectId> definition;
-    if (kind == TrackKind::picture)
+    for (const auto s : a.children(mob, "Mob", "Slots"))
+    {
+        const auto segment = a.child(s, "MobSlot", "Segment");
+        if (segment && projector.trackKindOf(*segment) == kind)
+        {
+            definition = a.weak(*segment, "Component", "DataDefinition");
+            if (definition)
+            {
+                break;
+            }
+        }
+    }
+    if (!definition && kind == TrackKind::picture)
     {
         definition = findDataDefinition(a, { "01030202-0100-0000-060e-2b3404010101"_auid, "6f3c8ce1-6cef-11d2-807d-006008143e6f"_auid }, "Picture");
     }
-    else if (kind == TrackKind::sound)
+    else if (!definition)
     {
         definition = findDataDefinition(a, { "01030202-0200-0000-060e-2b3404010101"_auid, "78e1ebe1-6cef-11d2-807d-006008143e6f"_auid }, "Sound");
-    }
-    else
-    {
-        return fail(Errc::unsupported, "only picture and sound tracks can be added");
     }
     if (!definition)
     {
         return fail(Errc::not_found, "the file has no suitable data definition");
     }
-    const Projector projector(tx.document());
     std::uint32_t physical = 1;
     for (const auto s : a.children(mob, "Mob", "Slots"))
     {

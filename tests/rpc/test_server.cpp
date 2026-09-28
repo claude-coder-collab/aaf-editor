@@ -285,6 +285,17 @@ TEST_CASE("Timeline operations are available through the RPC API", "[rpc][timeli
     const auto split = c.result("timeline.op", { { "op", "split" }, { "slot", track["slot"] }, { "position", first["start"].get<std::int64_t>() + first["length"].get<std::int64_t>() / 2 } });
     CHECK(split["id"].is_number());
     CHECK_FALSE(split["changes"]["objects"].empty());
+    const auto full = c.result("timeline.get", { { "mob", mob["id"] } });
+    CHECK_FALSE(full["partial"].get<bool>());
+    CHECK(full["slots"].size() == full["tracks"].size());
+    const auto partial = c.result("timeline.get", { { "mob", mob["id"] }, { "changed", split["changes"]["objects"] } });
+    CHECK(partial["partial"].get<bool>());
+    CHECK(partial["slots"] == full["slots"]);
+    REQUIRE(partial["tracks"].size() == 1);
+    CHECK(partial["tracks"][0] == *std::ranges::find_if(full["tracks"], [&](const Json& t) -> bool { return t["slot"] == track["slot"]; }));
+    const auto outside = c.result("timeline.get", { { "mob", mob["id"] }, { "changed", Json::array({ 0 }) } });
+    CHECK_FALSE(outside["partial"].get<bool>());
+    CHECK(c.request("timeline.get", { { "mob", mob["id"] }, { "changed", "all" } })["error"]["code"] == -32000);
     c.result("timeline.op", { { "op", "lift" }, { "item", split["id"] } });
     c.result("timeline.op", { { "op", "trim" }, { "item", first["object"] }, { "edge", "tail" }, { "delta", -1 }, { "ripple", true } });
     const auto added = c.result("timeline.op", { { "op", "addTrack" }, { "mob", mob["id"] }, { "kind", "sound" }, { "name", "Music" } });
