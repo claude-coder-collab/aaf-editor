@@ -381,8 +381,8 @@ TEST_CASE("The compact timeline form carries every projected field", "[rpc][time
             CHECK(j["length"] == item.length);
             CHECK(j["hasLength"] == item.hasLength);
             CHECK(j["label"] == item.label);
-            CHECK(j.value("effect", "") == item.effect);
-            CHECK(j.value("comment", "") == item.comment);
+            CHECK((j.contains("effect") ? j["effect"].get<std::string>() : std::string()) == item.effect);
+            CHECK((j.contains("comment") ? j["comment"].get<std::string>() : std::string()) == item.comment);
             CHECK(j.contains("timecode") == item.timecode.has_value());
             CHECK(j.contains("source") == item.source.has_value());
             if (item.source)
