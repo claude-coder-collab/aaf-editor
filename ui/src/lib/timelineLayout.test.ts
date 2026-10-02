@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Timeline, TimelineItem, TimelineTrack } from "./rpc";
-import { badgeText, channelFormat, hitTest, holds, layout, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange } from "./timelineLayout";
+import { badgeText, channelFormat, hitTest, renderedLabel, holds, layout, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange } from "./timelineLayout";
 
 function item(object: number, kind: string, start: number, length: number): TimelineItem {
   return { object, kind, class: kind, start, length, hasLength: true, label: `item ${object}` };
@@ -140,5 +140,15 @@ describe("channelFormat", () => {
     expect(channelFormat(6)).toBe("5.1");
     expect(channelFormat(8)).toBe("7.1");
     expect(channelFormat(4)).toBe("4 ch");
+  });
+});
+
+describe("renderedLabel", () => {
+  it("names each kind of rendered audio", () => {
+    expect(renderedLabel(undefined)).toBe("");
+    expect(renderedLabel("fadeIn")).toBe("Fade in");
+    expect(renderedLabel("crossfade")).toBe("Crossfade");
+    expect(renderedLabel("seam")).toBe("Sample-accurate edit");
+    expect(renderedLabel("region")).toBe("Rendered audio");
   });
 });

@@ -17,7 +17,6 @@ namespace
 {
 
 constexpr std::string_view kFrameAligned = "protools/multichannel_frame_aligned.aaf";
-constexpr std::string_view kSampleAccurate = "protools/multichannel_wav.aaf";
 constexpr std::string_view kSplitMono = "protools/split_mono_wav.aaf";
 
 auto openSession(std::string_view file) -> edit::Session
@@ -160,24 +159,24 @@ TEST_CASE("Splitting a multichannel clip splits every channel", "[timeline][mult
 
 TEST_CASE("Trimming a multichannel clip trims every channel", "[timeline][multichannel][edit]")
 {
-    auto session = openSession(kSampleAccurate);
+    auto session = openSession(kFrameAligned);
     const auto& doc = session.document();
-    const auto stereo = clips(track(composition(doc), "stereo"));
-    const auto target = *std::ranges::find_if(stereo, [](const Item& i) { return i.length == 2; });
+    const auto target = clips(track(composition(doc), "7.1")).front();
+    REQUIRE(target.length == 7);
 
-    REQUIRE(session.execute("trim", [&](edit::Transaction& tx) { return ops::trim(tx, target.object, ops::Edge::tail, -1, true); }));
+    REQUIRE(session.execute("trim", [&](edit::Transaction& tx) { return ops::trim(tx, target.object, ops::Edge::tail, -2, true); }));
     CHECK(errorCount(doc) == 0);
-    CHECK(integer(doc, target.object, "Component", "Length") == 1);
+    CHECK(integer(doc, target.object, "Component", "Length") == 5);
     for (const auto channel : target.channels)
     {
-        CHECK(integer(doc, channel, "Component", "Length") == 1);
+        CHECK(integer(doc, channel, "Component", "Length") == 5);
     }
 
-    REQUIRE(session.execute("head", [&](edit::Transaction& tx) { return ops::trim(tx, target.object, ops::Edge::head, -1, true); }));
+    REQUIRE(session.execute("head", [&](edit::Transaction& tx) { return ops::trim(tx, target.object, ops::Edge::head, 1, false); }));
     CHECK(errorCount(doc) == 0);
     for (const auto channel : target.channels)
     {
-        CHECK(integer(doc, channel, "Component", "Length") == 2);
+        CHECK(integer(doc, channel, "Component", "Length") == 4);
     }
 }
 

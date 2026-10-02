@@ -123,3 +123,18 @@ test("shows multichannel clips as one clip with their format", async ({ editor }
   await expect(page.locator(".panel .subtitle")).toContainText(`OperationGroup · object ${clip.object}`);
   await expect(page.locator(".timeline .chain")).toContainText("7.1_01-01.L");
 });
+
+test("lifting a rendered crossfade replaces it with a cut and says so", async ({ editor }) => {
+  const { page } = editor;
+  await editor.open(editor.copy("protools/multichannel_frame_aligned.aaf"));
+  await expect.poll(async () => (await tracks(editor)).some((t) => t.items.some((i) => i.rendered === "crossfade"))).toBe(true);
+  const track = (await tracks(editor)).find((t) => t.kind === "sound" && !t.channels && t.items.some((i) => i.rendered === "crossfade"))!;
+  const fade = track.items.find((i) => i.rendered === "crossfade")!;
+  await page.evaluate(() => window.__aafTimeline!.zoom(8));
+  await page.evaluate((id) => window.__aafTimeline!.show(id, 300), fade.object);
+  const box = await clipBox(editor, fade.object);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.getByRole("button", { name: "Lift" }).click();
+  await expect(page.locator(".message.info")).toContainText("Replaced a rendered crossfade with a cut.");
+  await expect.poll(async () => (await tracks(editor)).find((t) => t.slot === track.slot)!.items.some((i) => i.rendered)).toBe(false);
+});

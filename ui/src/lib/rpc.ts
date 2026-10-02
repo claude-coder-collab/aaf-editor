@@ -174,6 +174,8 @@ export interface TimelineItem {
   effects?: { object: number; name: string }[];
   /// Number of audio channels of a multichannel clip.
   channels?: number;
+  /// Audio Pro Tools rendered for Media Composer: a fade, crossfade or sample-accurate edit frame, or a run of them.
+  rendered?: "fadeIn" | "fadeOut" | "crossfade" | "seam" | "region";
 }
 
 export interface TimelineTrack {
@@ -250,7 +252,7 @@ declare global {
     __aafSmoke?: { file: string };
     __aafTest?: boolean;
     __aafTimeline?: {
-      tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number; clip?: number; effects?: string[]; channels?: number }[]; channels?: number }[];
+      tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number; clip?: number; effects?: string[]; channels?: number; rendered?: string }[]; channels?: number }[];
       itemRect: (object: number) => { x: number; y: number; width: number; height: number } | null;
       measure: (repeat: number) => { draw: number; pick: number };
       zoom: (factor: number) => void;
@@ -311,7 +313,7 @@ export class RpcClient {
   history = () => this.call<{ items: string[]; position: number }>("edit.history");
   search = (text: string, cls = "", limit = 200) => this.call<SearchHit[]>("search.query", { text, class: cls, limit });
   mobs = () => this.call<MobSummary[]>("timeline.mobs");
-  timelineOp = (params: Record<string, unknown>) => this.call<{ changes: ChangeSet; id?: number; count?: number }>("timeline.op", params);
+  timelineOp = (params: Record<string, unknown>) => this.call<{ changes: ChangeSet; id?: number; count?: number; warnings?: string[] }>("timeline.op", params);
   timeline = async (mob: number, changed?: number[]) => expandTimeline(await this.call<WireTimeline>("timeline.get", changed ? { mob, changed } : { mob }));
   resolve = (clip: number) => this.call<SourceChain>("timeline.resolve", { clip });
   extractEssence = (id: number, path: string) => this.call<{ size: number }>("essence.extract", { id, path });

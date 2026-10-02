@@ -154,6 +154,24 @@ export function channelFormat(channels: number | undefined): string {
   }
 }
 
+/// Label and description of rendered audio, for drawing and tooltips.
+export function renderedLabel(rendered: TimelineItem["rendered"]): string {
+  switch (rendered) {
+    case "fadeIn":
+      return "Fade in";
+    case "fadeOut":
+      return "Fade out";
+    case "crossfade":
+      return "Crossfade";
+    case "seam":
+      return "Sample-accurate edit";
+    case "region":
+      return "Rendered audio";
+    default:
+      return "";
+  }
+}
+
 export function badgeText(item: TimelineItem, room: number, measure: (text: string) => number): string | null {
   if (!item.effects?.length) return null;
   const names = `fx ${item.effects.map((e) => e.name || "effect").join(", ")}`;

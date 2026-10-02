@@ -4,7 +4,7 @@
   import type { ChangeSet, MobSummary, RpcClient, SourceChain, Timeline, TimelineItem } from "../rpc";
   import { dragZone, snap } from "../snap";
   import { formatTimecode, nominalFps } from "../timecode";
-  import { badgeText, channelFormat, hitTest, holds, layout, rateValue, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
+  import { badgeText, channelFormat, hitTest, renderedLabel, holds, layout, rateValue, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
   import { addPending, mergeTimeline, type Pending } from "../timelineMerge";
 
   interface Props {
@@ -14,9 +14,10 @@
     mobs: MobSummary[];
     onselect: (id: number) => void;
     onerror: (message: string) => void;
+    onwarning: (message: string) => void;
   }
 
-  let { client, mob, selected, mobs, onselect, onerror }: Props = $props();
+  let { client, mob, selected, mobs, onselect, onerror, onwarning }: Props = $props();
 
   const HEADER = 150;
   const SNAP_PIXELS = 8;
@@ -149,6 +150,41 @@
     return kind === "sound" ? c["--tl-audio"] : c["--tl-video"];
   }
 
+  /// Rendered audio over its clip: a ramp for fades, a shaded overlap for crossfades, hatching for seams and regions.
+  function drawRendered(g: CanvasRenderingContext2D, kind: NonNullable<TimelineItem["rendered"]>, left: number, top: number, w: number, h: number) {
+    g.save();
+    g.beginPath();
+    g.rect(left, top, w, h);
+    g.clip();
+    g.fillStyle = "rgb(0 0 0 / 0.35)";
+    g.beginPath();
+    if (kind === "fadeIn") {
+      g.moveTo(left, top);
+      g.lineTo(left + w, top);
+      g.lineTo(left, top + h);
+    } else if (kind === "fadeOut") {
+      g.moveTo(left, top);
+      g.lineTo(left + w, top);
+      g.lineTo(left + w, top + h);
+    } else if (kind === "crossfade") {
+      g.moveTo(left, top);
+      g.lineTo(left + w, top);
+      g.lineTo(left + w / 2, top + h / 2);
+      g.moveTo(left, top + h);
+      g.lineTo(left + w, top + h);
+      g.lineTo(left + w / 2, top + h / 2);
+    } else {
+      for (let x = left - h; x < left + w; x += 6) {
+        g.moveTo(x, top + h);
+        g.lineTo(x + h, top);
+        g.lineTo(x + h + 2, top);
+        g.lineTo(x + 2, top + h);
+      }
+    }
+    g.fill();
+    g.restore();
+  }
+
   function editPoints(): number[] {
     if (!view) return [];
     const points = [playhead];
@@ -246,6 +282,7 @@
           g.strokeRect(left + 0.5, top + 0.5, w - 1, h - 1);
           g.setLineDash([]);
         }
+        if (item.rendered) drawRendered(g, item.rendered, left, top, w, h);
         if (isSelected) {
           g.strokeStyle = accent;
           g.lineWidth = 2;
@@ -289,7 +326,7 @@
           g.rect(left + 4, top, textRight - left - 4, h);
           g.clip();
           g.fillStyle = "#fff";
-          g.fillText(item.label, textLeft, top + h / 2);
+          g.fillText(renderedLabel(item.rendered) || item.label, textLeft, top + h / 2);
           g.restore();
         }
       }
@@ -387,7 +424,7 @@
   $effect(() => {
     if (!window.__aafTest) return;
     window.__aafTimeline = {
-      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, channels: r.track.channels, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length, clip: i.clip, effects: i.effects?.map((e) => e.name), channels: i.channels })) })) ?? [],
+      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, channels: r.track.channels, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length, clip: i.clip, effects: i.effects?.map((e) => e.name), channels: i.channels, rendered: i.rendered })) })) ?? [],
       itemRect: (object: number) => {
         const row = view?.rows.find((r) => r.track.items.some((i) => i.object === object));
         const item = row?.track.items.find((i) => i.object === object);
@@ -416,7 +453,9 @@
 
   async function op(params: Record<string, unknown>) {
     try {
-      return await client.timelineOp(params);
+      const result = await client.timelineOp(params);
+      if (result.warnings?.length) onwarning(result.warnings.join(" "));
+      return result;
     } catch (e) {
       onerror(e instanceof Error ? e.message : String(e));
       return null;
@@ -590,6 +629,7 @@
     const lines = [`${rowLabel} · ${item.clip !== undefined ? "SourceClip" : item.class}: ${item.label}`, `start ${item.start}, length ${item.hasLength ? item.length : "—"}`];
     if (item.effects?.length) lines.push(`effects: ${item.effects.map((e) => e.name || "effect").join(", ")}`);
     if (item.channels) lines.push(`channels: ${channelFormat(item.channels)}`);
+    if (item.rendered) lines.push(`rendered by Pro Tools: ${renderedLabel(item.rendered).toLowerCase()}${item.rendered === "region" ? " (cannot be edited)" : " (Lift replaces it with a cut)"}`);
     if (item.source) {
       lines.push(item.source.original ? "original source" : `${item.source.mob === null ? "MISSING " : ""}${item.source.mobKind} mob, slot ${item.source.slotId}, from ${item.source.startTime}`);
     }

@@ -15,6 +15,11 @@ namespace
 
 using detail::Access;
 using detail::ClassFilter;
+using detail::classifyRenderedRoles;
+using detail::RenderedName;
+using detail::renderedName;
+using detail::RenderedProbe;
+using detail::writtenByProTools;
 
 constexpr int kMaxDepth = 16;
 constexpr std::size_t kMaxChain = 64;
@@ -197,7 +202,8 @@ auto to_string(ChainStatus status) noexcept -> std::string_view
 }
 
 Projector::Projector(const Document& document) :
-    doc_(document)
+    doc_(document),
+    proTools_(writtenByProTools(document))
 {
     const Access a(doc_);
     const ClassFilter mobs(doc_, "Mob");
@@ -362,6 +368,26 @@ auto Projector::buildSequence(ObjectId segment, int depth, std::vector<std::stri
         cursor += length;
     }
     return items;
+}
+
+auto to_string(Rendered rendered) noexcept -> std::string_view
+{
+    switch (rendered)
+    {
+        case Rendered::none:
+            return "none";
+        case Rendered::fadeIn:
+            return "fadeIn";
+        case Rendered::fadeOut:
+            return "fadeOut";
+        case Rendered::crossfade:
+            return "crossfade";
+        case Rendered::seam:
+            return "seam";
+        case Rendered::region:
+            return "region";
+    }
+    return "none";
 }
 
 auto channelFormatName(std::uint32_t channels) -> std::string
@@ -732,6 +758,7 @@ auto Projector::buildTrack(ObjectId slot) const -> Track
         content = inputs.front();
     }
     track.items = buildSequence(content, 0, track.warnings);
+    classifyRendered(track.items);
     const auto declared = a.integer(*segment, "Component", "Length");
     std::int64_t end = 0;
     for (const auto& item : track.items)
@@ -748,6 +775,27 @@ auto Projector::buildTrack(ObjectId slot) const -> Track
         }
     }
     return track;
+}
+
+void Projector::classifyRendered(std::vector<Item>& items) const
+{
+    if (!proTools_)
+    {
+        return;
+    }
+    std::vector<RenderedProbe> probes;
+    probes.reserve(items.size());
+    for (const auto& i : items)
+    {
+        const bool clip = (i.kind == ItemKind::sourceClip || i.clip.has_value()) && i.source.has_value();
+        const auto name = clip && i.source ? renderedName(i.source->mobName) : RenderedName::none;
+        probes.push_back({ name, clip, i.start, i.length });
+    }
+    const auto roles = classifyRenderedRoles(probes);
+    for (std::size_t n = 0; n < items.size(); ++n)
+    {
+        items[n].rendered = roles[n];
+    }
 }
 
 auto Projector::resolve(ObjectId target) const -> Result<SourceChain>

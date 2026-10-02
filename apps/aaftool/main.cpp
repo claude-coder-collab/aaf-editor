@@ -465,6 +465,10 @@ auto itemJson(const aaf::timeline::Item& item) -> nlohmann::ordered_json
     {
         j["channels"] = item.channels;
     }
+    if (item.rendered != aaf::timeline::Rendered::none)
+    {
+        j["rendered"] = aaf::timeline::to_string(item.rendered);
+    }
     if (!item.nested.empty())
     {
         j["nested"] = nlohmann::ordered_json::array();
@@ -577,7 +581,11 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
             {
                 effects += std::format("{}{}", effects.empty() ? "  [fx " : ", ", effect.name.empty() ? "effect" : effect.name);
             }
-            const auto channels = item.channels.empty() ? std::string{} : std::format(" ({} ch)", item.channels.size());
+            auto channels = item.channels.empty() ? std::string{} : std::format(" ({} ch)", item.channels.size());
+            if (item.rendered != aaf::timeline::Rendered::none)
+            {
+                channels += std::format(" <rendered {}>", aaf::timeline::to_string(item.rendered));
+            }
             std::println("    {:>8} +{:<6} {:<14} {}{}{}", item.start, item.length, aaf::timeline::to_string(item.kind), item.label, channels, effects.empty() ? "" : effects + "]");
         }
     }

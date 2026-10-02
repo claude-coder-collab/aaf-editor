@@ -288,7 +288,7 @@
                 </span>
               {/each}
             </nav>
-            <TimelineView {client} mob={activeTimeline} {selected} {mobs} onselect={(id) => select(id, true)} onerror={(m) => notify(m, m.startsWith("Relinked") ? "info" : "error")} />
+            <TimelineView {client} mob={activeTimeline} {selected} {mobs} onselect={(id) => select(id, true)} onerror={(m) => notify(m, m.startsWith("Relinked") ? "info" : "error")} onwarning={(m) => notify(m, "info")} />
           </div>
         {/if}
         <div class="properties">

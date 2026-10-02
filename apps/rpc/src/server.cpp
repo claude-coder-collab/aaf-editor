@@ -593,6 +593,10 @@ private:
         {
             w_.key("channels").value(item.channels.size());
         }
+        if (item.rendered != timeline::Rendered::none)
+        {
+            w_.key("rendered").value(timeline::to_string(item.rendered));
+        }
         if (!item.nested.empty())
         {
             w_.key("nested").beginArray();
@@ -1304,6 +1308,8 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         auto id = [&](const char* key) -> Result<ObjectId> { return objectParam(key); };
         auto integer = [&](const char* key) -> Result<std::int64_t> { return param<std::int64_t>(params, key); };
         Json extra = Json::object();
+        std::vector<std::string> warnings;
+        auto* notes = &warnings;
         edit::Session::Command command;
         std::string description;
         if (*op == "split")
@@ -1334,7 +1340,17 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             }
             description = *op == "lift" ? "Lift" : "Ripple delete";
             const bool ripple = *op == "rippleDelete";
-            command = [item = *item, ripple](edit::Transaction& tx) -> Result<void> { return ripple ? timeline::ops::rippleDelete(tx, item) : timeline::ops::lift(tx, item); };
+            command = [item = *item, ripple, notes](edit::Transaction& tx) -> Result<void> { return ripple ? timeline::ops::rippleDelete(tx, item, notes) : timeline::ops::lift(tx, item, notes); };
+        }
+        else if (*op == "removeFade")
+        {
+            auto item = id("item");
+            if (!item)
+            {
+                return std::unexpected(item.error());
+            }
+            description = "Remove fade";
+            command = [item = *item, notes](edit::Transaction& tx) -> Result<void> { return timeline::ops::removeFade(tx, item, notes); };
         }
         else if (*op == "trim")
         {
@@ -1348,7 +1364,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             }
             description = *ripple ? "Ripple trim" : "Trim";
             const auto side = *edge == "head" ? timeline::ops::Edge::head : timeline::ops::Edge::tail;
-            command = [item = *item, side, delta = *delta, ripple = *ripple](edit::Transaction& tx) -> Result<void> { return timeline::ops::trim(tx, item, side, delta, ripple); };
+            command = [item = *item, side, delta = *delta, ripple = *ripple, notes](edit::Transaction& tx) -> Result<void> { return timeline::ops::trim(tx, item, side, delta, ripple, notes); };
         }
         else if (*op == "move")
         {
@@ -1361,7 +1377,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
                 return invalid("move needs item, toSlot and position");
             }
             description = "Move";
-            command = [item = *item, slot = *slot, position = *position, ripple = *ripple](edit::Transaction& tx) -> Result<void> { return timeline::ops::move(tx, item, slot, position, ripple); };
+            command = [item = *item, slot = *slot, position = *position, ripple = *ripple, notes](edit::Transaction& tx) -> Result<void> { return timeline::ops::move(tx, item, slot, position, ripple, notes); };
         }
         else if (*op == "insertClip" || *op == "overwriteClip")
         {
@@ -1467,6 +1483,10 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             return changes;
         }
         extra["changes"] = std::move(*changes);
+        if (!warnings.empty())
+        {
+            extra["warnings"] = warnings;
+        }
         return extra;
     }
     if (method == "essence.extract" || method == "essence.replace")

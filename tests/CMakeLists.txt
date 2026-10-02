@@ -27,6 +27,7 @@ add_executable(aaf_tests
     rpc/test_server.cpp
     timeline/test_edit_ops.cpp
     timeline/test_multichannel.cpp
+    timeline/test_rendered.cpp
     timeline/test_timeline.cpp
     support/fixtures.cpp
 )

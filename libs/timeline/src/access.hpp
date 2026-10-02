@@ -2,6 +2,9 @@
 
 #include <aaf/core/document.hpp>
 #include <aaf/timeline/rational.hpp>
+#include <aaf/timeline/timeline.hpp>
+
+#include <span>
 
 #include <limits>
 #include <optional>
@@ -195,6 +198,89 @@ public:
     const Document& doc_;
     const MetaModel& model_;
 };
+
+/// True if any Identification in the file names Pro Tools as the application that wrote or modified it.
+[[nodiscard]] inline auto writtenByProTools(const Document& doc) -> bool
+{
+    const Access a(doc);
+    for (std::size_t i = 0; i < doc.objectCount(); ++i)
+    {
+        if (a.isA(i, "Identification"))
+        {
+            const auto product = a.string(i, "Identification", "ProductName");
+            if (product.contains("ProTools") || product.contains("Pro Tools"))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+enum class RenderedName : std::uint8_t {
+    none,
+    fade,
+    seam,
+};
+
+/// Whether a mob name is one Pro Tools gives rendered audio: "Fade " (fades and crossfades) or
+/// "Sample accurate edit" (the frame around a cut that is not frame-aligned).
+[[nodiscard]] inline auto renderedName(std::string_view name) -> RenderedName
+{
+    while (!name.empty() && name.back() == ' ')
+    {
+        name.remove_suffix(1);
+    }
+    if (name == "Fade")
+    {
+        return RenderedName::fade;
+    }
+    return name == "Sample accurate edit" ? RenderedName::seam : RenderedName::none;
+}
+
+/// One segment of a track, as far as rendered-audio classification needs.
+struct RenderedProbe
+{
+    RenderedName name = RenderedName::none;
+    /// A clip (possibly inside effects, or multichannel) with a source.
+    bool clip = false;
+    std::int64_t start = 0;
+    std::int64_t length = 0;
+};
+
+/// The `Rendered` role of each segment (see `Rendered`).
+[[nodiscard]] inline auto classifyRenderedRoles(std::span<const RenderedProbe> probes) -> std::vector<Rendered>
+{
+    std::vector<Rendered> roles(probes.size(), Rendered::none);
+    const auto ordinary = [&](std::size_t n) -> bool { return probes[n].clip && probes[n].name == RenderedName::none; };
+    for (std::size_t n = 0; n < probes.size(); ++n)
+    {
+        const auto& p = probes[n];
+        if (!p.clip || p.name == RenderedName::none)
+        {
+            continue;
+        }
+        const bool before = n > 0 && ordinary(n - 1) && probes[n - 1].start + probes[n - 1].length == p.start;
+        const bool after = n + 1 < probes.size() && ordinary(n + 1) && p.start + p.length == probes[n + 1].start;
+        if (!before && !after)
+        {
+            roles[n] = Rendered::region;
+        }
+        else if (p.name == RenderedName::seam)
+        {
+            roles[n] = Rendered::seam;
+        }
+        else if (before && after)
+        {
+            roles[n] = Rendered::crossfade;
+        }
+        else
+        {
+            roles[n] = after ? Rendered::fadeIn : Rendered::fadeOut;
+        }
+    }
+    return roles;
+}
 
 /// Answers "is this object a `className`?" for many objects, deciding once per distinct class.
 class ClassFilter
