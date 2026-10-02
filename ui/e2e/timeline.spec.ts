@@ -111,8 +111,8 @@ test("shows a clip inside effects as the clip, with its effects on a badge", asy
 test("shows multichannel clips as one clip with their format", async ({ editor }) => {
   const { page } = editor;
   await editor.open(editor.copy("protools/multichannel_frame_aligned.aaf"));
-  await expect.poll(async () => (await tracks(editor)).map((t) => t.channels ?? 0)).toEqual([0, 2, 6, 8]);
-  const surround = (await tracks(editor))[3]!;
+  await expect.poll(async () => (await tracks(editor)).filter((t) => t.kind === "sound").map((t) => t.channels ?? 0)).toEqual([0, 2, 6, 8]);
+  const surround = (await tracks(editor)).find((t) => t.channels === 8)!;
   const clip = surround.items.find((i) => i.channels === 8)!;
   expect(clip.effects ?? []).toEqual([]);
   const box = await clipBox(editor, clip.object);
@@ -121,5 +121,5 @@ test("shows multichannel clips as one clip with their format", async ({ editor }
   await expect(page.locator(".timeline .chain")).toContainText("7.1_01-01.L");
 
   await page.keyboard.press("s");
-  await expect.poll(async () => (await tracks(editor))[3]!.items.filter((i) => i.channels === 8).length).toBe(clip.length > 1 ? 2 : 1);
+  await expect.poll(async () => (await tracks(editor)).find((t) => t.channels === 8)!.items.filter((i) => i.channels === 8).length).toBe(clip.length > 1 ? 2 : 1);
 });
