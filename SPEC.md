@@ -281,6 +281,19 @@ Decoding (`decodeValue(model, type, bytes, bigEndian)`):
 
 `MobId::toString()` produces `urn:smpte:umid:…` using the same algorithm as pyaaf2, including its special case for half-swapped material numbers.
 
+**SMPTE labels** (`aaf/core/labels.hpp`): many AUID values are SMPTE Universal Labels from the SMPTE Labels register (ST 400), for example compression schemes, essence containers, operational patterns, channel assignments and the standard data definitions. They are not objects in the file, so they are named from a built-in table.
+
+- **Source**: the published register (`https://registry.smpte-ra.org/view/published/Labels.xml`, BSD 3-Clause; the licence is reproduced in `NOTICE` and `model/NOTICE`).
+  - `tools/gen_labels.py json [--xml FILE]` writes `model/smpte_labels.json`: the register version, then one label per line as `{ul, name, deprecated, node}`. Whitespace in names is collapsed.
+  - `tools/gen_labels.py cpp` writes `libs/core/src/generated/smpte_labels.cpp`. Both outputs are committed, and CI runs `gen_labels.py check`.
+  - Updating to a newer register is: run `json` (it downloads the register), then `cpp`, and review the diff.
+- **Form**: AAF stores a UL as an AUID with the halves swapped: UL bytes 8-15 become Data1-Data3, and bytes 0-7 become Data4. `isSmpteUl` checks that Data4 starts `06 0e 2b 34`.
+- **Matching ignores the UL version byte** (UL byte 7, the last byte of Data4), as SMPTE requires. The table is sorted by stored AUID bytes with that byte zeroed. Where labels differ only in that byte, the generator keeps the one that is not deprecated, then the one with the highest version.
+- The table is a `const` array (not `constexpr`): each entry's `_auid` literal is then evaluated on its own, which stays within the compilers' constant-evaluation step limits.
+- `findSmpteLabel(auid)` binary-searches the table and returns `{id, name, deprecated, node}` or nullptr.
+- `smpteLabelFamily(auid)` lists the leaf labels sharing the registry designator (version ignored) and the first four item bytes, for example every operational pattern (`0d010201`, 137), every picture coding (`04010202`, 668) or every essence container (`0d010301`, 2,340), in register order.
+- AAF-specific identifiers that are not in the register, and private labels such as Avid's, have no name.
+
 ### 5.5 Object graph
 
 - `Document` owns the source `cfb::Container` and every `Object`. Each object has:
@@ -467,7 +480,7 @@ Status: **implemented (M4)** in `libs/edit/` (namespace `aaf::edit`, headers `aa
   | `PropertyDefinition.Type` | TypeDefinition | `MetaDefinition.Identification` |
   | `InterchangeObject.Generation` | Identification | `Identification.GenerationAUID` |
 
-  Properties are looked up by class and name through the merged model, so file-specific names (for example Avid's `LinkedTrackID`) work. Not yet covered: `DescriptiveMarker.DescribedSlots` (a set of slot IDs) and the SMPTE label AUIDs (compression, operational pattern, essence containers, channel assignment), which name well-known labels rather than objects.
+  Properties are looked up by class and name through the merged model, so file-specific names (for example Avid's `LinkedTrackID`) work. Not yet covered: `DescriptiveMarker.DescribedSlots` (a set of slot IDs). AUIDs that are SMPTE labels (compression, operational pattern, essence containers, channel assignment) name well-known labels rather than objects, and are named instead (§5.4).
   - **`ReferenceIndex(doc)`** is built in one pass over attached objects. It is a snapshot and must be rebuilt after a change.
     - Keys are byte strings (scope, key PID, identifier bytes), so lookups need no formatting. Class membership is computed once per class as a bit mask.
     - `resolve(id, pid)` gives `{status, target, builtinName}`. The status is `resolved`, `null` (the null MobID or AUID; for `SourceMobSlotID`, when `SourceID` is null), `external` (no object here has the identifier, which is legitimate: the target may be in another file) or `builtin` (a `PropertyDefinition.Type` naming a baseline type that the file does not store).
@@ -592,7 +605,8 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   | `model.subclasses` | `{class}` → the concrete subclasses |
   | `edit.undo`, `edit.redo` | → change set |
   | `edit.history` | → `{items, position}` |
-  | `search.query` | `{text?, class?, limit=200}` → `[{id, class, label}]`. Matches the label or any string, AUID or MobID data value, case-insensitively, among attached objects. |
+  | `search.query` | `{text?, class?, limit=200}` → `[{id, class, label}]`. Matches the label or any string, AUID or MobID data value, or the SMPTE label name of an AUID value, case-insensitively, among attached objects. |
+  | `labels.family` | `{auid}` → `[{auid, name, deprecated}]`, the label's family (`smpteLabelFamily`). Needs no open document. |
   | `essence.extract` | `{id, path}` → `{size}` |
   | `essence.replace` | `{id, path}` → change set (file-backed) |
 
@@ -632,8 +646,8 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
 - **Tagged values** (`toJson` and `valueFromJson`): `{"t":…}` with one of these tags:
   - `null`; `bool`;
   - `int` and `uint` (decimal **strings**);
-  - `string`, `auid`, `mobid` (the URN);
-  - `enum` (`v` as a string, plus `name`) and `extenum` (`v` as an AUID, plus `name`);
+  - `string`, `auid` (plus `name`, only when the AUID is a registered SMPTE label), `mobid` (the URN);
+  - `enum` (`v` as a string, plus `name`) and `extenum` (`v` as an AUID, plus `name`: the model's element name, else the SMPTE label name, else empty);
   - `record` (`fields:[{name, value}]`) and `array` (`items`);
   - `indirect` (`type`, `value`) and `opaque` (`type`, `bytes` in hex);
   - `bytes` (`v` in hex).
@@ -665,6 +679,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - dropdowns for enumerations and extendible enumerations, showing undefined values explicitly;
     - text inputs for integers (range-checked) and strings;
     - monospace inputs with a copy button for AUIDs and MobIDs;
+    - for an AUID that is a SMPTE label, its name below the input and a "Change…" button. This opens a text input whose datalist holds the label's family (`labels.family`); typing filters it, and picking a name sets that label. `ValueEditor` takes an optional `labelFamily` loader and passes it to nested record and array editors, so labels inside sets such as `Header.EssenceContainers` work too;
     - nested editors for records;
     - element editing and add/remove for variable arrays;
     - read-only display for opaque, indirect and undecodable values.
@@ -875,6 +890,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 
 | 2026-09-28 | UI end-to-end tests run the real page in Playwright against `aaftool serve` rather than in the native webviews, which cannot be automated on all three platforms. The engines are matched per platform (§10) |
 | 2026-10-02 | Identifiers that point at other objects (SourceID, SourceMobSlotID, Parameter.Definition and others, §7) are resolved for display and editing but stay data properties on save; turning them into weak references would break interchange. A target missing from the file is shown neutrally, not as an error, because references to other files are legitimate |
+| 2026-10-02 | SMPTE label names come from the published SMPTE Labels register, generated into a committed table like the baseline model. Names are added to AUID values in the RPC rather than stored or written; the version byte is ignored when matching. The change picker offers the label's family (first four item bytes), since the nearest register node is often only a set of qualifiers (OP1a's eight variants) |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

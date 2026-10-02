@@ -17,6 +17,7 @@ add_executable(aaf_tests
     cfb/test_types.cpp
     core/test_auid.cpp
     core/test_document.cpp
+    core/test_labels.cpp
     core/test_metamodel.cpp
     core/test_value.cpp
     core/test_writer.cpp

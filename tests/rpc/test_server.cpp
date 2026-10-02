@@ -309,6 +309,27 @@ TEST_CASE("Identifiers that refer to other objects are resolved through the RPC 
     CHECK(findProperty(c.result("object.get", { { "id", clip["id"] } }), "SourceID")["refers"]["status"] == "external");
 }
 
+TEST_CASE("SMPTE labels are named through the RPC API", "[rpc][server][labels]")
+{
+    Client c;
+    c.result("doc.open", { { "path", sample() } });
+    const auto hits = c.result("search.query", { { "text", "Picture Essence Track" }, { "class", "DataDefinition" } });
+    REQUIRE_FALSE(hits.empty());
+    const auto definition = c.result("object.get", { { "id", hits[0]["id"] } });
+    const auto identification = findProperty(definition, "Identification")["value"];
+    CHECK(identification["t"] == "auid");
+    CHECK(identification["name"] == "Picture Essence Track");
+
+    const auto random = toJson(Value(Auid::generate()));
+    CHECK_FALSE(random.contains("name"));
+    CHECK(valueFromJson(identification).has_value());
+
+    const auto family = c.result("labels.family", { { "auid", "0d010201-0101-0100-060e-2b3404010101" } });
+    CHECK(std::ranges::any_of(family, [](const Json& l) { return l["name"].get<std::string>().contains("OP1b") && l["auid"].is_string(); }));
+    CHECK(c.result("labels.family", { { "auid", Auid::generate().toString() } }).empty());
+    CHECK(c.request("labels.family", { { "auid", "nonsense" } }).contains("error"));
+}
+
 TEST_CASE("Embedded essence can be extracted and replaced through the RPC API", "[rpc][server]")
 {
     Client c;

@@ -6,7 +6,7 @@ export type TaggedValue =
   | { t: "int"; v: string }
   | { t: "uint"; v: string }
   | { t: "string"; v: string }
-  | { t: "auid"; v: string }
+  | { t: "auid"; v: string; name?: string }
   | { t: "mobid"; v: string }
   | { t: "enum"; v: string; name: string }
   | { t: "extenum"; v: string; name: string }
@@ -134,6 +134,12 @@ export interface Diagnostic {
   pid: number;
   property: string;
   message: string;
+}
+
+export interface LabelInfo {
+  auid: string;
+  name: string;
+  deprecated: boolean;
 }
 
 export interface SearchHit {
@@ -294,6 +300,7 @@ export class RpcClient {
   setWeakRef = (id: number, pid: number, target: number) => this.call<ChangeSet>("object.setWeakRef", { id, pid, target });
   setReference = (id: number, pid: number, target: number) => this.call<ChangeSet>("object.setReference", { id, pid, target });
   candidates = (id: number, pid: number) => this.call<SearchHit[]>("object.candidates", { id, pid });
+  labelFamily = (auid: string) => this.call<LabelInfo[]>("labels.family", { auid });
   subclasses = (cls: string) => this.call<{ name: string; id: string }[]>("model.subclasses", { class: cls });
   undo = () => this.call<ChangeSet>("edit.undo");
   redo = () => this.call<ChangeSet>("edit.redo");

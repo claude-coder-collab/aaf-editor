@@ -94,3 +94,19 @@ test("follows identifiers between a mob and the clips that reference it", async 
   await sourceId.locator(".reference button.link").click();
   await expect(page.locator(".panel h2")).toHaveText("WHOSH SLO.A01.43E8ABEF_43E8ABEB");
 });
+
+test("names SMPTE labels and offers related labels", async ({ editor }) => {
+  const { page } = editor;
+  await editor.open(editor.copy(SAMPLE));
+  await page.locator("#search").fill("Picture Essence Track");
+  await page.locator("#search").press("Enter");
+  await page.locator(".results .result").filter({ hasText: "DataDefinition" }).first().click();
+  await expect(page.locator(".panel .subtitle")).toContainText("DataDefinition");
+
+  const identification = page.locator(".panel .row").filter({ has: page.locator(".name", { hasText: /^\s*Identification/ }) });
+  await expect(identification.locator(".label-name")).toHaveText("Picture Essence Track");
+  await identification.getByRole("button", { name: "Change…" }).click();
+  await expect(identification.locator("datalist option[value='Sound Essence Track']")).toHaveCount(1);
+  await identification.getByRole("button", { name: "Cancel" }).click();
+  await expect(identification.locator(".label-choice")).toHaveCount(0);
+});

@@ -26,6 +26,8 @@ jobs:
           pytest -q tools/tests
       - name: Generated model is up to date
         run: python tools/gen_model.py check
+      - name: Generated SMPTE label table is up to date
+        run: python tools/gen_labels.py check
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
