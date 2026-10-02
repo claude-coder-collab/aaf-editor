@@ -45,6 +45,19 @@ is stored as n sibling storages, so a 2,000-clip sequence has 2,000 siblings.
 - The result is written directly as text instead of building a JSON tree and then serialising it.
 - The response is 2.8× smaller and 3.3× faster to produce.
 
+**Reference index (implicit references, measured 2026-10-02 with a Release build on an Apple Silicon macOS VM):**
+
+- `object.get` now resolves identifiers and lists referrers through a `ReferenceIndex` that the server caches and
+  drops on every change. The first `object.get` after a change rebuilds it; later ones cost about 1 ms.
+- Rebuilding took 498 ms at first. Three changes brought it to 48 ms:
+  - keys are byte strings, not formatted text (URNs and AUID strings), so building and looking up a key no longer
+    allocates and formats (to 83 ms);
+  - class membership is a bit mask computed once per class, so each object needs one hash lookup, not one per
+    target class (to 69 ms);
+  - each object's mask is fetched once per pass, and every reference's key prefix is computed once (to 48 ms).
+- `object.candidates` for a SourceID (500 master mobs) takes 4 ms. The extra check in `object.delete` reuses the
+  cached index.
+
 ## Native editor (WebKitGTK, timed inside the page through the real bridge)
 
 | Call | Baseline | Incremental | Compact payload |

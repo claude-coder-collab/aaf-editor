@@ -36,6 +36,22 @@ export interface WeakTarget {
   resolved?: "builtin" | "missing";
 }
 
+export interface ImplicitTarget {
+  id: number | null;
+  status: "resolved" | "null" | "external" | "builtin";
+  label?: string;
+  class?: string;
+}
+
+export interface Referrer {
+  id: number;
+  class: string;
+  label: string;
+  pid: number;
+  property: string;
+  weak: boolean;
+}
+
 export interface PropertyInfo {
   pid: number;
   name: string;
@@ -50,6 +66,8 @@ export interface PropertyInfo {
   count?: number;
   target?: WeakTarget;
   targets?: WeakTarget[];
+  refers?: ImplicitTarget;
+  referrers?: number;
   size?: number;
 }
 
@@ -73,6 +91,8 @@ export interface ObjectInfo {
   properties: PropertyInfo[];
   available: AvailableProperty[];
   types: Record<string, TypeDescriptor>;
+  referencedBy?: Referrer[];
+  referencedByCount?: number;
 }
 
 export interface TreeItem {
@@ -120,6 +140,7 @@ export interface SearchHit {
   id: number;
   class: string;
   label: string;
+  value?: TaggedValue;
 }
 
 export interface EditRate {
@@ -263,13 +284,15 @@ export class RpcClient {
   children = (id: number, offset = 0, limit = 200) => this.call<{ total: number; items: TreeItem[] }>("tree.children", { id, offset, limit });
   path = (id: number) => this.call<number[]>("tree.path", { id });
   object = (id: number) => this.call<ObjectInfo>("object.get", { id });
-  setProperty = (id: number, pid: number, value: TaggedValue) => this.call<ChangeSet>("object.setProperty", { id, pid, value });
+  setProperty = (id: number, pid: number, value: TaggedValue, updateReferences = false) =>
+    this.call<ChangeSet>("object.setProperty", { id, pid, value, updateReferences });
   removeProperty = (id: number, pid: number) => this.call<ChangeSet>("object.removeProperty", { id, pid });
   create = (parent: number, pid: number, cls: string, index?: number) =>
     this.call<{ id: number; changes: ChangeSet }>("object.create", { parent, pid, class: cls, index });
   remove = (id: number, force = false) => this.call<ChangeSet>("object.delete", { id, force });
   move = (parent: number, pid: number, from: number, to: number) => this.call<ChangeSet>("object.move", { parent, pid, from, to });
   setWeakRef = (id: number, pid: number, target: number) => this.call<ChangeSet>("object.setWeakRef", { id, pid, target });
+  setReference = (id: number, pid: number, target: number) => this.call<ChangeSet>("object.setReference", { id, pid, target });
   candidates = (id: number, pid: number) => this.call<SearchHit[]>("object.candidates", { id, pid });
   subclasses = (cls: string) => this.call<{ name: string; id: string }[]>("model.subclasses", { class: cls });
   undo = () => this.call<ChangeSet>("edit.undo");

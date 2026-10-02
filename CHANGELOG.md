@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Inspector
+
+- **Identifiers are shown as what they point to.** A source clip's SourceID now shows the mob it refers to as a link, and its SourceMobSlotID the slot ("A1 (Slot 1)"). The same applies to EssenceData and rendering MobIDs, linked slot IDs, effect parameter definitions, property types and the Generation of every object (the application that last changed it). The raw identifier is still shown and editable. Targets that are not in the file are labelled "not in this file" rather than flagged as errors, since they may be in another file.
+- These identifiers have a **Change…** list, like weak references, so a clip can be pointed at another mob without pasting a MobID.
+- A **Referenced by** list shows every object that refers to the selected one, by weak reference or by identifier.
+- Changing a MobID, SlotID or definition identifier that other objects use asks whether to update them as well.
+- Deleting an object that clips or parameters still refer to by identifier now warns and offers "delete anyway", as it already did for weak references.
+- Mob slots are labelled "Name (Slot n)" and Identification objects by product name and version, instead of by class name.
+
 ## 0.2.1
 
 ### Timeline
