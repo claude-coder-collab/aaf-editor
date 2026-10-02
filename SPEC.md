@@ -453,12 +453,36 @@ Status: **implemented (M4)** in `libs/edit/` (namespace `aaf::edit`, headers `aa
   - **`undo()` and `redo()`** apply journals. `history()` and `position()` expose the history.
   - **`dirty()`** is true when the position differs from the saved one. After truncating past the saved position, the document stays dirty until it is saved.
   - **`save(path, options)`** keeps the history.
+- **Implicit references** (`references.hpp`): data properties that identify another object by value. The file format does not record them as references, and they stay data on save.
+
+  | Property | Target | Found by |
+  |---|---|---|
+  | `SourceReference.SourceID` | Mob | `Mob.MobID` |
+  | `SourceReference.SourceMobSlotID` | MobSlot of the mob named by `SourceID` | `MobSlot.SlotID` |
+  | `EssenceData.MobID` | Mob | `Mob.MobID` |
+  | `CompositionMob.Rendering` | Mob | `Mob.MobID` |
+  | `FileDescriptor.LinkedSlotID` | MobSlot of the mob containing the descriptor | `MobSlot.SlotID` |
+  | `Parameter.Definition` | ParameterDefinition | `DefinitionObject.Identification` |
+  | `PluginDefinition.DefinitionObject` | DefinitionObject | `DefinitionObject.Identification` |
+  | `PropertyDefinition.Type` | TypeDefinition | `MetaDefinition.Identification` |
+  | `InterchangeObject.Generation` | Identification | `Identification.GenerationAUID` |
+
+  Properties are looked up by class and name through the merged model, so file-specific names (for example Avid's `LinkedTrackID`) work. Not yet covered: `DescriptiveMarker.DescribedSlots` (a set of slot IDs) and the SMPTE label AUIDs (compression, operational pattern, essence containers, channel assignment), which name well-known labels rather than objects.
+  - **`ReferenceIndex(doc)`** is built in one pass over attached objects. It is a snapshot and must be rebuilt after a change.
+    - Keys are byte strings (scope, key PID, identifier bytes), so lookups need no formatting. Class membership is computed once per class as a bit mask.
+    - `resolve(id, pid)` gives `{status, target, builtinName}`. The status is `resolved`, `null` (the null MobID or AUID; for `SourceMobSlotID`, when `SourceID` is null), `external` (no object here has the identifier, which is legitimate: the target may be in another file) or `builtin` (a `PropertyDefinition.Type` naming a baseline type that the file does not store).
+    - `candidates(id, pid)` lists attached objects of the target class (for slots, the slots of the scoping mob), and `valueFor(id, pid, target)` gives the identifier to store.
+    - `referrers(target)` lists **every** reference to an object, weak (resolved through `resolveWeak`) and implicit, as `{object, pid, weak}`. `referrersByKey(target, keyPid)` gives the implicit ones that find the target through its property `keyPid`.
+  - `setReference(tx, id, pid, target)`: sets the property to `valueFor(target)`. The target must be a candidate.
+  - `setIdentifier(tx, id, pid, value)`: `setProperty`, then rewrites every implicit reference that found the object through that property (for example, the SourceIDs of a mob whose MobID changes, or the SourceMobSlotIDs of a slot whose SlotID changes). Weak references to set elements are already rewritten by `setProperty`.
+  - `incomingImplicitReferences(doc, [index,] id)`: implicit references from outside the subtree of `id` that resolve inside it. `deleteObject` does not check these (the timeline operations rely on that); the RPC layer does.
 - **`ChangeSet`**: the objects that changed, the created ids, the individual `{object, pid}` property changes, and whether the tag table changed. The UI uses it to refresh only what is affected.
 - **Tests** (`tests/edit/`):
   - every primitive, including rejection cases and atomic rollback;
   - building a complete new CompositionMob: a slot, a sequence, a filler and weak references to a DataDefinition;
   - re-identifying a DataDefinition that is weakly referenced, with all references still resolving;
   - forced and unforced deletion;
+  - implicit references (`test_references.cpp`): SourceIDs and SourceMobSlotIDs resolve to the matching mob and slot, null SourceIDs report `null`, parameter definitions and property types resolve, retargeting with `setReference` and undo, `setIdentifier` keeping references resolved where plain `setProperty` leaves them `external`, and references from inside a subtree not counting as incoming;
   - vector moves;
   - stream replacement;
   - save and dirty tracking;
@@ -556,14 +580,15 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   | `doc.validate` | → `[{severity, object, pid, property, message}]` |
   | `tree.children` | `{id, offset=0, limit=500}` → `{total, items:[{id, class, label, pid, property, index, key, childCount}]}`. Children are the strongly referenced objects in property order. `key` is the set key. |
   | `tree.path` | `{id}` → object IDs from the root to `id` |
-  | `object.get` | `{id}` → `{id, class, classId, concrete, label, parent, parentPid, attached, properties, available, types}` (see below) |
-  | `object.setProperty` | `{id, pid, value}` → change set |
+  | `object.get` | `{id}` → `{id, class, classId, concrete, label, parent, parentPid, attached, properties, available, types, referencedBy, referencedByCount}` (see below) |
+  | `object.setProperty` | `{id, pid, value, updateReferences=false}` → change set. With `updateReferences`, uses `setIdentifier`. |
   | `object.removeProperty` | `{id, pid}` → change set |
   | `object.create` | `{parent, pid, class (name or AUID), index?}` → `{id, changes}`. Creates the object with `createWithDefaults`, then sets or inserts it (appends if no index). |
-  | `object.delete` | `{id, force?}` → change set |
+  | `object.delete` | `{id, force?}` → change set. Without `force`, also fails if implicit references from outside the subtree point into it: "N reference(s) point to <class> or its descendants by identifier (first: <class>.<property>)". The weak-reference failure from `deleteObject` also contains "reference(s) point to". |
   | `object.move` | `{parent, pid, from, to}` → change set |
   | `object.setWeakRef` | `{id, pid, target}` → change set |
-  | `object.candidates` | `{id, pid}` → the objects a weak reference may target |
+  | `object.candidates` | `{id, pid}` → `[{id, class, label}]`, the objects a weak reference may target. For an implicit reference, its candidates, each with `value` (the tagged identifier). |
+  | `object.setReference` | `{id, pid, target}` → change set (`setReference`) |
   | `model.subclasses` | `{class}` → the concrete subclasses |
   | `edit.undo`, `edit.redo` | → change set |
   | `edit.history` | → `{items, position}` |
@@ -572,12 +597,14 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   | `essence.replace` | `{id, path}` → change set (file-backed) |
 
   - Each property in `object.get` is `{pid, name, kind, storedForm, type, optional, uniqueId, …}`, plus a kind-specific payload:
-    - `data`: `value` (a tagged value), or `error` together with the raw bytes;
+    - `data`: `value` (a tagged value), or `error` together with the raw bytes. An implicit reference adds `refers {status, id|null, label?, class?}` (`label` and `class` when resolved; `label` is the type name when `builtin`). A property that implicit references use to find this object adds `referrers` (their count).
     - `strongRef`: `children`;
     - vectors and sets: `count`;
     - `weakRef`: `target {id|null, key, label, resolved?}`;
     - weak collections: `targets`;
     - `stream`: `size`.
+  - `referencedBy` lists up to 50 references to the object, weak and implicit, as `{id, class, label, pid, property, weak}`; `referencedByCount` is the total.
+  - The server caches one `ReferenceIndex`, dropped on every `doc.changed`, open and close, and rebuilt on first use (about 50 ms for the 66k-object stress file).
   - `available` lists defined properties that are absent. `types` holds every referenced type descriptor (`{id, name, kind, element?, className?, size?, signed?, count?, fields?, elements?}`), so the UI can build editors without further calls.
   - Timeline (M6):
     - `timeline.mobs` returns the mob summaries.
@@ -612,7 +639,7 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   - `bytes` (`v` in hex).
 
   A round-trip test covers every tag. The TypeScript mirror is `ui/src/lib/rpc.ts`.
-- `labelOf(doc, id)` gives the `Name` property if it is set, else the unique identifier, else, for an OperationGroup, its operation definition's label ("Audio Gain"), else the class name.
+- `labelOf(doc, id)` gives, for a MobSlot, "SlotName (Slot n)" or "Slot n"; for an Identification, "ProductName ProductVersionString"; otherwise the `Name` property if it is set, else the unique identifier, else, for an OperationGroup, its operation definition's label ("Audio Gain"), else the class name.
 
 ### 8.4 UI (`ui/`)
 
@@ -632,7 +659,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - A bottom panel with tabs for Diagnostics (Validate, with each entry linking to its object) and History (click an entry to undo or redo to that point).
   - A single column below 700 px width.
 - **Property panel**:
-  - Header actions: Parent, Move up and Move down (vectors only), and Delete. Delete offers "delete anyway" when weak references would dangle.
+  - Header actions: Parent, Move up and Move down (vectors only), and Delete. Delete offers "delete anyway" when weak or implicit references would dangle.
   - Type-aware editors:
     - checkbox for booleans;
     - dropdowns for enumerations and extendible enumerations, showing undefined values explicitly;
@@ -642,6 +669,9 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - element editing and add/remove for variable arrays;
     - read-only display for opaque, indirect and undecodable values.
   - References: strong references are links, and collections have an Add button that asks for a concrete subclass when there are several. Weak references show a link plus a "Change…" dropdown of candidates.
+  - **Implicit references** (`refers`) show, above the raw identifier editor, a link to the target with its class, or the status ("none", "not in this file", or the built-in definition's name), plus a "Change…" dropdown that calls `object.setReference`. The raw value stays editable.
+  - Editing a property with `referrers` asks whether to update those references too (`updateReferences`).
+  - **Referenced by**: below the properties, links to the objects that refer to this one (weak and implicit) with the referring property, and "and N more" past 50.
   - Streams show their size, with Extract and Replace buttons for essence.
   - Optional properties can be removed, and missing ones added. Missing required properties are flagged.
   - Edits commit on Enter or blur; Escape reverts.
@@ -844,6 +874,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | 2026-09-27 | The release workflow also runs, without publishing, on PRs that change packaging, so packaging problems show up before a tag |
 
 | 2026-09-28 | UI end-to-end tests run the real page in Playwright against `aaftool serve` rather than in the native webviews, which cannot be automated on all three platforms. The engines are matched per platform (§10) |
+| 2026-10-02 | Identifiers that point at other objects (SourceID, SourceMobSlotID, Parameter.Definition and others, §7) are resolved for display and editing but stay data properties on save; turning them into weak references would break interchange. A target missing from the file is shown neutrally, not as an error, because references to other files are legitimate |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

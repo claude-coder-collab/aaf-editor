@@ -260,6 +260,55 @@ TEST_CASE("Edits through the RPC API are undoable and emit events", "[rpc][serve
     std::filesystem::remove_all(dir);
 }
 
+TEST_CASE("Identifiers that refer to other objects are resolved through the RPC API", "[rpc][server]")
+{
+    Client c;
+    c.result("doc.open", { { "path", sample() } });
+    Json clip;
+    Json sourceId;
+    for (const auto& hit : c.result("search.query", { { "class", "SourceClip" } }))
+    {
+        clip = c.result("object.get", { { "id", hit["id"] } });
+        sourceId = findProperty(clip, "SourceID");
+        if (sourceId["refers"]["status"] == "resolved")
+        {
+            break;
+        }
+    }
+    REQUIRE(sourceId["refers"]["status"] == "resolved");
+    const auto mobId = sourceId["refers"]["id"];
+    CHECK(sourceId["refers"]["label"].is_string());
+    CHECK(findProperty(clip, "SourceMobSlotID")["refers"]["class"].get<std::string>().ends_with("MobSlot"));
+
+    const auto mob = c.result("object.get", { { "id", mobId } });
+    CHECK(findProperty(mob, "MobID")["referrers"].get<int>() >= 1);
+    CHECK(mob["referencedByCount"].get<int>() >= 1);
+    CHECK(std::ranges::any_of(mob["referencedBy"], [&](const Json& r) { return r["id"] == clip["id"] && r["property"] == "SourceID" && r["weak"] == false; }));
+
+    const auto candidates = c.result("object.candidates", { { "id", clip["id"] }, { "pid", sourceId["pid"] } });
+    REQUIRE(candidates.size() > 1);
+    const auto other = *std::ranges::find_if(candidates, [&](const Json& m) { return m["id"] != mobId; });
+    CHECK(other["value"]["t"] == "mobid");
+    c.result("object.setReference", { { "id", clip["id"] }, { "pid", sourceId["pid"] }, { "target", other["id"] } });
+    CHECK(findProperty(c.result("object.get", { { "id", clip["id"] } }), "SourceID")["refers"]["id"] == other["id"]);
+    c.result("edit.undo");
+
+    const auto refused = c.request("object.delete", { { "id", mobId } });
+    CHECK(refused["error"]["message"].get<std::string>().contains("reference(s) point to"));
+
+    const auto renamed = Json{ { "t", "mobid" }, { "v", MobId::generate().toString() } };
+    const auto mobIdPid = findProperty(mob, "MobID")["pid"];
+    c.result("object.setProperty", { { "id", mobId }, { "pid", mobIdPid }, { "value", renamed }, { "updateReferences", true } });
+    CHECK(findProperty(c.result("object.get", { { "id", clip["id"] } }), "SourceID")["refers"]["id"] == mobId);
+    c.result("edit.undo");
+    c.result("object.setProperty", { { "id", mobId }, { "pid", mobIdPid }, { "value", renamed } });
+    CHECK(findProperty(c.result("object.get", { { "id", clip["id"] } }), "SourceID")["refers"]["status"] == "external");
+    c.result("edit.undo");
+
+    c.result("object.delete", { { "id", mobId }, { "force", true } });
+    CHECK(findProperty(c.result("object.get", { { "id", clip["id"] } }), "SourceID")["refers"]["status"] == "external");
+}
+
 TEST_CASE("Embedded essence can be extracted and replaced through the RPC API", "[rpc][server]")
 {
     Client c;

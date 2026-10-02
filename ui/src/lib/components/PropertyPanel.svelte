@@ -33,7 +33,11 @@
     }
   }
 
-  const setValue = (p: PropertyInfo, value: TaggedValue) => attempt(() => client.setProperty(object.id, p.pid, value));
+  function setValue(p: PropertyInfo, value: TaggedValue) {
+    const n = p.referrers ?? 0;
+    const update = n > 0 && confirm(`${n} reference${n === 1 ? "" : "s"} identify this object by its ${p.name}. Update them to the new value?\n\nCancel leaves them pointing at the old value.`);
+    return attempt(() => client.setProperty(object.id, p.pid, value, update));
+  }
   const removeProperty = (p: PropertyInfo) => attempt(() => client.removeProperty(object.id, p.pid));
 
   async function loadCandidates(p: PropertyInfo) {
@@ -44,6 +48,8 @@
   }
 
   const setWeak = (p: PropertyInfo, target: string) => attempt(() => client.setWeakRef(object.id, p.pid, Number(target)));
+  const setImplicit = (p: PropertyInfo, target: string) => attempt(() => client.setReference(object.id, p.pid, Number(target)));
+  const statusText: Record<string, string> = { null: "none", external: "not in this file", builtin: "built-in definition" };
 
   async function beginCreate(pid: number, typeId: string | undefined) {
     const type = typeId ? object.types[typeId] : undefined;
@@ -96,9 +102,10 @@
       await client.remove(object.id);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      if (message.includes("weak reference") && confirm(`${message}\n\nDelete anyway? References to it will be left dangling.`)) {
+      const referenced = message.includes("reference(s) point to");
+      if (referenced && confirm(`${message}\n\nDelete anyway? References to it will be left dangling.`)) {
         await attempt(() => client.remove(object.id, true));
-      } else if (!message.includes("weak reference")) {
+      } else if (!referenced) {
         onerror(message);
       }
     }
@@ -155,6 +162,23 @@
         <div class="value">
           {#if p.kind === "data" && p.value}
             {#if p.error}<div class="error">{p.error}</div>{/if}
+            {#if p.refers}
+              <span class="weak reference">
+                {#if p.refers.id !== null}
+                  <button class="link" onclick={() => onselect(p.refers!.id!)}>{p.refers.label}</button>
+                  <span class="muted">({p.refers.class})</span>
+                {:else}
+                  {#if p.refers.label}<span>{p.refers.label}</span>{/if}
+                  <span class="muted">({statusText[p.refers.status]})</span>
+                {/if}
+                <select onfocus={() => loadCandidates(p)} onchange={(e) => setImplicit(p, (e.currentTarget as HTMLSelectElement).value)} value="">
+                  <option value="" disabled>Change…</option>
+                  {#each candidates[p.pid] ?? [] as c (c.id)}
+                    <option value={String(c.id)}>{c.label} ({c.class})</option>
+                  {/each}
+                </select>
+              </span>
+            {/if}
             <ValueEditor value={p.value} typeId={p.type} types={object.types} readonly={!!p.error} onchange={(v) => setValue(p, v)} />
           {:else if p.kind === "strongRef" && p.children}
             {#each p.children as child (child.id)}
@@ -206,6 +230,23 @@
       </div>
     {/each}
   </div>
+
+  {#if object.referencedBy && object.referencedBy.length > 0}
+    <div class="referenced-by">
+      <h3>Referenced by</h3>
+      <ul>
+        {#each object.referencedBy as r, i (i)}
+          <li>
+            <button class="link" onclick={() => onselect(r.id)}>{r.label}</button>
+            <span class="muted">({r.class}) · {r.property}</span>
+          </li>
+        {/each}
+      </ul>
+      {#if (object.referencedByCount ?? 0) > object.referencedBy.length}
+        <div class="muted">and {(object.referencedByCount ?? 0) - object.referencedBy.length} more</div>
+      {/if}
+    </div>
+  {/if}
 
   {#if createFor}
     <div class="create">
@@ -290,6 +331,23 @@
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
+  }
+  .reference {
+    flex-basis: 100%;
+  }
+  .referenced-by {
+    margin-top: 16px;
+  }
+  .referenced-by h3 {
+    font-size: 13px;
+    margin: 0 0 6px;
+  }
+  .referenced-by ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 4px;
   }
   .notice {
     background: var(--warn-bg);

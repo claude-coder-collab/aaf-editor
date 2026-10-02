@@ -72,3 +72,25 @@ test("saves an edited copy that aaftool validates", async ({ editor }, testInfo)
   expect(aaftool("validate", host.savePath).status).toBe(0);
   expect(aaftool("timeline", host.savePath, "--mobs").stdout).toContain("Saved by e2e");
 });
+
+test("follows identifiers between a mob and the clips that reference it", async ({ editor }) => {
+  const { page } = editor;
+  await editor.open(editor.copy(SAMPLE));
+  await page.locator("#search").fill("WHOSH SLO.A01.43E8ABEF_43E8ABEB");
+  await page.locator("#search").press("Enter");
+  await page.locator(".results .result").filter({ hasText: "SourceMob" }).first().click();
+  await expect(page.locator(".panel .subtitle")).toContainText("SourceMob");
+
+  const referencedBy = page.locator(".panel .referenced-by");
+  await expect(referencedBy).toContainText("SourceID");
+  await referencedBy.getByRole("button").first().click();
+  await expect(page.locator(".panel .subtitle")).toContainText("SourceClip");
+
+  const sourceId = page.locator(".panel .row").filter({ has: page.locator(".name", { hasText: /^\s*SourceID/ }) });
+  await expect(sourceId.locator(".reference")).toContainText("WHOSH SLO.A01.43E8ABEF_43E8ABEB");
+  const slot = page.locator(".panel .row").filter({ has: page.locator(".name", { hasText: /^\s*SourceMobSlotID/ }) });
+  await expect(slot.locator(".reference")).toContainText("Slot 1");
+
+  await sourceId.locator(".reference button.link").click();
+  await expect(page.locator(".panel h2")).toHaveText("WHOSH SLO.A01.43E8ABEF_43E8ABEB");
+});

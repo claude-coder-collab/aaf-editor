@@ -1,5 +1,6 @@
 #pragma once
 
+#include <aaf/edit/references.hpp>
 #include <aaf/edit/session.hpp>
 #include <aaf/rpc/json_value.hpp>
 
@@ -38,11 +39,14 @@ private:
     void attachListener();
     /// True if `changes` may alter what `timeline.mobs` returns.
     [[nodiscard]] auto mobListChanged(const edit::ChangeSet& changes) -> bool;
+    /// The reference index for the current document state, built on first use after a change.
+    [[nodiscard]] auto references(const Document& document) -> const edit::ReferenceIndex&;
 
     std::optional<edit::Session> session_;
     std::filesystem::path path_;
     EventSink sink_;
     std::optional<std::set<MobId>> compositions_;
+    std::optional<edit::ReferenceIndex> references_;
 };
 
 /// JSON form of a change set: `{"objects":[...], "created":[...], "properties":[{"object","pid"}], "referencedPropertiesChanged"}`.

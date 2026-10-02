@@ -214,8 +214,31 @@ auto weakTarget(const Document& doc, const Object& o, std::uint16_t tag, std::sp
     return j;
 }
 
-auto propertyJson(const Document& doc, const Object& o, const Property& p, Json& types) -> Json
+constexpr std::size_t kReferencedByLimit = 50;
+
+auto referenceJson(const Document& doc, const edit::ReferenceResolution& r) -> Json
 {
+    Json j = { { "status", std::string(edit::to_string(r.status)) } };
+    if (r.status == edit::ReferenceStatus::resolved)
+    {
+        j["id"] = r.target;
+        j["label"] = labelOf(doc, r.target);
+        j["class"] = className(doc, r.target);
+    }
+    else
+    {
+        j["id"] = nullptr;
+        if (r.status == edit::ReferenceStatus::builtin)
+        {
+            j["label"] = r.builtinName;
+        }
+    }
+    return j;
+}
+
+auto propertyJson(const Document& doc, ObjectId id, const Property& p, Json& types, const edit::ReferenceIndex& references) -> Json
+{
+    const auto& o = doc.object(id);
     const auto* def = doc.propertyDef(p);
     Json j = { { "pid", p.pid }, { "name", propertyName(doc, p.pid) }, { "kind", std::string(storedFormName(p)) }, { "storedForm", p.storedForm } };
     if (def != nullptr)
@@ -233,6 +256,14 @@ auto propertyJson(const Document& doc, const Object& o, const Property& p, Json&
                 if (auto v = doc.decode(o, p))
                 {
                     j["value"] = toJson(*v);
+                    if (const auto r = references.resolve(id, p.pid))
+                    {
+                        j["refers"] = referenceJson(doc, *r);
+                    }
+                    if (const auto n = references.referrersByKey(id, p.pid).size(); n > 0)
+                    {
+                        j["referrers"] = n;
+                    }
                 }
                 else
                 {
@@ -274,14 +305,20 @@ auto propertyJson(const Document& doc, const Object& o, const Property& p, Json&
     return j;
 }
 
-auto objectJson(const Document& doc, ObjectId id) -> Json
+auto objectJson(const Document& doc, ObjectId id, const edit::ReferenceIndex& references) -> Json
 {
     const auto& o = doc.object(id);
     Json types = Json::object();
     Json properties = Json::array();
     for (const auto& p : o.properties)
     {
-        properties.push_back(propertyJson(doc, o, p, types));
+        properties.push_back(propertyJson(doc, id, p, types, references));
+    }
+    const auto incoming = references.referrers(id);
+    Json referencedBy = Json::array();
+    for (const auto& r : incoming.first(std::min(incoming.size(), kReferencedByLimit)))
+    {
+        referencedBy.push_back({ { "id", r.object }, { "class", className(doc, r.object) }, { "label", labelOf(doc, r.object) }, { "pid", r.pid }, { "property", propertyName(doc, r.pid) }, { "weak", r.weak } });
     }
     Json available = Json::array();
     for (const auto* def : doc.model().allProperties(o.classId))
@@ -306,6 +343,8 @@ auto objectJson(const Document& doc, ObjectId id) -> Json
         { "properties", std::move(properties) },
         { "available", std::move(available) },
         { "types", std::move(types) },
+        { "referencedBy", std::move(referencedBy) },
+        { "referencedByCount", incoming.size() },
     };
 }
 
@@ -568,6 +607,28 @@ auto labelOf(const Document& document, ObjectId id) -> std::string
 {
     const auto& o = document.object(id);
     const auto& model = document.model();
+    const auto text = [&](std::string_view cls, std::string_view property) -> std::string {
+        const auto v = document.value(id, cls, property);
+        return v && v->is<std::string>() ? v->as<std::string>() : std::string{};
+    };
+    const auto* slot = model.findClassByName("MobSlot");
+    if (slot != nullptr && model.isA(o.classId, slot->id))
+    {
+        const auto slotId = document.value(id, "MobSlot", "SlotID");
+        const auto number = slotId ? std::format("Slot {}", slotId->toString()) : std::string("Slot");
+        const auto name = text("MobSlot", "SlotName");
+        return name.empty() ? number : std::format("{} ({})", name, number);
+    }
+    const auto* identification = model.findClassByName("Identification");
+    if (identification != nullptr && model.isA(o.classId, identification->id))
+    {
+        const auto product = text("Identification", "ProductName");
+        const auto version = text("Identification", "ProductVersionString");
+        if (!product.empty())
+        {
+            return version.empty() ? product : std::format("{} {}", product, version);
+        }
+    }
     const PropertyDef* unique = nullptr;
     for (const auto* def : model.allProperties(o.classId))
     {
@@ -670,7 +731,9 @@ void Server::attachListener()
         return;
     }
     compositions_.reset();
+    references_.reset();
     session_->setListener([this](const edit::ChangeSet& changes) -> void {
+        references_.reset();
         const bool mobs = mobListChanged(changes);
         emit("doc.changed", { { "changes", changeSetToJson(changes) }, { "info", info() }, { "mobsChanged", mobs } });
     });
@@ -738,6 +801,15 @@ auto Server::mobListChanged(const edit::ChangeSet& changes) -> bool
     });
 }
 
+auto Server::references(const Document& document) -> const edit::ReferenceIndex&
+{
+    if (!references_)
+    {
+        return references_.emplace(document);
+    }
+    return *references_;
+}
+
 auto Server::run(const std::string& description, const edit::Session::Command& command) -> Result<Json>
 {
     auto session = requireSession();
@@ -772,6 +844,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         "object.move",
         "object.setWeakRef",
         "object.candidates",
+        "object.setReference",
         "model.subclasses",
         "edit.undo",
         "edit.redo",
@@ -808,6 +881,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         {
             return std::unexpected(opened.error());
         }
+        references_.reset();
         session_.reset();
         session_.emplace(std::move(*opened));
         path_ = *path;
@@ -817,6 +891,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
     }
     if (method == "doc.close")
     {
+        references_.reset();
         session_.reset();
         path_.clear();
         emit("doc.opened", info());
@@ -913,7 +988,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         {
             return std::unexpected(id.error());
         }
-        return objectJson(doc, *id);
+        return objectJson(doc, *id, references(doc));
     }
     if (method == "object.setProperty")
     {
@@ -924,11 +999,18 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             return invalid("object.setProperty needs id, pid and value");
         }
         auto value = valueFromJson(params["value"]);
+        auto updateReferences = optionalParam<bool>(params, "updateReferences", false);
         if (!value)
         {
             return std::unexpected(value.error());
         }
-        return run(std::format("Set {}", propertyName(doc, *pid)), [&](edit::Transaction& tx) -> Result<void> { return edit::setProperty(tx, *id, *pid, *value); });
+        if (!updateReferences)
+        {
+            return std::unexpected(updateReferences.error());
+        }
+        return run(std::format("Set {}", propertyName(doc, *pid)), [&](edit::Transaction& tx) -> Result<void> {
+            return *updateReferences ? edit::setIdentifier(tx, *id, *pid, *value) : edit::setProperty(tx, *id, *pid, *value);
+        });
     }
     if (method == "object.removeProperty")
     {
@@ -992,6 +1074,13 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         {
             return invalid("object.delete needs id");
         }
+        if (!*force)
+        {
+            if (const auto incoming = edit::incomingImplicitReferences(doc, references(doc), *id); !incoming.empty())
+            {
+                return invalid(std::format("{} reference(s) point to {} or its descendants by identifier (first: {}.{})", incoming.size(), className(doc, *id), className(doc, incoming.front().object), propertyName(doc, incoming.front().pid)));
+            }
+        }
         return run(std::format("Delete {}", className(doc, *id)), [&](edit::Transaction& tx) -> Result<void> { return edit::deleteObject(tx, *id, *force); });
     }
     if (method == "object.move")
@@ -1026,11 +1115,34 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
             return invalid("object.candidates needs id and pid");
         }
         Json out = Json::array();
+        const auto& index = references(doc);
+        if (index.definition(*id, *pid) != nullptr)
+        {
+            for (const auto c : index.candidates(*id, *pid))
+            {
+                if (auto v = index.valueFor(*id, *pid, c))
+                {
+                    out.push_back({ { "id", c }, { "class", className(doc, c) }, { "label", labelOf(doc, c) }, { "value", toJson(*v) } });
+                }
+            }
+            return out;
+        }
         for (const auto c : edit::weakCandidates(doc, *id, *pid))
         {
             out.push_back({ { "id", c }, { "class", className(doc, c) }, { "label", labelOf(doc, c) } });
         }
         return out;
+    }
+    if (method == "object.setReference")
+    {
+        auto id = objectParam("id");
+        auto pid = param<std::uint16_t>(params, "pid");
+        auto target = objectParam("target");
+        if (!id || !pid || !target)
+        {
+            return invalid("object.setReference needs id, pid and target");
+        }
+        return run(std::format("Set {}", propertyName(doc, *pid)), [&](edit::Transaction& tx) -> Result<void> { return edit::setReference(tx, *id, *pid, *target); });
     }
     if (method == "model.subclasses")
     {

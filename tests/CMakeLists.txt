@@ -20,6 +20,7 @@ add_executable(aaf_tests
     core/test_metamodel.cpp
     core/test_value.cpp
     core/test_writer.cpp
+    edit/test_references.cpp
     edit/test_session.cpp
     rpc/test_server.cpp
     timeline/test_edit_ops.cpp
