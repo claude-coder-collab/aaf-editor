@@ -135,6 +135,25 @@ export function selectionTarget(item: TimelineItem): number {
 }
 
 /// Text of the effects badge on a clip inside effects: effect names when `room` allows, else just "fx".
+/// "Mono", "Stereo", "5.1", "7.1" or "N ch" for an audio channel count; empty when unknown.
+export function channelFormat(channels: number | undefined): string {
+  switch (channels) {
+    case undefined:
+    case 0:
+      return "";
+    case 1:
+      return "Mono";
+    case 2:
+      return "Stereo";
+    case 6:
+      return "5.1";
+    case 8:
+      return "7.1";
+    default:
+      return `${channels} ch`;
+  }
+}
+
 export function badgeText(item: TimelineItem, room: number, measure: (text: string) => number): string | null {
   if (!item.effects?.length) return null;
   const names = `fx ${item.effects.map((e) => e.name || "effect").join(", ")}`;

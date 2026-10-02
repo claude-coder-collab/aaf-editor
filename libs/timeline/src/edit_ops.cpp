@@ -39,56 +39,74 @@ struct Entry
     std::int64_t length = 0;
 };
 
-/// A source clip, or a chain of single-input effects around one, edited as one unit.
+/// A source clip, or a chain of single-input effects around one, edited as one unit. A multichannel clip is an
+/// audio channel combiner (possibly inside single-input effects) whose every input is such a chain: one source
+/// clip per channel.
 struct ClipChain
 {
-    /// The effects from the track inwards; empty for a plain source clip.
+    /// Every OperationGroup in the unit: the effects from the track inwards, the channel combiner, and each
+    /// channel's own effects. Empty for a plain source clip.
     std::vector<ObjectId> effects;
-    ObjectId clip = kNoObject;
+    /// The source clips, one per channel.
+    std::vector<ObjectId> clips;
     /// Set when changing the length would change what the effects do: speed changes map clip time differently,
     /// and keyframe times are relative to the effect's length.
     std::string locked;
 };
 
+auto collectChain(const Access& a, ObjectId node, bool allowCombiner, int depth, ClipChain& chain) -> bool
+{
+    if (depth >= kMaxDepth)
+    {
+        return false;
+    }
+    if (a.isA(node, "SourceClip"))
+    {
+        chain.clips.push_back(node);
+        return true;
+    }
+    if (!a.isA(node, "OperationGroup"))
+    {
+        return false;
+    }
+    const auto inputs = a.children(node, "OperationGroup", "InputSegments");
+    const bool combiner = allowCombiner && inputs.size() > 1 && a.isChannelCombiner(node);
+    if (inputs.size() != 1 && !combiner)
+    {
+        return false;
+    }
+    const auto definition = a.weak(node, "OperationGroup", "Operation");
+    const auto name = a.definitionName(definition);
+    const auto warp = definition ? a.value(*definition, "OperationDefinition", "IsTimeWarp") : std::nullopt;
+    if (chain.locked.empty() && warp && warp->is<bool>() && warp->as<bool>())
+    {
+        chain.locked = std::format("the clip has a speed change ({}), which cannot be trimmed or split yet", name.empty() ? "effect" : name);
+    }
+    const auto parameters = a.children(node, "OperationGroup", "Parameters");
+    if (chain.locked.empty() && std::ranges::any_of(parameters, [&](ObjectId p) -> bool { return a.isA(p, "VaryingValue"); }))
+    {
+        chain.locked = std::format("the clip has keyframed effect parameters ({}), which cannot be trimmed or split yet", name.empty() ? "effect" : name);
+    }
+    chain.effects.push_back(node);
+    return std::ranges::all_of(inputs, [&](ObjectId input) -> bool { return collectChain(a, input, allowCombiner && !combiner, depth + 1, chain); });
+}
+
 auto clipChain(const Access& a, ObjectId id) -> std::optional<ClipChain>
 {
     ClipChain chain;
-    ObjectId node = id;
-    for (int depth = 0; depth < kMaxDepth && a.isA(node, "OperationGroup"); ++depth)
-    {
-        const auto inputs = a.children(node, "OperationGroup", "InputSegments");
-        if (inputs.size() != 1)
-        {
-            return std::nullopt;
-        }
-        const auto definition = a.weak(node, "OperationGroup", "Operation");
-        const auto name = a.definitionName(definition);
-        const auto warp = definition ? a.value(*definition, "OperationDefinition", "IsTimeWarp") : std::nullopt;
-        if (chain.locked.empty() && warp && warp->is<bool>() && warp->as<bool>())
-        {
-            chain.locked = std::format("the clip has a speed change ({}), which cannot be trimmed or split yet", name.empty() ? "effect" : name);
-        }
-        const auto parameters = a.children(node, "OperationGroup", "Parameters");
-        if (chain.locked.empty() && std::ranges::any_of(parameters, [&](ObjectId p) -> bool { return a.isA(p, "VaryingValue"); }))
-        {
-            chain.locked = std::format("the clip has keyframed effect parameters ({}), which cannot be trimmed or split yet", name.empty() ? "effect" : name);
-        }
-        chain.effects.push_back(node);
-        node = inputs.front();
-    }
-    if (!a.isA(node, "SourceClip"))
+    if (!collectChain(a, id, true, 0, chain))
     {
         return std::nullopt;
     }
-    chain.clip = node;
     return chain;
 }
 
-/// The source clip that decides where a segment's material comes from: itself, or the clip inside its effects.
-auto sourceClipOf(const Access& a, ObjectId id) -> ObjectId
+/// The source clips that decide where a segment's material comes from: itself, or the clips inside its effects
+/// (one per channel for a multichannel clip).
+auto sourceClipsOf(const Access& a, ObjectId id) -> std::vector<ObjectId>
 {
     const auto chain = clipChain(a, id);
-    return chain ? chain->clip : id;
+    return chain ? chain->clips : std::vector<ObjectId>{ id };
 }
 
 auto pidOf(const Access& a, std::string_view cls, std::string_view name) -> Result<std::uint16_t>
@@ -128,7 +146,8 @@ auto setLength(edit::Transaction& tx, ObjectId id, std::int64_t length) -> Resul
     return setInt(tx, id, "Component", "Length", length);
 }
 
-/// Sets a segment's length; for a clip inside effects, the effects and the clip all get the new length.
+/// Sets a segment's length; for a clip inside effects, the effects and the clip all get the new length, and for a
+/// multichannel clip, every channel does.
 auto setSegmentLength(edit::Transaction& tx, ObjectId id, std::int64_t length) -> Result<void>
 {
     const Access a(tx.document());
@@ -141,14 +160,17 @@ auto setSegmentLength(edit::Transaction& tx, ObjectId id, std::int64_t length) -
     {
         return fail(Errc::unsupported, chain->locked);
     }
-    for (const auto effect : chain->effects)
+    for (const auto* parts : { &chain->effects, &chain->clips })
     {
-        if (auto r = setLength(tx, effect, length); !r)
+        for (const auto part : *parts)
         {
-            return r;
+            if (auto r = setLength(tx, part, length); !r)
+            {
+                return r;
+            }
         }
     }
-    return setLength(tx, chain->clip, length);
+    return {};
 }
 
 /// Copies the DataDefinition weak reference of `from` onto `to`.
@@ -431,13 +453,19 @@ auto normalize(edit::Transaction& tx, const TrackRef& track) -> Result<void>
 auto adjustStart(edit::Transaction& tx, ObjectId segment, std::int64_t delta) -> Result<void>
 {
     const Access a(tx.document());
-    const auto clip = sourceClipOf(a, segment);
-    const auto start = a.integer(clip, "SourceClip", "StartTime").value_or(0) + delta;
-    if (start < 0)
+    for (const auto clip : sourceClipsOf(a, segment))
     {
-        return fail(Errc::invalid_argument, "the edit would move the clip before the start of its source");
+        const auto start = a.integer(clip, "SourceClip", "StartTime").value_or(0) + delta;
+        if (start < 0)
+        {
+            return fail(Errc::invalid_argument, "the edit would move the clip before the start of its source");
+        }
+        if (auto r = setInt(tx, clip, "SourceClip", "StartTime", start); !r)
+        {
+            return r;
+        }
     }
-    return setInt(tx, clip, "SourceClip", "StartTime", start);
+    return {};
 }
 
 /// Length of the source slot a clip refers to, when it can be determined.
@@ -469,16 +497,18 @@ auto sourceLength(const Access& a, ObjectId clip) -> std::optional<std::int64_t>
 
 auto checkWithinSource(const Access& a, ObjectId segment) -> Result<void>
 {
-    const auto clip = sourceClipOf(a, segment);
-    if (!a.isA(clip, "SourceClip"))
+    for (const auto clip : sourceClipsOf(a, segment))
     {
-        return {};
-    }
-    const auto available = sourceLength(a, clip);
-    const auto end = a.integer(clip, "SourceClip", "StartTime").value_or(0) + lengthOf(a, clip);
-    if (available && end > *available)
-    {
-        return fail(Errc::invalid_argument, std::format("the clip would extend past the end of its source ({} units)", *available));
+        if (!a.isA(clip, "SourceClip"))
+        {
+            continue;
+        }
+        const auto available = sourceLength(a, clip);
+        const auto end = a.integer(clip, "SourceClip", "StartTime").value_or(0) + lengthOf(a, clip);
+        if (available && end > *available)
+        {
+            return fail(Errc::invalid_argument, std::format("the clip would extend past the end of its source ({} units)", *available));
+        }
     }
     return {};
 }

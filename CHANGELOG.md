@@ -7,6 +7,11 @@
 - **Quick Look previews on macOS.** Select an `.aaf` file in Finder and press Space to see who created and last modified it, the main composition's timeline (zoomable from 1× to 16×) and clip list with record timecodes, and the file's other compositions, master clips and sources. Light and dark mode are supported, and large files stay quick: a 60,000-clip, 30-track sequence previews in under half a second. The extension is included in `aafedit.app`; open the app once to enable it.
 - **Application icon** on all platforms: an edit timeline with picture and sound tracks and a playhead.
 - `aaftool preview <file> [<out.html>]` writes the same preview page on any platform.
+- **Multichannel audio.** Stereo, 5.1 and 7.1 tracks exported from Pro Tools as multichannel tracks are shown as such: each clip appears once, with its name and a format badge, rather than as an "Audio Channel Combiner" effect, and track headers show the format. Splitting and trimming a multichannel clip edit every channel together. The Quick Look preview and its clip list show multichannel clips and track formats too.
+
+### Fixes
+
+- Trimming a clip made of several channels changed only the outer clip, leaving its channels at the old length. Every channel is now trimmed, and validation reports (and the editor refuses) a channel whose length differs from its clip.
 
 ## 0.3.0
 

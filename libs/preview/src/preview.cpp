@@ -267,7 +267,7 @@ auto effectNames(const Item& item) -> std::string
     {
         out += (out.empty() ? "" : ", ") + e.name;
     }
-    if (out.empty() && item.kind == ItemKind::operationGroup)
+    if (out.empty() && item.kind == ItemKind::operationGroup && item.channels.empty())
     {
         out = item.effect;
     }
@@ -369,7 +369,8 @@ private:
         ".zoom label{font-size:10px;color:var(--muted);padding:1px 7px;border:1px solid var(--line);border-radius:4px;cursor:pointer;user-select:none}"
         ".tl{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}"
         ".labels{flex:0 0 auto;border-right:1px solid var(--line);padding-top:18px}"
-        ".labels div{height:24px;line-height:24px;padding:0 8px;font-weight:600;color:var(--muted);font-size:11px}"
+        ".labels div{height:24px;line-height:24px;padding:0 8px;font-weight:600;color:var(--muted);font-size:11px;white-space:nowrap}"
+        ".labels .fmt{font-weight:400}"
         ".scroll{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden}"
         ".inner{width:100%;position:relative}"
         ".ruler{display:none;position:relative;height:18px;border-bottom:1px solid var(--line)}"
@@ -498,7 +499,8 @@ private:
         std::string trackNames;
         for (const auto& lane : lanes)
         {
-            trackNames += (trackNames.empty() ? "" : " ") + lane.label;
+            const auto format = timeline::channelFormatName(lane.track->channels);
+            trackNames += (trackNames.empty() ? "" : " ") + lane.label + (format.empty() ? "" : " (" + format + ")");
         }
         item("Tracks", trackNames.empty() ? "none" : trackNames);
         out_ += "</dl>";
@@ -528,7 +530,8 @@ private:
         out_ += R"(</div><div class="tl"><div class="labels">)";
         for (const auto& lane : lanes)
         {
-            out_ += "<div>" + escapeHtml(lane.label) + "</div>";
+            const auto format = timeline::channelFormatName(lane.track->channels);
+            out_ += "<div>" + escapeHtml(lane.label) + (format.empty() ? "" : R"( <span class="fmt">)" + escapeHtml(format) + "</span>") + "</div>";
         }
         out_ += R"(</div><div class="scroll"><div class="inner">)";
         for (const auto z : kZoomLevels)
@@ -633,6 +636,11 @@ private:
             {
                 title += " (source not in this file)";
             }
+            const auto format = timeline::channelFormatName(static_cast<std::uint32_t>(i.channels.size()));
+            if (!format.empty())
+            {
+                title += ", " + format;
+            }
             out_ += std::format(R"(<div class="c {}" style="left:{};width:{}" title="{}">{}{}</div>)", cls, percent(left), percent(width), escapeHtml(title), effects.empty() || cls == "fx" ? "" : "<i>fx</i>", escapeHtml(label));
             ++drawn;
         }
@@ -693,6 +701,10 @@ private:
             else if (source.mobKind == MobKind::composition)
             {
                 clip += "<span class=\"tag\">nested</span>";
+            }
+            if (!i.channels.empty())
+            {
+                clip += R"(<span class="tag">)" + escapeHtml(timeline::channelFormatName(static_cast<std::uint32_t>(i.channels.size()))) + "</span>";
             }
             out_ += std::format(R"(<tr><td>{}</td><td>{}</td><td class="tc">{}</td><td class="tc">{}</td><td class="tc">{}</td><td>{}</td><td>{}</td></tr>)", n + 1, escapeHtml(r.lane->label), clock.at(r.start), clock.at(r.end), clock.duration(r.end - r.start), clip, escapeHtml(effectNames(i)));
         }

@@ -364,6 +364,85 @@ auto Projector::buildSequence(ObjectId segment, int depth, std::vector<std::stri
     return items;
 }
 
+auto channelFormatName(std::uint32_t channels) -> std::string
+{
+    switch (channels)
+    {
+        case 0:
+            return {};
+        case 1:
+            return "Mono";
+        case 2:
+            return "Stereo";
+        case 6:
+            return "5.1";
+        case 8:
+            return "7.1";
+        default:
+            return std::format("{} channels", channels);
+    }
+}
+
+namespace
+{
+
+/// The name shared by every channel's clip: the common label, or the label without a channel suffix such as
+/// ".L" or ".LFE" when only the suffixes differ.
+auto multichannelLabel(const std::vector<std::string>& labels) -> std::string
+{
+    if (labels.empty())
+    {
+        return {};
+    }
+    if (std::ranges::all_of(labels, [&](const std::string& l) -> bool { return l == labels.front(); }))
+    {
+        return labels.front();
+    }
+    const auto dot = labels.front().rfind('.');
+    if (dot == std::string::npos)
+    {
+        return labels.front();
+    }
+    const auto stem = labels.front().substr(0, dot + 1);
+    const bool suffixesOnly = std::ranges::all_of(labels, [&](const std::string& l) -> bool { return l.starts_with(stem) && l.find('.', stem.size()) == std::string::npos; });
+    return suffixesOnly ? stem.substr(0, dot) : labels.front();
+}
+
+/// Makes a channel combiner item stand for its clip when every input is a clip (possibly inside effects).
+void combineChannels(Item& item)
+{
+    std::vector<std::string> labels;
+    std::vector<ObjectId> channels;
+    for (const auto& input : item.nested)
+    {
+        if (input.size() != 1)
+        {
+            return;
+        }
+        const auto& inner = input.front();
+        if (inner.kind == ItemKind::sourceClip)
+        {
+            channels.push_back(inner.object);
+        }
+        else if (inner.kind == ItemKind::operationGroup && inner.clip && inner.channels.empty())
+        {
+            channels.push_back(*inner.clip);
+        }
+        else
+        {
+            return;
+        }
+        labels.push_back(inner.label);
+    }
+    item.channels = std::move(channels);
+    item.clip = item.object;
+    item.label = multichannelLabel(labels);
+    item.source = item.nested.front().front().source;
+    item.effects = item.nested.front().front().effects;
+}
+
+}
+
 auto Projector::buildItem(ObjectId component, std::int64_t start, int depth, std::vector<std::string>& warnings) const -> Item
 {
     const Access a(doc_);
@@ -434,14 +513,20 @@ auto Projector::buildItem(ObjectId component, std::int64_t start, int depth, std
             {
                 const auto& inner = item.nested.front().front();
                 const bool clip = inner.kind == ItemKind::sourceClip;
-                if (clip || (inner.kind == ItemKind::operationGroup && inner.clip))
+                const bool multichannel = inner.kind == ItemKind::operationGroup && !inner.channels.empty();
+                if (clip || (inner.kind == ItemKind::operationGroup && inner.clip) || multichannel)
                 {
-                    item.clip = clip ? inner.object : *inner.clip;
+                    item.clip = clip ? inner.object : inner.clip.value_or(inner.object);
                     item.effects.push_back({ component, item.effect });
                     item.effects.insert(item.effects.end(), inner.effects.begin(), inner.effects.end());
                     item.label = inner.label;
                     item.source = inner.source;
+                    item.channels = inner.channels;
                 }
+            }
+            else if (item.nested.size() > 1 && a.isChannelCombiner(component))
+            {
+                combineChannels(item);
             }
             break;
         case ItemKind::essenceGroup:
@@ -654,12 +739,30 @@ auto Projector::buildTrack(ObjectId slot) const -> Track
         end = std::max(end, item.start + item.length);
     }
     track.length = declared.value_or(end);
+    track.channels = a.trackFormatChannels(slot);
+    if (track.channels == 0)
+    {
+        for (const auto& item : track.items)
+        {
+            track.channels = std::max(track.channels, static_cast<std::uint32_t>(item.channels.size()));
+        }
+    }
     return track;
 }
 
-auto Projector::resolve(ObjectId sourceClip) const -> Result<SourceChain>
+auto Projector::resolve(ObjectId target) const -> Result<SourceChain>
 {
     const Access a(doc_);
+    auto sourceClip = target;
+    for (int depth = 0; depth < kMaxDepth && sourceClip < doc_.objectCount() && a.isA(sourceClip, "OperationGroup"); ++depth)
+    {
+        const auto inputs = a.children(sourceClip, "OperationGroup", "InputSegments");
+        if (inputs.empty())
+        {
+            break;
+        }
+        sourceClip = inputs.front();
+    }
     if (sourceClip >= doc_.objectCount() || !a.isA(sourceClip, "SourceClip"))
     {
         return fail(Errc::invalid_argument, std::format("object {} is not a source clip", sourceClip));
