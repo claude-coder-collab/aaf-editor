@@ -56,6 +56,8 @@ enum class ItemKind : std::uint8_t {
 [[nodiscard]] auto to_string(TrackKind kind) noexcept -> std::string_view;
 [[nodiscard]] auto to_string(SlotKind kind) noexcept -> std::string_view;
 [[nodiscard]] auto to_string(ItemKind kind) noexcept -> std::string_view;
+/// "Mono", "Stereo", "5.1", "7.1" or "N channels" for an audio channel count; empty for 0 (unknown).
+[[nodiscard]] auto channelFormatName(std::uint32_t channels) -> std::string;
 
 /// Where a source clip points.
 struct SourceReference
@@ -111,10 +113,14 @@ struct Item
     /// Marker comment for descriptive markers and comment markers.
     std::string comment;
     /// For an effect whose only input is a source clip, possibly through further single-input effects: that clip.
-    /// The item then also carries the clip's `label` and `source`, so it can be shown as the clip.
+    /// For a multichannel clip: its channel combiner (the item itself when it is the combiner). The item then also
+    /// carries the clip's `label` and `source`, so it can be shown as the clip.
     std::optional<ObjectId> clip;
     /// The effects around `clip`, from the track inwards.
     std::vector<Effect> effects;
+    /// For a multichannel clip (an audio channel combiner, possibly inside effects): the source clip of each
+    /// channel, in channel order. `label` and `source` then describe the clip as a whole.
+    std::vector<ObjectId> channels;
 
     auto operator==(const Item&) const -> bool = default;
 };
@@ -135,6 +141,9 @@ struct Track
     std::vector<Effect> effects;
     std::vector<Item> items;
     std::vector<std::string> warnings;
+    /// Audio channels per clip: from the slot's `_TRACK_FORMAT` (stereo 2, 5.1 6, 7.1 8), else the most channels
+    /// of any multichannel clip on the track; 0 when unknown (typically mono).
+    std::uint32_t channels = 0;
 
     auto operator==(const Track&) const -> bool = default;
 };
@@ -218,8 +227,9 @@ public:
     /// object lies outside the mob (another mob, a definition, a locator), because any track may show data from it.
     /// Detached objects are ignored: whatever held them is itself among the changes.
     [[nodiscard]] auto affectedSlots(ObjectId mob, std::span<const ObjectId> changed) const -> std::optional<std::vector<ObjectId>>;
-    /// Follows a source clip's reference through master and source mobs to the physical essence.
-    [[nodiscard]] auto resolve(ObjectId sourceClip) const -> Result<SourceChain>;
+    /// Follows a source clip's reference through master and source mobs to the physical essence. Given an
+    /// effect or a channel combiner, follows its first input down to a source clip (the first channel).
+    [[nodiscard]] auto resolve(ObjectId item) const -> Result<SourceChain>;
     [[nodiscard]] auto findMob(const MobId& id) const -> std::optional<ObjectId>;
     [[nodiscard]] auto trackKindOf(ObjectId component) const -> TrackKind;
 

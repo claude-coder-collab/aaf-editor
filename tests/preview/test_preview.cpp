@@ -113,3 +113,13 @@ TEST_CASE("Unreadable files give an error page", "[preview]")
     CHECK(html.contains("could not be previewed"));
     CHECK(previewFile("/nonexistent/file.aaf").contains("could not be previewed"));
 }
+
+TEST_CASE("Multichannel tracks and clips show their format", "[preview][multichannel]")
+{
+    const auto html = previewFile(test::fixturesDir() / "protools/multichannel_frame_aligned.aaf");
+    CHECK(html.contains("A2 (Stereo)"));
+    CHECK(html.contains("A3 (5.1)"));
+    CHECK(html.contains("A4 (7.1)"));
+    CHECK(html.contains(R"(7.1_01-01<span class="tag">7.1</span>)"));
+    CHECK_FALSE(html.contains("Audio Channel Combiner"));
+}

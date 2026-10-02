@@ -132,7 +132,51 @@ private:
                 report(Diagnostic::Severity::error, o, pid, std::format("{} is missing required property {}", cls->name, def->name));
             }
         }
+        checkChannelCombiner(o);
     }
+
+    /// The inputs of an audio channel combiner are the channels of one clip, so each must be as long as the group.
+    void checkChannelCombiner(const Object& o)
+    {
+        const auto* group = model_.findClassByName("OperationGroup");
+        const auto* operation = model_.findProperty("OperationGroup", "Operation");
+        const auto* inputs = model_.findProperty("OperationGroup", "InputSegments");
+        const auto* length = model_.findProperty("Component", "Length");
+        if (group == nullptr || operation == nullptr || inputs == nullptr || length == nullptr || !model_.isA(o.classId, group->id))
+        {
+            return;
+        }
+        const auto* op = o.find(operation->pid);
+        const auto* weak = op == nullptr ? nullptr : std::get_if<WeakRefProperty>(&op->payload);
+        if (weak == nullptr || weak->key.size() != 16)
+        {
+            return;
+        }
+        const auto key = Auid::fromStored(std::span<const std::byte, 16>(weak->key.data(), 16), o.bigEndian());
+        const auto definition = doc_.resolveWeak(weak->tag, weak->key);
+        const auto name = definition ? doc_.value(*definition, "DefinitionObject", "Name") : std::nullopt;
+        const bool combiner = key == kChannelCombiner || (name && name->is<std::string>() && name->as<std::string>() == "Audio Channel Combiner");
+        const auto* list = o.find(inputs->pid);
+        const auto* vector = list == nullptr ? nullptr : std::get_if<StrongRefVectorProperty>(&list->payload);
+        const auto groupLength = doc_.value(o.id, "Component", "Length");
+        if (!combiner || vector == nullptr || !groupLength)
+        {
+            return;
+        }
+        for (std::size_t i = 0; i < vector->objects.size(); ++i)
+        {
+            const auto inputLength = doc_.value(vector->objects[i], "Component", "Length");
+            if (inputLength && *inputLength != *groupLength)
+            {
+                report(Diagnostic::Severity::error, o, inputs->pid, std::format("audio channel {} has length {}, but its channel combiner has length {}", i + 1, inputLength->toString(), groupLength->toString()));
+            }
+        }
+    }
+
+    static constexpr Auid kChannelCombiner = [] consteval -> Auid {
+        using namespace aaf::literals;
+        return "6b46dd7a-132d-4856-ab21-8b751d8462ec"_auid;
+    }();
 
     void checkProperty(const Object& o, const ClassDef& cls, const std::unordered_map<std::uint16_t, const PropertyDef*>& allowed, const Property& p)
     {

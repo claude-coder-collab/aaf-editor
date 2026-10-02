@@ -461,6 +461,10 @@ auto itemJson(const aaf::timeline::Item& item) -> nlohmann::ordered_json
             j["effects"].push_back({ { "object", effect.object }, { "name", effect.name } });
         }
     }
+    if (!item.channels.empty())
+    {
+        j["channels"] = item.channels;
+    }
     if (!item.nested.empty())
     {
         j["nested"] = nlohmann::ordered_json::array();
@@ -556,7 +560,7 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
             {
                 effects.push_back({ { "object", effect.object }, { "name", effect.name } });
             }
-            tracks.push_back({ { "slot", track.slot }, { "slotId", track.slotId }, { "name", track.name }, { "kind", aaf::timeline::to_string(track.kind) }, { "slotKind", aaf::timeline::to_string(track.slotKind) }, { "editRate", track.editRate.toString() }, { "origin", track.origin }, { "length", track.length }, { "effects", std::move(effects) }, { "items", std::move(items) } });
+            tracks.push_back({ { "slot", track.slot }, { "slotId", track.slotId }, { "name", track.name }, { "kind", aaf::timeline::to_string(track.kind) }, { "slotKind", aaf::timeline::to_string(track.slotKind) }, { "editRate", track.editRate.toString() }, { "origin", track.origin }, { "length", track.length }, { "effects", std::move(effects) }, { "channels", track.channels }, { "items", std::move(items) } });
         }
         std::println("{}", nlohmann::ordered_json{ { "mob", timeline->mob }, { "name", timeline->name }, { "kind", aaf::timeline::to_string(timeline->kind) }, { "tracks", std::move(tracks) }, { "warnings", timeline->warnings } }.dump(1));
         return 0;
@@ -564,7 +568,8 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
     std::println("{} ({}, {})", timeline->name, aaf::timeline::to_string(timeline->kind), timeline->mobId.toString());
     for (const auto& track : timeline->tracks)
     {
-        std::println("  slot {} {} [{}] rate {} length {}{}", track.slotId, aaf::timeline::to_string(track.kind), track.name, track.editRate.toString(), track.length, track.slotKind == aaf::timeline::SlotKind::event ? " (events)" : "");
+        const auto format = aaf::timeline::channelFormatName(track.channels);
+        std::println("  slot {} {} [{}] rate {} length {}{}{}", track.slotId, aaf::timeline::to_string(track.kind), track.name, track.editRate.toString(), track.length, track.slotKind == aaf::timeline::SlotKind::event ? " (events)" : "", format.empty() ? "" : " " + format);
         for (const auto& item : track.items)
         {
             std::string effects;
@@ -572,7 +577,8 @@ auto cmdTimeline(std::span<const std::string_view> args) -> int
             {
                 effects += std::format("{}{}", effects.empty() ? "  [fx " : ", ", effect.name.empty() ? "effect" : effect.name);
             }
-            std::println("    {:>8} +{:<6} {:<14} {}{}", item.start, item.length, aaf::timeline::to_string(item.kind), item.label, effects.empty() ? "" : effects + "]");
+            const auto channels = item.channels.empty() ? std::string{} : std::format(" ({} ch)", item.channels.size());
+            std::println("    {:>8} +{:<6} {:<14} {}{}{}", item.start, item.length, aaf::timeline::to_string(item.kind), item.label, channels, effects.empty() ? "" : effects + "]");
         }
     }
     return 0;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Timeline, TimelineItem, TimelineTrack } from "./rpc";
-import { badgeText, hitTest, holds, layout, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange } from "./timelineLayout";
+import { badgeText, channelFormat, hitTest, holds, layout, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange } from "./timelineLayout";
 
 function item(object: number, kind: string, start: number, length: number): TimelineItem {
   return { object, kind, class: kind, start, length, hasLength: true, label: `item ${object}` };
@@ -128,5 +128,17 @@ describe("clips inside effects", () => {
     expect(badgeText(wrapped, 200, measure)).toBe("fx Audio Gain, Pan");
     expect(badgeText(wrapped, 50, measure)).toBe("fx");
     expect(badgeText(plain, 200, measure)).toBeNull();
+  });
+});
+
+describe("channelFormat", () => {
+  it("names the common audio formats", () => {
+    expect(channelFormat(undefined)).toBe("");
+    expect(channelFormat(0)).toBe("");
+    expect(channelFormat(1)).toBe("Mono");
+    expect(channelFormat(2)).toBe("Stereo");
+    expect(channelFormat(6)).toBe("5.1");
+    expect(channelFormat(8)).toBe("7.1");
+    expect(channelFormat(4)).toBe("4 ch");
   });
 });

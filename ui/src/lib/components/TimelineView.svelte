@@ -4,7 +4,7 @@
   import type { ChangeSet, MobSummary, RpcClient, SourceChain, Timeline, TimelineItem } from "../rpc";
   import { dragZone, snap } from "../snap";
   import { formatTimecode, nominalFps } from "../timecode";
-  import { badgeText, hitTest, holds, layout, rateValue, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
+  import { badgeText, channelFormat, hitTest, holds, layout, rateValue, RULER_HEIGHT, RunMerger, selectionTarget, tickStep, visibleRange, type Layout, type Row } from "../timelineLayout";
   import { addPending, mergeTimeline, type Pending } from "../timelineMerge";
 
   interface Props {
@@ -270,10 +270,23 @@
           badges.set(item.object, { x0, x1: x0 + bw });
           textLeft = x0 + bw + 5;
         }
+        let textRight = left + w - 4;
+        const format = channelFormat(item.channels);
+        if (format && w >= 60) {
+          const fw = g.measureText(format).width + 8;
+          const fx = left + w - fw - 4;
+          g.fillStyle = "rgb(0 0 0 / 0.35)";
+          g.beginPath();
+          g.roundRect(fx, top + h / 2 - 7, fw, 14, 3);
+          g.fill();
+          g.fillStyle = "#fff";
+          g.fillText(format, fx + 4, top + h / 2);
+          textRight = fx - 2;
+        }
         if (w > 30 && item.kind !== "filler") {
           g.save();
           g.beginPath();
-          g.rect(left + 4, top, w - 8, h);
+          g.rect(left + 4, top, textRight - left - 4, h);
           g.clip();
           g.fillStyle = "#fff";
           g.fillText(item.label, textLeft, top + h / 2);
@@ -313,7 +326,8 @@
       if (row.height > 30) {
         g.fillStyle = muted;
         const effects = row.track.effects.map((e) => e.name).filter(Boolean).join(", ");
-        g.fillText(effects || `${row.track.editRate.num}/${row.track.editRate.den}`, 8, row.y + row.height / 2 + 8);
+        const details = [channelFormat(row.track.channels), effects || `${row.track.editRate.num}/${row.track.editRate.den}`].filter(Boolean).join(" · ");
+        g.fillText(details, 8, row.y + row.height / 2 + 8);
       }
     }
     if (drag) {
@@ -373,7 +387,7 @@
   $effect(() => {
     if (!window.__aafTest) return;
     window.__aafTimeline = {
-      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length, clip: i.clip, effects: i.effects?.map((e) => e.name) })) })) ?? [],
+      tracks: () => view?.rows.map((r) => ({ slot: r.track.slot, label: r.label, kind: r.track.kind, channels: r.track.channels, items: r.track.items.map((i) => ({ object: i.object, kind: i.kind, start: i.start, length: i.length, clip: i.clip, effects: i.effects?.map((e) => e.name), channels: i.channels })) })) ?? [],
       itemRect: (object: number) => {
         const row = view?.rows.find((r) => r.track.items.some((i) => i.object === object));
         const item = row?.track.items.find((i) => i.object === object);
@@ -575,6 +589,7 @@
   function describe(item: TimelineItem, rowLabel: string): string {
     const lines = [`${rowLabel} · ${item.clip !== undefined ? "SourceClip" : item.class}: ${item.label}`, `start ${item.start}, length ${item.hasLength ? item.length : "—"}`];
     if (item.effects?.length) lines.push(`effects: ${item.effects.map((e) => e.name || "effect").join(", ")}`);
+    if (item.channels) lines.push(`channels: ${channelFormat(item.channels)}`);
     if (item.source) {
       lines.push(item.source.original ? "original source" : `${item.source.mob === null ? "MISSING " : ""}${item.source.mobKind} mob, slot ${item.source.slotId}, from ${item.source.startTime}`);
     }

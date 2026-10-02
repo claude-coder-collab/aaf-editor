@@ -2,6 +2,7 @@
 
 #include <format>
 #include <limits>
+#include <set>
 
 namespace aaf::edit
 {
@@ -65,7 +66,16 @@ auto Session::danglingCount() const -> std::size_t
 
 auto Session::checkCommitted(const Transaction& tx) const -> Result<void>
 {
-    for (const auto id : tx.touched())
+    std::set<ObjectId> checked;
+    for (const auto touched : tx.touched())
+    {
+        checked.insert(touched);
+        if (const auto parent = document_.object(touched).parent; parent != kNoObject)
+        {
+            checked.insert(parent);
+        }
+    }
+    for (const auto id : checked)
     {
         if (!document_.isAttached(id))
         {

@@ -417,8 +417,10 @@ Status: **implemented (M7)** in `aaf/timeline/edit.hpp` (namespace `aaf::timelin
 - A chain is **locked** against length changes when a group's OperationDefinition has `IsTimeWarp` (speed changes map clip time differently), or when it has a `VaryingValue` parameter (keyframe times are relative to the group's length). `split` and `trim` then fail with a message naming the effect.
 - Avid stores `OperationGroup.Parameters` as a strong-reference **set** keyed by 0x1B01, where the specification has a vector. Copies keep that form, and a split file saves and reloads with 0 errors.
 
-- **Not yet supported**: moving or trimming transitions, editing inside nested scopes and multi-input effects, and trimming or splitting clips with speed changes or keyframed effects.
-- **Tests** (`tests/timeline/test_edit_ops.cpp`, on the SDK sample so they run on every PR):
+**Multichannel clips**: a channel combiner (§6.2) whose every input is a clip chain is part of the `ClipChain` too, so a multichannel clip is edited as one clip. `ClipChain` then holds every group (outer effects, the combiner, each channel's effects) and one source clip per channel. Length changes apply to all of them, `StartTime` changes to every channel's clip, and every channel must stay within its source. Only one combiner is allowed per chain, and a channel that is not a clip chain makes the whole item an ordinary multi-input effect.
+
+- **Not yet supported**: moving or trimming transitions, editing inside nested scopes and multi-input effects other than channel combiners, and trimming or splitting clips with speed changes or keyframed effects.
+- **Tests** (`tests/timeline/test_edit_ops.cpp`, on the SDK sample so they run on every PR; multichannel in `test_multichannel.cpp`, on the Pro Tools fixtures):
   - every operation, including refusals;
   - the stored Length always equal to the projected total;
   - no adjacent fillers;
@@ -426,6 +428,21 @@ Status: **implemented (M7)** in `aaf/timeline/edit.hpp` (namespace `aaf::timelin
   - exact undo;
   - a random sequence of 80 operations that is undone to the original objects.
 - **Cross-check** (`tools/crosscheck_edits.py`, in `full.yml`): split, overwrite, add-track and add-marker are applied through `aaftool rpc` to every reference file, and the result is saved. The saved file must validate with 0 errors, pyaaf2 must read the same mobs, and OTIO must read every comparable edited track identically to our projection. All 43 files pass.
+
+### 6.2 Multichannel audio
+
+Status: **projection and editing implemented**; grouping split-to-mono tracks and adding multichannel tracks are not.
+
+- **How Pro Tools stores it** (verified on the Pro Tools 26.4 exports in `tests/fixtures/protools/`, see `PROVENANCE.md`; the structure is Avid's, but Media Composer's own exports have not been checked yet):
+  - With "Export stereo, 5.1 and 7.1 tracks as multi-channel" (available only with "Enforce Media Composer compatibility"), each multichannel track is **one** TimelineMobSlot. Every clip on it is an OperationGroup whose OperationDefinition is "Audio Channel Combiner" (`6b46dd7a-132d-4856-ab21-8b751d8462ec`; it also carries a parameter whose bytes spell `EFF2_AUDIO_CHANNEL_COMBINER`). Its InputSegments are one mono SourceClip per channel, in Pro Tools film order: L C R Ls Rs LFE (5.1), L C R Lss Rss Lsr Rsr LFE (7.1). Each channel references its own mono master mob, named after the clip plus a channel suffix (`5.1_01-02.LFE`).
+  - The slot carries the Avid TaggedValue `_TRACK_FORMAT` in `TimelineMobAttributeList`: absent for mono, **2** stereo, **3** 5.1, **4** 7.1. A multichannel slot reserves one SlotID per channel (stereo 4 → next is 6; 5.1 6 → next is 12).
+  - Without the option, each channel is a separate mono slot; the only link is the shared SlotName (six slots named "5.1").
+  - With "Enforce Media Composer compatibility", edits are quantised to frames. Pro Tools renders the frame around any cut that is not frame-aligned into a one-frame clip whose master mob is named **"Sample accurate edit"**, and renders fades and crossfades into clips named **"Fade "** (with a trailing space) that are as long as the fade. Neither is a Transition: no fade shape or length survives as metadata. When every edit is frame-aligned, there are no "Sample accurate edit" clips.
+- **Projection**:
+  - `Item.channels` lists the channel source clips of a multichannel clip: a combiner whose inputs are each a SourceClip or a single-input effect chain around one, or single-input effects around such a combiner. The item's `clip` is the combiner (the item itself for a bare combiner), its `label` is the channels' common name (identical labels, or the labels without a ".L"-style suffix when only the suffixes differ), its `source` is the first channel's, and its `effects` are the outer effects plus the first channel's own effects.
+  - `Track.channels` comes from `_TRACK_FORMAT` (2, 6, 8), else the most channels of any clip on the track, else 0 (unknown, normally mono). `channelFormatName` gives "Mono", "Stereo", "5.1", "7.1" or "N channels".
+  - `Projector::resolve` accepts an effect or combiner and follows its first input down to a source clip (the first channel).
+- **Validation**: each input of an Audio Channel Combiner must have the group's length (an **error**: the channels are one clip). The session validates the parents of touched objects as well, so an edit to one channel that breaks this is refused.
 
 ## 7. Layer 4: Edit session (`libaafedit`)
 
@@ -459,7 +476,7 @@ Status: **implemented (M4)** in `libs/edit/` (namespace `aaf::edit`, headers `aa
   - **`execute(description, command)`**:
     1. Runs the command in a transaction.
     2. Rebuilds the indexes.
-    3. **Validates** every touched object that is attached: any error from `validateObject` rejects the command.
+    3. **Validates** every touched object that is attached, and the parent of each: any error from `validateObject` rejects the command. (Parents are included because some rules, such as a channel combiner's input lengths, are checked on the parent.)
     4. Unless the command was forced, rejects it if the number of unresolved weak references increased.
     5. On any failure, rolls back, so **the document is unchanged**.
     6. On success, commits, truncates the redo history, pushes the step and notifies the listener.
@@ -627,10 +644,10 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
   - Timeline (M6):
     - `timeline.mobs` returns the mob summaries.
     - `timeline.get {mob, changed?}` returns `{mob, mobId, name, kind, partial, slots, warnings, timecode, sources, tracks:[{slot, slotId, name, physicalNumber, kind, slotKind, editRate:{num, den}, origin, length, segment, effects:[{object, name}], items, warnings}]}`. `slots` lists every slot id in order.
-      - **Compact items**: `{object, kind, start, length, class?, hasLength?, label?, source?:{ref, slotId, startTime}, effect?, comment?, timecode?, nested?, clip?, effects?}`. `sources` lists each referenced source once per response as `{mobId, mob, mobName, mobKind, original}`, and `ref` indexes it; indexes are only meaningful within one response. Omitted fields take defaults: `class` is the kind with its first letter upper-cased, `hasLength` is true, and `label` is the source's `mobName`. `effect` and `comment` are omitted when empty, `nested` (a list of item lists) when there is none. `clip` and `effects` (`[{object, name}]`) are present together, for clips inside effects.
+      - **Compact items**: `{object, kind, start, length, class?, hasLength?, label?, source?:{ref, slotId, startTime}, effect?, comment?, timecode?, nested?, clip?, effects?}`. `sources` lists each referenced source once per response as `{mobId, mob, mobName, mobKind, original}`, and `ref` indexes it; indexes are only meaningful within one response. Omitted fields take defaults: `class` is the kind with its first letter upper-cased, `hasLength` is true, and `label` is the source's `mobName`. `effect` and `comment` are omitted when empty, `nested` (a list of item lists) when there is none. `clip` and `effects` (`[{object, name}]`) are present together, for clips inside effects and multichannel clips. `channels` (a count) is present for multichannel clips. Tracks also carry `channels` when known (§6.2).
       - The result is written straight to text by `TimelineWriter` with `JsonWriter` (`aaf/rpc/json_writer.hpp`: compact JSON, automatic commas, string escaping, integers of any width), not built as a JSON tree. `Server::handle` splices the text into the response; `Server::call` parses it for callers that want a `Json` value.
       - With `changed` (object ids, typically a ChangeSet's `objects`), only the tracks of the affected slots are returned (`partial: true`). If a change lies outside the mob, the whole timeline is returned (`partial: false`).
-    - `timeline.resolve {clip}` returns `{status, links, essence}`.
+    - `timeline.resolve {clip}` returns `{status, links, essence}`. `clip` may also be an effect or channel combiner (its first channel is resolved).
     - `timeline.op {op, …}` (M7) runs a §6.1 operation as one undoable step and returns `{changes, id?, count?}`. Operations:
       - `split {slot, position}` → `id` of the right part;
       - `lift {item}` and `rippleDelete {item}`;
@@ -704,6 +721,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - **Ruler**: timecode from the mob's timecode start, fps and drop-frame flag (`timecode.ts`: SMPTE drop-frame formatting and parsing, tested). Ticks are spaced at least 90 px apart, stepping through 1/2/5/10 frames, then 1 s … 1 h.
   - **Drawing**:
     - clips coloured by kind: video, audio, effect, code, and nested for NestedScope or clips of compositions;
+    - **multichannel clips** are drawn as one audio clip labelled with the clip name, with a format badge ("Stereo", "5.1", "7.1" or "N ch", from `channelFormat` in `timelineLayout.ts`) at the right end when the clip is at least 60 px wide; the label is clipped before it. Clicking selects the combiner, and the source chain shown is the first channel's. The track header's second line starts with the track's format ("5.1 · 24/1"), and the tooltip adds a "channels:" line;
     - **clips inside effects** are drawn as their clip (colour, label, missing source in red) with an effects badge: "fx Audio Gain, Pan" when it fits within the clip less 60 px, else "fx", and none below 40 px. The badge starts 8 px in (clicks nearer the edge trim), after any transition covering the clip's head, as does the label. The badge is filled with the accent colour while one of its effects is selected;
     - fillers as dashed outlines;
     - transitions as orange boxes with an X;
@@ -754,7 +772,8 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - **Timeline**: one lane per track except timecode, edgecode and fixed slots, ordered picture, sound, descriptive metadata, then the rest, labelled V1…, A1…, DM, D and so on. Positions are converted to the base rate (the first picture timeline track, else the first timeline track) and placed as percentages, so the drawing scales. Clips are coloured as in the editor (picture, sound, effect, nested, missing source in red); transitions are hatched, markers are diamonds, fillers are not drawn. Each clip has a `title` tooltip with its name and effects. An "fx" prefix marks clips inside effects.
     - **Zoom without JavaScript**: radio inputs `z1`…`z16` with labels; `#zN:checked~.tl .inner{width:N00%}` widens the strip inside a horizontally scrolling box, and one ruler per zoom level (about 8×N ticks at 1, 2, 5, 10, 15 or 30 s, or 1, 2, 5, 10, 15, 30 or 60 min steps) is shown for the checked level.
     - **Drawing budget**: clips narrower than a threshold are merged into runs of one class, each run ending once it reaches the threshold width. The threshold is 0.04% of the width, scaled up by (items ÷ 12,000) when a composition has more than 12,000 items, and at most 4,000 shapes are drawn per track. The 60,000-clip stress file draws about 12,000 shapes (1.1 MB of HTML, 0.4 s in total).
-    - **Clips table**: picture and sound clips with a source, in record order: number, track, record in and out, duration, clip name (tagged "original", "not in file" or "nested") and effects, up to `maxClips` rows, then "and N more clips".
+    - **Multichannel**: lane labels and the summary's track list show the format ("A2 Stereo"), multichannel clips are drawn as audio clips with the format in their tooltip, and the channel combiner is not listed as an effect.
+  - **Clips table**: picture and sound clips with a source, in record order: number, track, record in and out, duration, clip name (tagged "original", "not in file", "nested" or with the channel format) and effects, up to `maxClips` rows, then "and N more clips".
   - **Other compositions** (name, top-level tag, tracks; up to 50), then **Master clips** and **Sources** (name, tracks, MobID; sorted by name, up to `maxMobs`).
   - `renderErrorPreview(name, message)` is a page saying why a file could not be previewed. `previewFile(path)` opens the file and returns the preview or that page, catching every exception.
   - `formatTimecode(frames, fps, drop)` is SMPTE 12M (drop-frame for 30 and 60 fps), and `escapeHtml` escapes `& < > " '`. Every name from the file passes through it.
@@ -926,6 +945,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 
 | 2026-09-28 | UI end-to-end tests run the real page in Playwright against `aaftool serve` rather than in the native webviews, which cannot be automated on all three platforms. The engines are matched per platform (§10) |
 | 2026-10-02 | Identifiers that point at other objects (SourceID, SourceMobSlotID, Parameter.Definition and others, §7) are resolved for display and editing but stay data properties on save; turning them into weak references would break interchange. A target missing from the file is shown neutrally, not as an error, because references to other files are legitimate |
+| 2026-10-02 | Multichannel audio follows the representation Pro Tools writes for Media Composer compatibility (channel combiners and `_TRACK_FORMAT`, §6.2). A multichannel clip is edited as one clip across all its channels; the combiner is presented as the clip, not as an effect |
 | 2026-10-02 | The Quick Look extension is a thin Objective-C++ `.appex` built by CMake and embedded in `aafedit.app`, not a separate Xcode/Swift project as in edl-quicklook: it reuses the C++ library directly, and full Xcode is not needed. Its HTML comes from `aaf::preview`, which `aaftool preview` also exposes, so the preview is tested on every platform |
 | 2026-10-02 | The application icon is drawn by a Pillow script and its outputs are committed, like the generated model, so builds need no image tools |
 | 2026-10-02 | SMPTE label names come from the published SMPTE Labels register, generated into a committed table like the baseline model. Names are added to AUID values in the RPC rather than stored or written; the version byte is ignored when matching. The change picker offers the label's family (first four item bytes), since the nearest register node is often only a set of qualifiers (OP1a's eight variants) |

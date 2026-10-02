@@ -167,11 +167,13 @@ export interface TimelineItem {
   source?: { mobId: string; slotId: number; startTime: number; mob: number | null; mobName: string; mobKind: string; original: boolean };
   timecode?: { start: number; fps: number; drop: boolean };
   nested?: TimelineItem[][];
-  /// For an effect whose only input is a source clip (possibly through further such effects): that clip. The item
-  /// then carries the clip's label and source.
+  /// For an effect whose only input is a source clip (possibly through further such effects): that clip; for a
+  /// multichannel clip, its channel combiner. The item then carries the clip's label and source.
   clip?: number;
   /// The effects around `clip`, from the track inwards.
   effects?: { object: number; name: string }[];
+  /// Number of audio channels of a multichannel clip.
+  channels?: number;
 }
 
 export interface TimelineTrack {
@@ -188,6 +190,8 @@ export interface TimelineTrack {
   effects: { object: number; name: string }[];
   items: TimelineItem[];
   warnings: string[];
+  /// Audio channels per clip (stereo 2, 5.1 6, 7.1 8), when known.
+  channels?: number;
 }
 
 export interface Timeline {
@@ -246,7 +250,7 @@ declare global {
     __aafSmoke?: { file: string };
     __aafTest?: boolean;
     __aafTimeline?: {
-      tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number; clip?: number; effects?: string[] }[] }[];
+      tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number; clip?: number; effects?: string[]; channels?: number }[]; channels?: number }[];
       itemRect: (object: number) => { x: number; y: number; width: number; height: number } | null;
       measure: (repeat: number) => { draw: number; pick: number };
       zoom: (factor: number) => void;

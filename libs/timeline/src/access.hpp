@@ -133,6 +133,65 @@ public:
         return definition ? string(*definition, "DefinitionObject", "Name") : std::string{};
     }
 
+    /// True for an Avid/Pro Tools "Audio Channel Combiner": an OperationGroup whose inputs are the channels of one
+    /// multichannel clip, in channel order.
+    [[nodiscard]] auto isChannelCombiner(ObjectId id) const -> bool
+    {
+        if (!isA(id, "OperationGroup"))
+        {
+            return false;
+        }
+        if (weakKey(id, "OperationGroup", "Operation") == kChannelCombiner)
+        {
+            return true;
+        }
+        return definitionName(weak(id, "OperationGroup", "Operation")) == "Audio Channel Combiner";
+    }
+
+    /// Channel count from a slot's Avid `_TRACK_FORMAT` tagged value (2 stereo, 3 5.1, 4 7.1), or 0.
+    [[nodiscard]] auto trackFormatChannels(ObjectId slot) const -> std::uint32_t
+    {
+        for (const auto tag : children(slot, "TimelineMobSlot", "TimelineMobAttributeList"))
+        {
+            if (string(tag, "TaggedValue", "Name") != "_TRACK_FORMAT")
+            {
+                continue;
+            }
+            const auto v = value(tag, "TaggedValue", "Value");
+            if (!v || !v->is<Value::Indirect>() || v->as<Value::Indirect>().value.empty())
+            {
+                return 0;
+            }
+            const auto& inner = v->as<Value::Indirect>().value.front();
+            std::int64_t format = 0;
+            if (inner.is<std::int64_t>())
+            {
+                format = inner.as<std::int64_t>();
+            }
+            else if (inner.is<std::uint64_t>())
+            {
+                format = static_cast<std::int64_t>(inner.as<std::uint64_t>());
+            }
+            switch (format)
+            {
+                case 2:
+                    return 2;
+                case 3:
+                    return 6;
+                case 4:
+                    return 8;
+                default:
+                    return 0;
+            }
+        }
+        return 0;
+    }
+
+    static constexpr Auid kChannelCombiner = [] consteval -> Auid {
+        using namespace aaf::literals;
+        return "6b46dd7a-132d-4856-ab21-8b751d8462ec"_auid;
+    }();
+
     const Document& doc_;
     const MetaModel& model_;
 };

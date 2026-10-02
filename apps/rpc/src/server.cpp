@@ -523,6 +523,10 @@ private:
             w_.beginObject().key("object").value(effect.object).key("name").value(effect.name).endObject();
         }
         w_.endArray();
+        if (track.channels != 0)
+        {
+            w_.key("channels").value(track.channels);
+        }
         items(track.items);
         strings("warnings", track.warnings);
         w_.endObject();
@@ -584,6 +588,10 @@ private:
                 w_.beginObject().key("object").value(effect.object).key("name").value(effect.name).endObject();
             }
             w_.endArray();
+        }
+        if (!item.channels.empty())
+        {
+            w_.key("channels").value(item.channels.size());
         }
         if (!item.nested.empty())
         {

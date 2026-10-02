@@ -9,6 +9,7 @@
 #include <cctype>
 #include <format>
 #include <functional>
+#include <map>
 #include <random>
 #include <ranges>
 
@@ -328,6 +329,32 @@ TEST_CASE("SMPTE labels are named through the RPC API", "[rpc][server][labels]")
     CHECK(std::ranges::any_of(family, [](const Json& l) { return l["name"].get<std::string>().contains("OP1b") && l["auid"].is_string(); }));
     CHECK(c.result("labels.family", { { "auid", Auid::generate().toString() } }).empty());
     CHECK(c.request("labels.family", { { "auid", "nonsense" } }).contains("error"));
+}
+
+TEST_CASE("Multichannel clips and track formats are in the timeline form", "[rpc][timeline][multichannel]")
+{
+    Client c;
+    c.result("doc.open", { { "path", (fixturesDir() / "protools/multichannel_frame_aligned.aaf").string() } });
+    const auto mobs = c.result("timeline.mobs");
+    const auto composition = std::ranges::find_if(mobs, [](const Json& m) { return m["kind"] == "composition"; });
+    REQUIRE(composition != mobs.end());
+    const auto t = expandTimeline(c.result("timeline.get", { { "mob", (*composition)["id"] } }));
+    std::map<std::string, Json> tracks;
+    for (const auto& track : t["tracks"])
+    {
+        tracks[track["name"].get<std::string>()] = track;
+    }
+    CHECK_FALSE(tracks["mono"].contains("channels"));
+    CHECK(tracks["5.1"]["channels"] == 6);
+    const auto& items = tracks["7.1"]["items"];
+    const auto clip = std::ranges::find_if(items, [](const Json& i) { return i["kind"] == "operationGroup"; });
+    REQUIRE(clip != items.end());
+    CHECK((*clip)["channels"] == 8);
+    CHECK((*clip)["label"] == "7.1_01-01");
+    CHECK((*clip)["clip"] == (*clip)["object"]);
+    const auto chain = c.result("timeline.resolve", { { "clip", (*clip)["object"] } });
+    REQUIRE_FALSE(chain["links"].empty());
+    CHECK(chain["links"][0]["name"] == "7.1_01-01.L");
 }
 
 TEST_CASE("Embedded essence can be extracted and replaced through the RPC API", "[rpc][server]")
