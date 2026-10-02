@@ -95,7 +95,7 @@ TEST_CASE("Names from the file are escaped", "[preview]")
         auto pid = edit::pidOf(tx.document(), mob, "Name");
         return pid ? edit::setProperty(tx, mob, *pid, Value(std::string("<img src=x onerror=alert(1)>"))) : Result<void>(std::unexpected(pid.error()));
     }));
-    const auto html = renderPreview(doc, { .fileName = "<evil>.aaf" });
+    const auto html = renderPreview(doc, { .fileName = "<evil>.aaf", .fileSize = std::nullopt });
     CHECK_FALSE(html.contains("<img"));
     CHECK_FALSE(html.contains("<evil>"));
     CHECK(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
