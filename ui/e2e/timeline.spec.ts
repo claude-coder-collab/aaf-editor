@@ -115,7 +115,10 @@ test("shows multichannel clips as one clip with their format", async ({ editor }
   const surround = (await tracks(editor)).find((t) => t.channels === 8)!;
   const clip = surround.items.find((i) => i.channels === 8)!;
   expect(clip.effects ?? []).toEqual([]);
+  await page.evaluate((id) => window.__aafTimeline!.show(id, 300), clip.object);
+  const canvas = (await page.locator(".timeline canvas").boundingBox())!;
   const box = await clipBox(editor, clip.object);
+  expect(box.y + box.height).toBeLessThanOrEqual(canvas.y + canvas.height);
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator(".panel .subtitle")).toContainText(`OperationGroup · object ${clip.object}`);
   await expect(page.locator(".timeline .chain")).toContainText("7.1_01-01.L");
