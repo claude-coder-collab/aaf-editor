@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 ### New
 
@@ -8,7 +8,6 @@
 - **Application icon** on all platforms: an edit timeline with picture and sound tracks and a playhead.
 - `aaftool preview <file> [<out.html>]` writes the same preview page on any platform.
 - **Multichannel audio.** Stereo, 5.1 and 7.1 tracks exported from Pro Tools as multichannel tracks are shown as such: each clip appears once, with its name and a format badge, rather than as an "Audio Channel Combiner" effect, and track headers show the format. Splitting and trimming a multichannel clip edit every channel together. The Quick Look preview and its clip list show multichannel clips and track formats too.
-
 - **Pro Tools fades.** Fades, crossfades and sample-accurate edit frames that Pro Tools renders when exporting for Media Composer are recognised and drawn as fades in the timeline and Quick Look preview. Lifting one replaces it with a cut, using the clips' media handles. Lifting, deleting, moving or trimming a clip next to one does the same first and says so; edits that cannot do this safely are refused with an explanation.
 
 ### Fixes
