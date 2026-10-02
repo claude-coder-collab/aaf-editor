@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TaggedValue } from "../rpc";
+  import type { LabelInfo, TaggedValue } from "../rpc";
   import { defaultValue, editorKind, formatValue, parseScalar, resolveType, withField, withItem, type Types } from "../values";
   import ValueEditor from "./ValueEditor.svelte";
 
@@ -9,9 +9,29 @@
     types: Types;
     readonly?: boolean;
     onchange: (value: TaggedValue) => void;
+    labelFamily?: (auid: string) => Promise<LabelInfo[]>;
   }
 
-  let { value, typeId, types, readonly = false, onchange }: Props = $props();
+  let { value, typeId, types, readonly = false, onchange, labelFamily }: Props = $props();
+
+  const listId = `labels-${Math.random().toString(36).slice(2)}`;
+  let family = $state<LabelInfo[] | null>(null);
+  let choosing = $state(false);
+  let choice = $state("");
+
+  async function beginChoose() {
+    if (!labelFamily || value.t !== "auid") return;
+    family = await labelFamily(value.v);
+    choice = "";
+    choosing = true;
+  }
+
+  function choose() {
+    const picked = family?.find((l) => l.name === choice.trim());
+    if (!picked) return;
+    choosing = false;
+    if (value.t !== "auid" || picked.auid !== value.v) onchange({ t: "auid", v: picked.auid, name: picked.name });
+  }
 
   const type = $derived(resolveType(types, typeId));
   const kind = $derived(editorKind(types, typeId));
@@ -83,7 +103,7 @@
       {@const fieldType = type?.fields?.find((f) => f.name === field.name)?.type}
       <label class="field">
         <span class="field-name">{field.name}</span>
-        <ValueEditor value={field.value} typeId={fieldType} {types} {readonly} onchange={(v) => onchange(withField(value, field.name, v))} />
+        <ValueEditor value={field.value} typeId={fieldType} {types} {readonly} {labelFamily} onchange={(v) => onchange(withField(value, field.name, v))} />
       </label>
     {/each}
   </div>
@@ -92,7 +112,7 @@
     {#each value.items as item, index (index)}
       <div class="array-item">
         <span class="index">{index}</span>
-        <ValueEditor value={item} typeId={elementType} {types} {readonly} onchange={(v) => onchange(withItem(value, index, v))} />
+        <ValueEditor value={item} typeId={elementType} {types} {readonly} {labelFamily} onchange={(v) => onchange(withItem(value, index, v))} />
         {#if !readonly && canResize}
           <button class="icon" title="Remove element" onclick={() => onchange(withItem(value, index, null))}>−</button>
         {/if}
@@ -124,6 +144,30 @@
     />
     {#if (kind === "auid" || kind === "mobid") && !readonly}
       <button class="icon copy" title="Copy" onclick={() => navigator.clipboard?.writeText(draft)}>⧉</button>
+    {/if}
+    {#if value.t === "auid" && value.name}
+      <span class="label-name" title="SMPTE label">{value.name}</span>
+      {#if !readonly && labelFamily}
+        {#if choosing}
+          <input
+            class="label-choice"
+            type="text"
+            list={listId}
+            placeholder="Type to filter labels…"
+            bind:value={choice}
+            onchange={choose}
+            onkeydown={(e) => e.key === "Escape" && (choosing = false)}
+          />
+          <datalist id={listId}>
+            {#each family ?? [] as l (l.auid)}
+              <option value={l.name}>{l.deprecated ? "deprecated" : ""}</option>
+            {/each}
+          </datalist>
+          <button class="small" onclick={() => (choosing = false)}>Cancel</button>
+        {:else}
+          <button class="small" onclick={beginChoose}>Change…</button>
+        {/if}
+      {/if}
     {/if}
     {#if error}
       <span class="error">{error}</span>
@@ -188,6 +232,13 @@
     color: var(--danger);
     font-size: 12px;
     flex-basis: 100%;
+  }
+  .label-name {
+    font-size: 12px;
+    flex-basis: 100%;
+  }
+  .label-choice {
+    max-width: 60ch;
   }
   .copy {
     flex-shrink: 0;

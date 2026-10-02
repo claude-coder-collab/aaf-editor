@@ -1,3 +1,4 @@
+#include <aaf/core/labels.hpp>
 #include <aaf/rpc/json_value.hpp>
 
 #include <charconv>
@@ -231,7 +232,12 @@ auto toJson(const Value& value) -> Json
             }
             else if constexpr (std::is_same_v<T, Auid>)
             {
-                return { { "t", "auid" }, { "v", v.toString() } };
+                Json j = { { "t", "auid" }, { "v", v.toString() } };
+                if (const auto* label = findSmpteLabel(v))
+                {
+                    j["name"] = label->name;
+                }
+                return j;
             }
             else if constexpr (std::is_same_v<T, MobId>)
             {
@@ -243,7 +249,8 @@ auto toJson(const Value& value) -> Json
             }
             else if constexpr (std::is_same_v<T, Value::ExtEnum>)
             {
-                return { { "t", "extenum" }, { "v", v.value.toString() }, { "name", v.name } };
+                const auto* label = v.name.empty() ? findSmpteLabel(v.value) : nullptr;
+                return { { "t", "extenum" }, { "v", v.value.toString() }, { "name", label != nullptr ? std::string(label->name) : v.name } };
             }
             else if constexpr (std::is_same_v<T, Value::Record>)
             {

@@ -179,7 +179,7 @@
                 </select>
               </span>
             {/if}
-            <ValueEditor value={p.value} typeId={p.type} types={object.types} readonly={!!p.error} onchange={(v) => setValue(p, v)} />
+            <ValueEditor value={p.value} typeId={p.type} types={object.types} readonly={!!p.error} labelFamily={client.labelFamily} onchange={(v) => setValue(p, v)} />
           {:else if p.kind === "strongRef" && p.children}
             {#each p.children as child (child.id)}
               <button class="link" onclick={() => onselect(child.id)}>{child.label} <span class="muted">({child.class})</span></button>

@@ -1,3 +1,4 @@
+#include <aaf/core/labels.hpp>
 #include <aaf/edit/defaults.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/rpc/json_writer.hpp>
@@ -405,6 +406,11 @@ auto matches(const Document& doc, ObjectId id, const std::string& needle) -> boo
         else if (v->is<Auid>() || v->is<MobId>())
         {
             text = v->toString();
+            if (const auto* label = v->is<Auid>() ? findSmpteLabel(v->as<Auid>()) : nullptr)
+            {
+                text += ' ';
+                text += label->name;
+            }
         }
         if (!text.empty() && lower(text).contains(needle))
         {
@@ -845,6 +851,7 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         "object.setWeakRef",
         "object.candidates",
         "object.setReference",
+        "labels.family",
         "model.subclasses",
         "edit.undo",
         "edit.redo",
@@ -888,6 +895,25 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
         attachListener();
         emit("doc.opened", info());
         return info();
+    }
+    if (method == "labels.family")
+    {
+        auto text = param<std::string>(params, "auid");
+        if (!text)
+        {
+            return std::unexpected(text.error());
+        }
+        auto auid = Auid::parse(*text);
+        if (!auid)
+        {
+            return std::unexpected(auid.error());
+        }
+        Json out = Json::array();
+        for (const auto* label : smpteLabelFamily(*auid))
+        {
+            out.push_back({ { "auid", label->id.toString() }, { "name", label->name }, { "deprecated", label->deprecated } });
+        }
+        return out;
     }
     if (method == "doc.close")
     {

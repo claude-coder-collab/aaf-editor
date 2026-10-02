@@ -2,6 +2,8 @@ add_library(aaf_core
     src/auid.cpp
     src/document.cpp
     src/generated/baseline_model.cpp
+    src/generated/smpte_labels.cpp
+    src/labels.cpp
     src/metamodel.cpp
     src/validate.cpp
     src/value.cpp

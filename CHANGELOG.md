@@ -10,6 +10,7 @@
 - Changing a MobID, SlotID or definition identifier that other objects use asks whether to update them as well.
 - Deleting an object that clips or parameters still refer to by identifier now warns and offers "delete anyway", as it already did for weak references.
 - Mob slots are labelled "Name (Slot n)" and Identification objects by product name and version, instead of by class name.
+- **SMPTE labels are named.** AUIDs that are SMPTE Universal Labels (compression schemes, essence containers, operational patterns, channel assignments, data definitions and the rest of the SMPTE Labels register) show their registered name, such as "MXF OP1a SingleItem SinglePackage UniTrack Stream Internal" or "Picture Essence Track". A **Change…** button offers the related labels in a list you can filter by typing. Search also matches label names.
 
 ## 0.2.1
 
