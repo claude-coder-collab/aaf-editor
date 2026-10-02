@@ -843,7 +843,7 @@ auto previewFile(const std::filesystem::path& path) -> std::string
         {
             return renderErrorPreview(name, doc.error().message);
         }
-        PreviewOptions options{ .fileName = name, .fileSize = std::nullopt };
+        PreviewOptions options{ .fileName = name, .fileSize = std::nullopt, .maxClips = 1000, .maxMobs = 200 };
         std::error_code ec;
         if (const auto size = std::filesystem::file_size(path, ec); !ec)
         {
