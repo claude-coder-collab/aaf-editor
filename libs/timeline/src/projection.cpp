@@ -750,10 +750,10 @@ auto Projector::buildTrack(ObjectId slot) const -> Track
     return track;
 }
 
-auto Projector::resolve(ObjectId item) const -> Result<SourceChain>
+auto Projector::resolve(ObjectId target) const -> Result<SourceChain>
 {
     const Access a(doc_);
-    auto sourceClip = item;
+    auto sourceClip = target;
     for (int depth = 0; depth < kMaxDepth && sourceClip < doc_.objectCount() && a.isA(sourceClip, "OperationGroup"); ++depth)
     {
         const auto inputs = a.children(sourceClip, "OperationGroup", "InputSegments");

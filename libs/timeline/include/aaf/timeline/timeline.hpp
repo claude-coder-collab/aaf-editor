@@ -229,7 +229,7 @@ public:
     [[nodiscard]] auto affectedSlots(ObjectId mob, std::span<const ObjectId> changed) const -> std::optional<std::vector<ObjectId>>;
     /// Follows a source clip's reference through master and source mobs to the physical essence. Given an
     /// effect or a channel combiner, follows its first input down to a source clip (the first channel).
-    [[nodiscard]] auto resolve(ObjectId item) const -> Result<SourceChain>;
+    [[nodiscard]] auto resolve(ObjectId target) const -> Result<SourceChain>;
     [[nodiscard]] auto findMob(const MobId& id) const -> std::optional<ObjectId>;
     [[nodiscard]] auto trackKindOf(ObjectId component) const -> TrackKind;
 
