@@ -1,6 +1,6 @@
 # AAF Editor — Specification
 
-Status: v0.2.1 (2026-09-28; clips inside effects, Avid effect names) after v0.2.0 (2026-09-28) and v0.1.0 (2026-09-27); milestones M1–M8 complete. Changes per version are in `CHANGELOG.md`. Licence: MIT. This document is the source of truth. Update it whenever a design decision changes, so that another engineer or agent can re-implement the project from it alone.
+Status: v0.3.0 (2026-10-02; identifiers resolved to the objects they point at, SMPTE label names) after v0.2.1 (2026-09-28), v0.2.0 (2026-09-28) and v0.1.0 (2026-09-27); milestones M1–M8 complete. Changes per version are in `CHANGELOG.md`. Licence: MIT. This document is the source of truth. Update it whenever a design decision changes, so that another engineer or agent can re-implement the project from it alone.
 
 ## 1. Goal
 
