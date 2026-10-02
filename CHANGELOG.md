@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- **Quick Look previews on macOS.** Select an `.aaf` file in Finder and press Space to see who created and last modified it, the main composition's timeline (zoomable from 1× to 16×) and clip list with record timecodes, and the file's other compositions, master clips and sources. Light and dark mode are supported, and large files stay quick: a 60,000-clip, 30-track sequence previews in under half a second. The extension is included in `aafedit.app`; open the app once to enable it.
+- **Application icon** on all platforms: an edit timeline with picture and sound tracks and a playhead.
+- `aaftool preview <file> [<out.html>]` writes the same preview page on any platform.
+
 ## 0.3.0
 
 ### Inspector

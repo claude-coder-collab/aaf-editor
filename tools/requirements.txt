@@ -2,3 +2,4 @@ pyaaf2==1.7.1
 pytest==9.1.1
 opentimelineio==0.18.1
 otio-aaf-adapter==2.0.0
+pillow==12.3.0

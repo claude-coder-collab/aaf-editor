@@ -11,6 +11,7 @@
 | `aaftool dump <file> [--json] [--depth N] [--header\|--metadict]` | The object tree from the root, the Header or the MetaDictionary. `--json` uses the canonical form in SPEC §8.1. |
 | `aaftool timeline <file> --mobs` | One line per mob: object ID, kind, MobID, number of tracks and name. Top-level compositions are marked. |
 | `aaftool timeline <file> [--mob NAME\|ID\|MOBID] [--json]` | A mob's tracks and their items, with positions in edit units. Defaults to the first composition. |
+| `aaftool preview <file> [<out.html>]` | The HTML page the macOS Quick Look extension shows: summary, main composition timeline and clip list, and mob lists. Writes to stdout without `<out.html>`. Unreadable files give a page explaining why. |
 | `aaftool cfb <file>` | The raw compound-file directory: storages, streams, sizes and CLSIDs. |
 
 ## Saving

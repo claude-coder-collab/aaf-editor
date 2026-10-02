@@ -6,6 +6,7 @@ install(FILES ${PROJECT_SOURCE_DIR}/LICENSE ${PROJECT_SOURCE_DIR}/README.md ${PR
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${PROJECT_SOURCE_DIR}/packaging/linux/aaf-editor.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/packaging/icons/hicolor DESTINATION ${CMAKE_INSTALL_DATADIR}/icons)
     set(aaf_platform "linux-${CMAKE_SYSTEM_PROCESSOR}")
     set(CPACK_GENERATOR "TGZ;DEB")
 elseif(APPLE)

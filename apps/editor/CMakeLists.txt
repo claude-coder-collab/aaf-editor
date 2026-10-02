@@ -82,4 +82,44 @@ set_target_properties(aafedit PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${AAF_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${AAF_VERSION}
 )
+set(AAF_ICON_DIR ${PROJECT_SOURCE_DIR}/packaging/icons)
+if(WIN32)
+    set(AAF_ICON_ICO ${AAF_ICON_DIR}/aafedit.ico)
+    configure_file(aafedit.rc.in ${CMAKE_CURRENT_BINARY_DIR}/aafedit.rc @ONLY)
+    target_sources(aafedit PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/aafedit.rc)
+endif()
+if(APPLE)
+    set(icon ${AAF_ICON_DIR}/aafedit.icns)
+    target_sources(aafedit PRIVATE ${icon})
+    set_source_files_properties(${icon} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(aafedit PROPERTIES MACOSX_BUNDLE_ICON_FILE aafedit.icns)
+endif()
+
 install(TARGETS aafedit RUNTIME DESTINATION bin BUNDLE DESTINATION .)
+
+if(APPLE AND TARGET aafquicklook)
+    # The Quick Look extension lives in aafedit.app/Contents/PlugIns. Extensions must be sandboxed and signed,
+    # and signing the app afterwards seals the extension into it. Ad-hoc ("-") by default.
+    set(AAF_CODESIGN_IDENTITY "-" CACHE STRING "codesign identity for aafedit.app and its Quick Look extension")
+    set(app $<TARGET_BUNDLE_DIR:aafedit>)
+    set(appex ${app}/Contents/PlugIns/AAFPreview.appex)
+    set(stamp ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/plugins.stamp)
+    add_custom_command(
+        OUTPUT ${stamp}
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${appex}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory $<TARGET_BUNDLE_DIR:aafquicklook> ${appex}
+        COMMAND codesign --force --sign ${AAF_CODESIGN_IDENTITY} --entitlements ${AAF_QUICKLOOK_ENTITLEMENTS} ${appex}
+        COMMAND codesign --force --sign ${AAF_CODESIGN_IDENTITY} ${app}
+        COMMAND ${CMAKE_COMMAND} -E touch ${stamp}
+        DEPENDS aafedit aafquicklook ${AAF_QUICKLOOK_ENTITLEMENTS}
+        COMMENT "Embedding and signing the Quick Look extension"
+        VERBATIM
+    )
+    add_custom_target(aafedit_bundle ALL DEPENDS ${stamp})
+    # Installing strips the executables, which invalidates the signatures, so sign the installed bundle again.
+    install(CODE "
+        set(app \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/aafedit.app\")
+        execute_process(COMMAND codesign --force --sign \"${AAF_CODESIGN_IDENTITY}\" --entitlements \"${AAF_QUICKLOOK_ENTITLEMENTS}\" \"\${app}/Contents/PlugIns/AAFPreview.appex\" COMMAND_ERROR_IS_FATAL ANY)
+        execute_process(COMMAND codesign --force --sign \"${AAF_CODESIGN_IDENTITY}\" \"\${app}\" COMMAND_ERROR_IS_FATAL ANY)
+    ")
+endif()

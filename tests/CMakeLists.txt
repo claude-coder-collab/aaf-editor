@@ -23,12 +23,13 @@ add_executable(aaf_tests
     core/test_writer.cpp
     edit/test_references.cpp
     edit/test_session.cpp
+    preview/test_preview.cpp
     rpc/test_server.cpp
     timeline/test_edit_ops.cpp
     timeline/test_timeline.cpp
     support/fixtures.cpp
 )
 target_include_directories(aaf_tests PRIVATE support)
-target_link_libraries(aaf_tests PRIVATE aaf::rpc aaf::timeline aaf::project_options Catch2::Catch2WithMain)
+target_link_libraries(aaf_tests PRIVATE aaf::rpc aaf::preview aaf::timeline aaf::project_options Catch2::Catch2WithMain)
 target_compile_definitions(aaf_tests PRIVATE AAF_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 catch_discover_tests(aaf_tests)
