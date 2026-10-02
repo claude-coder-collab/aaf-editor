@@ -93,7 +93,9 @@ TEST_CASE("Rendered fades and seams are classified by their neighbours", "[timel
         const Projector projector(session->document());
         for (const auto& m : projector.mobs())
         {
-            for (const auto& tr : projector.project(m.object)->tracks)
+            const auto projected = projector.project(m.object);
+            REQUIRE(projected);
+            for (const auto& tr : projected->tracks)
             {
                 CHECK(std::ranges::all_of(tr.items, [](const Item& i) { return i.rendered == Rendered::none; }));
             }
