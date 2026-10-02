@@ -7,6 +7,10 @@
 #define WEBVIEW_HEADER
 #include <webview/webview.h>
 
+#ifdef __linux__
+    #include <gtk/gtk.h>
+#endif
+
 namespace aafedit
 {
 
@@ -38,6 +42,9 @@ View::View(bool debug) :
     {
         throw std::runtime_error("cannot create the webview window");
     }
+#ifdef __linux__
+    gtk_window_set_icon_name(static_cast<GtkWindow*>(webview_get_window(handleOf(handle_))), "aafedit");
+#endif
 }
 
 View::~View()

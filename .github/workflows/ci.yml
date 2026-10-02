@@ -28,6 +28,8 @@ jobs:
         run: python tools/gen_model.py check
       - name: Generated SMPTE label table is up to date
         run: python tools/gen_labels.py check
+      - name: Generated icons are up to date
+        run: python tools/gen_icons.py check
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -146,6 +148,8 @@ jobs:
         run: ctest --test-dir build/clang -C Release --output-on-failure
       - name: Editor smoke test
         run: build/clang/apps/editor/Release/aafedit.app/Contents/MacOS/aafedit --smoke-test tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf
+      - name: Quick Look extension
+        run: python3 tools/check_quicklook.py build/clang/apps/editor/Release/aafedit.app --smoke tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf
       - name: UI end-to-end tests
         working-directory: ui
         env:

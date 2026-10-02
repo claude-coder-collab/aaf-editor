@@ -44,6 +44,22 @@ Builds are not code-signed. The release notes explain how to open them on macOS 
 - **Diagnostics and History (bottom):** Validate checks the whole file, and clicking a history entry undoes or redoes to that point.
 - **File shortcuts:** Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+Z, Ctrl+Shift+Z.
 
+## Quick Look on macOS
+
+`aafedit.app` includes a Quick Look extension. Select an `.aaf` file in Finder and press Space to see who wrote
+it, the main composition's timeline (zoom with the 1×–16× buttons) and clip list, and the file's compositions,
+master clips and sources.
+
+![Quick Look preview of an AAF file](docs/images/quicklook-preview.png)
+
+1. Move `aafedit.app` to Applications. Builds are not notarised, so clear the quarantine flag:
+   `xattr -dr com.apple.quarantine /Applications/aafedit.app`
+2. Open the app once so that macOS registers the extension.
+3. If no preview appears, enable **AAF Preview** under System Settings → General → Login Items & Extensions →
+   Quick Look, and run `qlmanage -r`. `qlmanage -p file.aaf` previews a file from Terminal.
+
+`aaftool preview file.aaf out.html` writes the same page on any platform.
+
 ## Using `aaftool`
 
 ```

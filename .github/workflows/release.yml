@@ -85,6 +85,11 @@ jobs:
           cpack -C Release -B "$GITHUB_WORKSPACE/dist"
           rm -rf "$GITHUB_WORKSPACE/dist/_CPack_Packages"
           if [[ "${{ runner.os }}" == macOS ]]; then
+            dmg=$(ls "$GITHUB_WORKSPACE"/dist/*.dmg)
+            mount=$(hdiutil attach -nobrowse -readonly "$dmg" | tail -1 | cut -f3-)
+            python3 "$GITHUB_WORKSPACE/tools/check_quicklook.py" "$mount/aafedit.app"
+            lipo -info "$mount/aafedit.app/Contents/PlugIns/AAFPreview.appex/Contents/MacOS/AAFPreview"
+            hdiutil detach "$mount"
             lipo -info apps/aaftool/Release/aaftool
             tar -C apps/aaftool/Release -czf "$GITHUB_WORKSPACE/dist/aaftool-${{ steps.version.outputs.version }}-macos-universal.tar.gz" aaftool
           fi

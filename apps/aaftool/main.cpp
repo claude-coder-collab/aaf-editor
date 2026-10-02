@@ -4,6 +4,7 @@
 #include <aaf/core/writer.hpp>
 #include <aaf/edit/operations.hpp>
 #include <aaf/edit/session.hpp>
+#include <aaf/preview/preview.hpp>
 #include <aaf/rpc/server.hpp>
 #include <aaf/timeline/timeline.hpp>
 
@@ -17,6 +18,7 @@
 
 #include <cstdio>
 #include <exception>
+#include <fstream>
 #include <print>
 #include <span>
 #include <string>
@@ -46,6 +48,7 @@ commands:
   extract <file> --list            list embedded essence
   extract <file> <mobid|index> <out>
                                    write an embedded essence stream to a file
+  preview <file> [<out.html>]      write the HTML preview shown by Quick Look (default: to stdout)
   set-essence <in> <mobid|index> <data> <out>
                                    replace an embedded essence stream with a file's contents
   --version                        print the version
@@ -650,6 +653,29 @@ auto cmdRpc(std::span<const std::string_view> args) -> int
     return 0;
 }
 
+auto cmdPreview(std::span<const std::string_view> args) -> int
+{
+    if (args.empty() || args.size() > 2)
+    {
+        std::print(stderr, "{}", kUsage);
+        return 2;
+    }
+    const auto html = aaf::preview::previewFile(std::filesystem::path(args[0]));
+    if (args.size() == 1)
+    {
+        std::print("{}", html);
+        return 0;
+    }
+    std::ofstream out{ std::filesystem::path(args[1]), std::ios::binary };
+    out << html;
+    if (!out)
+    {
+        std::println(stderr, "aaftool: cannot write {}", args[1]);
+        return 1;
+    }
+    return 0;
+}
+
 auto run(std::span<char*> argv) -> int
 {
     const std::vector<std::string_view> args(argv.begin() + 1, argv.end());
@@ -691,6 +717,10 @@ auto run(std::span<char*> argv) -> int
     if (args[0] == "rpc")
     {
         return cmdRpc(rest);
+    }
+    if (args[0] == "preview")
+    {
+        return cmdPreview(rest);
     }
     if (args[0] == "timeline")
     {
