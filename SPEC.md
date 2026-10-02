@@ -442,6 +442,17 @@ Status: **projection and editing implemented**; grouping split-to-mono tracks an
   - `Item.channels` lists the channel source clips of a multichannel clip: a combiner whose inputs are each a SourceClip or a single-input effect chain around one, or single-input effects around such a combiner. The item's `clip` is the combiner (the item itself for a bare combiner), its `label` is the channels' common name (identical labels, or the labels without a ".L"-style suffix when only the suffixes differ), its `source` is the first channel's, and its `effects` are the outer effects plus the first channel's own effects.
   - `Track.channels` comes from `_TRACK_FORMAT` (2, 6, 8), else the most channels of any clip on the track, else 0 (unknown, normally mono). `channelFormatName` gives "Mono", "Stereo", "5.1", "7.1" or "N channels".
   - `Projector::resolve` accepts an effect or combiner and follows its first input down to a source clip (the first channel).
+- **Rendered audio** (`Item.rendered`, files whose Identification names "ProTools" or "Pro Tools" only): a clip, multichannel clip or clip inside effects whose (first channel's) source mob is named "Fade" (trailing spaces ignored) or "Sample accurate edit" is classified by the **ordinary** clips that abut it (a clip with a source that is not itself rendered; fillers, transitions and other rendered clips do not count):
+  - a fade with clips on both sides is a **crossfade**, with a clip only after it a **fadeIn**, only before it a **fadeOut**;
+  - a sample-accurate edit frame with a clip on either side is a **seam**;
+  - rendered audio with no ordinary clip on either side is a **region**. These are runs of rendered frames, which can contain whole short clips (in `multichannel_wav.aaf`, `stereo_02` and its crossfade exist only inside three rendered frames), so nothing about them can be reconstructed.
+  The classifier (`classifyRenderedRoles` in `access.hpp`) is shared by the projection and the edit operations.
+- **Editing rendered audio** (`edit.hpp`, §6.1):
+  - `removeFade(item)` replaces a fade or seam with a **cut**: a crossfade's length L goes ⌈L/2⌉ to the clip before and ⌊L/2⌋ to the clip after (whose StartTime moves back by that much); a fade-in's to its clip (head), a fade-out's to its clip (tail); a seam frame to the clip before it, else after it. Every channel is extended. The clips must have media handles for it; otherwise it fails with "the … cannot be replaced by a cut: …". Timing elsewhere is unchanged. A region is refused.
+  - `lift` on a fade or seam does the same; `rippleDelete` of one is refused (lift it).
+  - `lift`, `rippleDelete` and `move` of a clip first replace the rendered fades and seams at **both** its edges with cuts (so a fade-in or fade-out goes with its clip as unfaded audio, and a crossfade is split between the two clips); `trim` does so at the trimmed edge, then trims so that the edge ends up `delta` from where it started. Moving or trimming a rendered clip itself is refused.
+  - Splitting inside rendered audio, and placing a clip (insert, overwrite, or a move's target) next to rendered audio, are refused, as is any edit that would need to convert a region.
+  - Each conversion appends "Replaced a rendered crossfade with a cut." (or fade-in, fade-out, sample-accurate edit frame) to the operation's `warnings`, which `timeline.op` returns.
 - **Validation**: each input of an Audio Channel Combiner must have the group's length (an **error**: the channels are one clip). The session validates the parents of touched objects as well, so an edit to one channel that breaks this is refused.
 
 ## 7. Layer 4: Edit session (`libaafedit`)
@@ -657,7 +668,9 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
       - `addTrack {mob, kind: picture|sound, name?}` → `id`;
       - `removeTrack {slot}`;
       - `addMarker {mob, position, comment?}` → `id`;
-      - `relink {find, replace}` → `count`.
+      - `relink {find, replace}` → `count`;
+      - `removeFade {item}` (§6.2).
+      Any operation may also return `warnings` (strings), for example when rendered fades were replaced with cuts.
 - **Events**: `doc.opened` (info), `doc.changed` (`{changes, info, mobsChanged}`, from the session listener) and `doc.state` (info, after a save).
   - `mobsChanged` is true when `timeline.mobs` may return something different:
     - a changed object is a Mob or the ContentStorage;
@@ -721,6 +734,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - **Ruler**: timecode from the mob's timecode start, fps and drop-frame flag (`timecode.ts`: SMPTE drop-frame formatting and parsing, tested). Ticks are spaced at least 90 px apart, stepping through 1/2/5/10 frames, then 1 s … 1 h.
   - **Drawing**:
     - clips coloured by kind: video, audio, effect, code, and nested for NestedScope or clips of compositions;
+    - **rendered audio** (Pro Tools): fades get a shaded ramp (dark above the volume line), crossfades a shaded hourglass, seams and regions diagonal hatching; their label is "Fade in", "Fade out", "Crossfade", "Sample-accurate edit" or "Rendered audio", and the tooltip says whether Lift replaces it with a cut. Operation warnings appear in the message bar as information;
     - **multichannel clips** are drawn as one audio clip labelled with the clip name, with a format badge ("Stereo", "5.1", "7.1" or "N ch", from `channelFormat` in `timelineLayout.ts`) at the right end when the clip is at least 60 px wide; the label is clipped before it. Clicking selects the combiner, and the source chain shown is the first channel's. The track header's second line starts with the track's format ("5.1 · 24/1"), and the tooltip adds a "channels:" line;
     - **clips inside effects** are drawn as their clip (colour, label, missing source in red) with an effects badge: "fx Audio Gain, Pan" when it fits within the clip less 60 px, else "fx", and none below 40 px. The badge starts 8 px in (clicks nearer the edge trim), after any transition covering the clip's head, as does the label. The badge is filled with the accent colour while one of its effects is selected;
     - fillers as dashed outlines;
@@ -772,7 +786,8 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - **Timeline**: one lane per track except timecode, edgecode and fixed slots, ordered picture, sound, descriptive metadata, then the rest, labelled V1…, A1…, DM, D and so on. Positions are converted to the base rate (the first picture timeline track, else the first timeline track) and placed as percentages, so the drawing scales. Clips are coloured as in the editor (picture, sound, effect, nested, missing source in red); transitions are hatched, markers are diamonds, fillers are not drawn. Each clip has a `title` tooltip with its name and effects. An "fx" prefix marks clips inside effects.
     - **Zoom without JavaScript**: radio inputs `z1`…`z16` with labels; `#zN:checked~.tl .inner{width:N00%}` widens the strip inside a horizontally scrolling box, and one ruler per zoom level (about 8×N ticks at 1, 2, 5, 10, 15 or 30 s, or 1, 2, 5, 10, 15, 30 or 60 min steps) is shown for the checked level.
     - **Drawing budget**: clips narrower than a threshold are merged into runs of one class, each run ending once it reaches the threshold width. The threshold is 0.04% of the width, scaled up by (items ÷ 12,000) when a composition has more than 12,000 items, and at most 4,000 shapes are drawn per track. The 60,000-clip stress file draws about 12,000 shapes (1.1 MB of HTML, 0.4 s in total).
-    - **Multichannel**: lane labels and the summary's track list show the format ("A2 Stereo"), multichannel clips are drawn as audio clips with the format in their tooltip, and the channel combiner is not listed as an effect.
+    - **Rendered audio**: fades, crossfades, seams and regions are labelled like the editor ("Fade in"…) with CSS-gradient shading, and tagged "rendered …" in the clip list.
+  - **Multichannel**: lane labels and the summary's track list show the format ("A2 Stereo"), multichannel clips are drawn as audio clips with the format in their tooltip, and the channel combiner is not listed as an effect.
   - **Clips table**: picture and sound clips with a source, in record order: number, track, record in and out, duration, clip name (tagged "original", "not in file", "nested" or with the channel format) and effects, up to `maxClips` rows, then "and N more clips".
   - **Other compositions** (name, top-level tag, tracks; up to 50), then **Master clips** and **Sources** (name, tracks, MobID; sorted by name, up to `maxMobs`).
   - `renderErrorPreview(name, message)` is a page saying why a file could not be previewed. `previewFile(path)` opens the file and returns the preview or that page, catching every exception.
@@ -945,6 +960,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 
 | 2026-09-28 | UI end-to-end tests run the real page in Playwright against `aaftool serve` rather than in the native webviews, which cannot be automated on all three platforms. The engines are matched per platform (§10) |
 | 2026-10-02 | Identifiers that point at other objects (SourceID, SourceMobSlotID, Parameter.Definition and others, §7) are resolved for display and editing but stay data properties on save; turning them into weak references would break interchange. A target missing from the file is shown neutrally, not as an error, because references to other files are legitimate |
+| 2026-10-02 | Pro Tools' rendered fades and sample-accurate edit frames cannot be re-rendered (there is no audio engine), so edits that would invalidate one first replace it with a cut taken from the clips' media handles and say so, and edits that cannot do that safely (rendered regions, short handles, placing clips against rendered audio) are refused |
 | 2026-10-02 | Multichannel audio follows the representation Pro Tools writes for Media Composer compatibility (channel combiners and `_TRACK_FORMAT`, §6.2). A multichannel clip is edited as one clip across all its channels; the combiner is presented as the clip, not as an effect |
 | 2026-10-02 | The Quick Look extension is a thin Objective-C++ `.appex` built by CMake and embedded in `aafedit.app`, not a separate Xcode/Swift project as in edl-quicklook: it reuses the C++ library directly, and full Xcode is not needed. Its HTML comes from `aaf::preview`, which `aaftool preview` also exposes, so the preview is tested on every platform |
 | 2026-10-02 | The application icon is drawn by a Pillow script and its outputs are committed, like the generated model, so builds need no image tools |

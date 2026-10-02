@@ -357,6 +357,32 @@ TEST_CASE("Multichannel clips and track formats are in the timeline form", "[rpc
     CHECK(chain["links"][0]["name"] == "7.1_01-01.L");
 }
 
+TEST_CASE("Rendered fades are reported and removed through the RPC API", "[rpc][timeline][rendered]")
+{
+    Client c;
+    c.result("doc.open", { { "path", (fixturesDir() / "protools/multichannel_frame_aligned.aaf").string() } });
+    const auto mobs = c.result("timeline.mobs");
+    const auto composition = std::ranges::find_if(mobs, [](const Json& m) { return m["kind"] == "composition"; });
+    REQUIRE(composition != mobs.end());
+    const auto t = expandTimeline(c.result("timeline.get", { { "mob", (*composition)["id"] } }));
+    Json fade;
+    for (const auto& track : t["tracks"])
+    {
+        for (const auto& item : track["items"])
+        {
+            if (item.value("rendered", "") == "crossfade")
+            {
+                fade = item;
+            }
+        }
+    }
+    REQUIRE(fade.is_object());
+    const auto result = c.result("timeline.op", { { "op", "removeFade" }, { "item", fade["object"] } });
+    REQUIRE(result.contains("warnings"));
+    CHECK(result["warnings"][0] == "Replaced a rendered crossfade with a cut.");
+    CHECK(c.request("timeline.op", { { "op", "removeFade" }, { "item", fade["object"] } }).contains("error"));
+}
+
 TEST_CASE("Embedded essence can be extracted and replaced through the RPC API", "[rpc][server]")
 {
     Client c;

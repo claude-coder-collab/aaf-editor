@@ -15,6 +15,11 @@ namespace
 {
 
 using detail::Access;
+using detail::classifyRenderedRoles;
+using detail::RenderedName;
+using detail::renderedName;
+using detail::RenderedProbe;
+using detail::writtenByProTools;
 using namespace literals;
 
 constexpr int kMaxDepth = 16;
@@ -549,6 +554,173 @@ auto cutTransition(edit::Transaction& tx, const TrackRef& track, std::size_t ind
     return removed ? Result<void>{} : propagate(removed);
 }
 
+auto renderedNameOf(const Access& a, const Projector& projector, ObjectId id) -> RenderedName
+{
+    const auto chain = clipChain(a, id);
+    if (!chain || chain->clips.empty())
+    {
+        return RenderedName::none;
+    }
+    const auto mobId = a.value(chain->clips.front(), "SourceReference", "SourceID");
+    if (!mobId || !mobId->is<MobId>())
+    {
+        return RenderedName::none;
+    }
+    const auto mob = projector.findMob(mobId->as<MobId>());
+    return mob ? renderedName(a.string(*mob, "Mob", "Name")) : RenderedName::none;
+}
+
+/// The `Rendered` role of each entry of a sequence; all `none` unless Pro Tools wrote the file.
+auto renderedRoles(const Document& doc, const std::vector<Entry>& list) -> std::vector<Rendered>
+{
+    if (!writtenByProTools(doc))
+    {
+        std::vector<Rendered> none(list.size(), Rendered::none);
+        return none;
+    }
+    const Access a(doc);
+    const Projector projector(doc);
+    std::vector<RenderedProbe> probes;
+    probes.reserve(list.size());
+    for (const auto& e : list)
+    {
+        probes.push_back({ e.clip ? renderedNameOf(a, projector, e.id) : RenderedName::none, e.clip, e.start, e.length });
+    }
+    return classifyRenderedRoles(probes);
+}
+
+auto describe(Rendered role) -> std::string_view
+{
+    switch (role)
+    {
+        case Rendered::crossfade:
+            return "crossfade";
+        case Rendered::fadeIn:
+            return "fade-in";
+        case Rendered::fadeOut:
+            return "fade-out";
+        case Rendered::seam:
+            return "sample-accurate edit frame";
+        case Rendered::region:
+            return "rendered audio";
+        case Rendered::none:
+            break;
+    }
+    return "segment";
+}
+
+constexpr std::string_view kRegionRefusal = "Pro Tools rendered this audio across several frames (it may contain whole short clips), so it cannot be edited";
+
+/// Replaces the rendered fade or seam at `index` with a cut, giving its length to the clips around it from their
+/// media handles: half to each side of a crossfade (the earlier clip gets the odd unit), all of a fade to its
+/// clip, and a seam frame to the clip before it (else after it). The timing of everything else is unchanged.
+auto renderedToCut(edit::Transaction& tx, const TrackRef& track, std::size_t index, std::vector<std::string>* warnings) -> Result<void>
+{
+    const Access a(tx.document());
+    const auto list = entries(a, track.sequence);
+    const auto roles = renderedRoles(tx.document(), list);
+    const auto role = roles.at(index);
+    if (role == Rendered::none)
+    {
+        return fail(Errc::invalid_argument, "the segment is not a rendered fade");
+    }
+    if (role == Rendered::region)
+    {
+        return fail(Errc::unsupported, std::string(kRegionRefusal));
+    }
+    const auto length = list[index].length;
+    const bool hasBefore = index > 0 && list[index - 1].clip && roles[index - 1] == Rendered::none;
+    std::int64_t before = 0;
+    std::int64_t after = 0;
+    switch (role)
+    {
+        case Rendered::crossfade:
+            after = length / 2;
+            before = length - after;
+            break;
+        case Rendered::fadeOut:
+            before = length;
+            break;
+        case Rendered::fadeIn:
+            after = length;
+            break;
+        default:
+            (hasBefore ? before : after) = length;
+            break;
+    }
+    const auto failure = [&](const Error& e) -> std::unexpected<Error> {
+        return fail(e.code, std::format("the {} cannot be replaced by a cut: {}", describe(role), e.message));
+    };
+    if (before > 0)
+    {
+        const auto& previous = list[index - 1];
+        if (auto r = setSegmentLength(tx, previous.id, previous.length + before); !r)
+        {
+            return failure(r.error());
+        }
+        if (auto r = checkWithinSource(a, previous.id); !r)
+        {
+            return failure(r.error());
+        }
+    }
+    if (after > 0)
+    {
+        const auto& next = list[index + 1];
+        if (auto r = setSegmentLength(tx, next.id, next.length + after); !r)
+        {
+            return failure(r.error());
+        }
+        if (auto r = adjustStart(tx, next.id, -after); !r)
+        {
+            return failure(r.error());
+        }
+    }
+    if (auto removed = removeAt(tx, track, index); !removed)
+    {
+        return propagate(removed);
+    }
+    if (warnings != nullptr)
+    {
+        warnings->push_back(std::format("Replaced a rendered {} with a cut.", describe(role)));
+    }
+    return {};
+}
+
+/// Replaces rendered fades or seams at the head and/or tail of the clip at `index` with cuts (see `renderedToCut`),
+/// and returns the clip's new index.
+auto absorbRendered(edit::Transaction& tx, const TrackRef& track, std::size_t index, bool head, bool tail, std::vector<std::string>* warnings) -> Result<std::size_t>
+{
+    const Access a(tx.document());
+    for (int guard = 0; guard < 4; ++guard)
+    {
+        const auto list = entries(a, track.sequence);
+        const auto roles = renderedRoles(tx.document(), list);
+        if (roles.at(index) != Rendered::none)
+        {
+            return fail(Errc::unsupported, roles[index] == Rendered::region ? std::string(kRegionRefusal) : std::format("this is a rendered {}: lift it to replace it with a cut", describe(roles[index])));
+        }
+        if (tail && index + 1 < list.size() && roles[index + 1] != Rendered::none)
+        {
+            if (auto r = renderedToCut(tx, track, index + 1, warnings); !r)
+            {
+                return propagate(r);
+            }
+            continue;
+        }
+        if (head && index > 0 && roles[index - 1] != Rendered::none)
+        {
+            if (auto r = renderedToCut(tx, track, index - 1, warnings); !r)
+            {
+                return propagate(r);
+            }
+            --index;
+            continue;
+        }
+        return index;
+    }
+    return index;
+}
+
 /// Makes a cut at `position` and returns the index of the first component at or after it.
 auto cutAt(edit::Transaction& tx, const TrackRef& track, std::int64_t position) -> Result<std::size_t>
 {
@@ -603,6 +775,10 @@ auto cutAt(edit::Transaction& tx, const TrackRef& track, std::int64_t position) 
             if (!e.locked.empty())
             {
                 return fail(Errc::unsupported, e.locked);
+            }
+            if (const auto role = renderedRoles(tx.document(), list).at(i); role != Rendered::none)
+            {
+                return fail(Errc::unsupported, std::format("a rendered {} cannot be split", describe(role)));
             }
             auto right = deepCopy(tx, e.id);
             if (!right)
@@ -791,7 +967,22 @@ auto split(edit::Transaction& tx, ObjectId slot, std::int64_t position) -> Resul
     return right;
 }
 
-auto lift(edit::Transaction& tx, ObjectId item) -> Result<void>
+auto removeFade(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings) -> Result<void>
+{
+    auto found = locate(tx, item);
+    if (!found)
+    {
+        return propagate(found);
+    }
+    auto& [track, index] = *found;
+    if (auto r = renderedToCut(tx, track, index, warnings); !r)
+    {
+        return r;
+    }
+    return normalize(tx, track);
+}
+
+auto lift(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings) -> Result<void>
 {
     auto found = locate(tx, item);
     if (!found)
@@ -808,6 +999,20 @@ auto lift(edit::Transaction& tx, ObjectId item) -> Result<void>
         }
         return normalize(tx, track);
     }
+    if (const auto role = renderedRoles(tx.document(), entries(a, track.sequence)).at(index); role != Rendered::none)
+    {
+        if (auto r = renderedToCut(tx, track, index, warnings); !r)
+        {
+            return r;
+        }
+        return normalize(tx, track);
+    }
+    auto absorbed = absorbRendered(tx, track, index, true, true, warnings);
+    if (!absorbed)
+    {
+        return propagate(absorbed);
+    }
+    index = *absorbed;
     auto filler = makeFiller(tx, track, lengthOf(a, item));
     if (!filler)
     {
@@ -824,7 +1029,7 @@ auto lift(edit::Transaction& tx, ObjectId item) -> Result<void>
     return normalize(tx, track);
 }
 
-auto rippleDelete(edit::Transaction& tx, ObjectId item) -> Result<void>
+auto rippleDelete(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings) -> Result<void>
 {
     auto found = locate(tx, item);
     if (!found)
@@ -841,6 +1046,16 @@ auto rippleDelete(edit::Transaction& tx, ObjectId item) -> Result<void>
         }
         return normalize(tx, track);
     }
+    if (renderedRoles(tx.document(), entries(a, track.sequence)).at(index) != Rendered::none)
+    {
+        return fail(Errc::unsupported, "rendered fades are removed with lift, which replaces them with a cut");
+    }
+    auto absorbed = absorbRendered(tx, track, index, true, true, warnings);
+    if (!absorbed)
+    {
+        return propagate(absorbed);
+    }
+    index = *absorbed;
     auto list = entries(a, track.sequence);
     if (index + 1 < list.size() && list[index + 1].transition)
     {
@@ -864,15 +1079,28 @@ auto rippleDelete(edit::Transaction& tx, ObjectId item) -> Result<void>
     return normalize(tx, track);
 }
 
-auto trim(edit::Transaction& tx, ObjectId item, Edge edge, std::int64_t delta, bool ripple) -> Result<void>
+auto trim(edit::Transaction& tx, ObjectId item, Edge edge, std::int64_t delta, bool ripple, std::vector<std::string>* warnings) -> Result<void>
 {
     auto found = locate(tx, item);
     if (!found)
     {
         return propagate(found);
     }
-    const auto& [track, index] = *found;
+    auto& [track, index] = *found;
     const Access a(tx.document());
+    {
+        const auto before = entries(a, track.sequence);
+        const auto edgeBefore = edge == Edge::head ? before[index].start : before[index].start + before[index].length;
+        auto absorbed = absorbRendered(tx, track, index, edge == Edge::head, edge == Edge::tail, warnings);
+        if (!absorbed)
+        {
+            return propagate(absorbed);
+        }
+        index = *absorbed;
+        const auto after = entries(a, track.sequence);
+        const auto edgeAfter = edge == Edge::head ? after[index].start : after[index].start + after[index].length;
+        delta -= edgeAfter - edgeBefore;
+    }
     const auto list = entries(a, track.sequence);
     const auto& self = list[index];
     if (self.transition)
@@ -1002,6 +1230,17 @@ auto place(edit::Transaction& tx, ObjectId slot, std::int64_t position, ObjectId
             }
         }
     }
+    {
+        const auto list = entries(a, track->sequence);
+        const auto roles = renderedRoles(tx.document(), list);
+        const bool before = *first > 0 && roles[*first - 1] != Rendered::none;
+        const bool after = *first < list.size() && roles[*first] != Rendered::none;
+        if (before || after)
+        {
+            const auto role = before ? roles[*first - 1] : roles[*first];
+            return fail(Errc::unsupported, std::format("the clip would sit next to a rendered {} that belongs to other clips; lift the {} first to replace it with a cut", describe(role), describe(role)));
+        }
+    }
     if (auto r = insertAt(tx, *track, *first, segment); !r)
     {
         return r;
@@ -1065,7 +1304,7 @@ auto placeClip(edit::Transaction& tx, ObjectId slot, std::int64_t position, Obje
     return clip;
 }
 
-auto move(edit::Transaction& tx, ObjectId item, ObjectId toSlot, std::int64_t position, bool ripple) -> Result<void>
+auto move(edit::Transaction& tx, ObjectId item, ObjectId toSlot, std::int64_t position, bool ripple, std::vector<std::string>* warnings) -> Result<void>
 {
     auto found = locate(tx, item);
     if (!found)
@@ -1078,6 +1317,12 @@ auto move(edit::Transaction& tx, ObjectId item, ObjectId toSlot, std::int64_t po
     {
         return fail(Errc::unsupported, "transitions cannot be moved");
     }
+    auto absorbed = absorbRendered(tx, track, index, true, true, warnings);
+    if (!absorbed)
+    {
+        return propagate(absorbed);
+    }
+    index = *absorbed;
     if (ripple)
     {
         const auto list = entries(a, track.sequence);

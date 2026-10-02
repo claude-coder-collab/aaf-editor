@@ -52,6 +52,21 @@ enum class ItemKind : std::uint8_t {
     other,
 };
 
+/// Audio that Pro Tools rendered when exporting for Media Composer: a fade or crossfade ("Fade " clips), or the
+/// frame around a cut that is not frame-aligned ("Sample accurate edit" clips). Classified by the ordinary clips
+/// that abut it: a fade between two is a crossfade, one with a clip only after it a fade-in, only before it a
+/// fade-out; a seam has a clip on at least one side. Rendered audio with no ordinary clip on either side (part of
+/// a run of rendered frames, which may contain whole short clips) is a `region`.
+enum class Rendered : std::uint8_t {
+    none,
+    fadeIn,
+    fadeOut,
+    crossfade,
+    seam,
+    region,
+};
+
+[[nodiscard]] auto to_string(Rendered rendered) noexcept -> std::string_view;
 [[nodiscard]] auto to_string(MobKind kind) noexcept -> std::string_view;
 [[nodiscard]] auto to_string(TrackKind kind) noexcept -> std::string_view;
 [[nodiscard]] auto to_string(SlotKind kind) noexcept -> std::string_view;
@@ -121,6 +136,8 @@ struct Item
     /// For a multichannel clip (an audio channel combiner, possibly inside effects): the source clip of each
     /// channel, in channel order. `label` and `source` then describe the clip as a whole.
     std::vector<ObjectId> channels;
+    /// For a clip on a track of a Pro Tools file: whether it is rendered audio (a fade or a seam), and its role.
+    Rendered rendered = Rendered::none;
 
     auto operator==(const Item&) const -> bool = default;
 };
@@ -240,7 +257,10 @@ private:
     [[nodiscard]] auto buildItem(ObjectId component, std::int64_t start, int depth, std::vector<std::string>& warnings) const -> Item;
     [[nodiscard]] auto buildSequence(ObjectId segment, int depth, std::vector<std::string>& warnings) const -> std::vector<Item>;
 
+    void classifyRendered(std::vector<Item>& items) const;
+
     const Document& doc_;
+    bool proTools_ = false;
     std::vector<std::pair<MobId, ObjectId>> mobIndex_;
     std::vector<std::pair<MobId, ObjectId>> essenceIndex_;
 };

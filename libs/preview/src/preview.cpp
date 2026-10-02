@@ -260,6 +260,26 @@ auto itemLabel(const Item& item) -> std::string
     return item.className;
 }
 
+auto renderedLabel(timeline::Rendered rendered) -> std::string_view
+{
+    switch (rendered)
+    {
+        case timeline::Rendered::fadeIn:
+            return "Fade in";
+        case timeline::Rendered::fadeOut:
+            return "Fade out";
+        case timeline::Rendered::crossfade:
+            return "Crossfade";
+        case timeline::Rendered::seam:
+            return "Sample-accurate edit";
+        case timeline::Rendered::region:
+            return "Rendered audio";
+        case timeline::Rendered::none:
+            break;
+    }
+    return {};
+}
+
 auto effectNames(const Item& item) -> std::string
 {
     std::string out;
@@ -379,6 +399,10 @@ private:
         ".c{position:absolute;top:3px;height:18px;border-radius:3px;color:#fff;font-size:10px;line-height:18px;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:clip;min-width:1px;box-shadow:inset -1px 0 0 rgba(0,0,0,.2)}"
         ".c.v{background:var(--v)}.c.a{background:var(--a)}.c.fx{background:var(--fx)}.c.nested{background:var(--nested)}.c.missing{background:var(--missing)}.c.other{background:var(--other)}"
         ".c i{font-style:normal;opacity:.85;margin-right:3px}"
+        ".c.r-fadeIn{background-image:linear-gradient(to bottom right,rgba(0,0,0,.35) 50%,transparent 50%)}"
+        ".c.r-fadeOut{background-image:linear-gradient(to bottom left,rgba(0,0,0,.35) 50%,transparent 50%)}"
+        ".c.r-crossfade{background-image:linear-gradient(to top right,transparent 47%,rgba(255,255,255,.45) 47% 53%,transparent 53%),linear-gradient(to bottom right,transparent 47%,rgba(255,255,255,.45) 47% 53%,transparent 53%)}"
+        ".c.r-seam,.c.r-region{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.3) 0 2px,transparent 2px 6px)}"
         ".t{position:absolute;top:0;height:24px;background:repeating-linear-gradient(135deg,var(--tr) 0 3px,transparent 3px 6px)}"
         ".m{position:absolute;top:4px;width:8px;height:8px;margin-left:-4px;background:#ff9500;transform:rotate(45deg)}"
         "table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}"
@@ -625,9 +649,14 @@ private:
                 continue;
             }
             flush();
-            const auto label = itemLabel(i);
+            const auto rendered = renderedLabel(i.rendered);
+            const auto label = rendered.empty() ? itemLabel(i) : std::string(rendered);
             const auto effects = effectNames(i);
             auto title = label;
+            if (!rendered.empty())
+            {
+                title += " (rendered by Pro Tools)";
+            }
             if (!effects.empty())
             {
                 title += " (" + effects + ")";
@@ -641,7 +670,7 @@ private:
             {
                 title += ", " + format;
             }
-            out_ += std::format(R"(<div class="c {}" style="left:{};width:{}" title="{}">{}{}</div>)", cls, percent(left), percent(width), escapeHtml(title), effects.empty() || cls == "fx" ? "" : "<i>fx</i>", escapeHtml(label));
+            out_ += std::format(R"(<div class="c {}{}" style="left:{};width:{}" title="{}">{}{}</div>)", cls, i.rendered == timeline::Rendered::none ? "" : std::format(" r-{}", timeline::to_string(i.rendered)), percent(left), percent(width), escapeHtml(title), effects.empty() || cls == "fx" ? "" : "<i>fx</i>", escapeHtml(label));
             ++drawn;
         }
         flush();
@@ -705,6 +734,10 @@ private:
             if (!i.channels.empty())
             {
                 clip += R"(<span class="tag">)" + escapeHtml(timeline::channelFormatName(static_cast<std::uint32_t>(i.channels.size()))) + "</span>";
+            }
+            if (i.rendered != timeline::Rendered::none)
+            {
+                clip += R"(<span class="tag">rendered )" + escapeHtml(std::string(renderedLabel(i.rendered))) + "</span>";
             }
             out_ += std::format(R"(<tr><td>{}</td><td>{}</td><td class="tc">{}</td><td class="tc">{}</td><td class="tc">{}</td><td>{}</td><td>{}</td></tr>)", n + 1, escapeHtml(r.lane->label), clock.at(r.start), clock.at(r.end), clock.duration(r.end - r.start), clip, escapeHtml(effectNames(i)));
         }

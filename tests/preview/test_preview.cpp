@@ -123,3 +123,12 @@ TEST_CASE("Multichannel tracks and clips show their format", "[preview][multicha
     CHECK(html.contains(R"(7.1_01-01<span class="tag">7.1</span>)"));
     CHECK_FALSE(html.contains("Audio Channel Combiner"));
 }
+
+TEST_CASE("Rendered Pro Tools fades are labelled", "[preview][rendered]")
+{
+    const auto html = previewFile(test::fixturesDir() / "protools/multichannel_frame_aligned.aaf");
+    CHECK(html.contains("r-crossfade"));
+    CHECK(html.contains("r-fadeIn"));
+    CHECK(html.contains(">Fade in</div>"));
+    CHECK(html.contains("rendered Crossfade"));
+}

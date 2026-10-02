@@ -4,6 +4,7 @@
 #include <aaf/timeline/timeline.hpp>
 
 #include <string>
+#include <vector>
 
 namespace aaf::timeline::ops
 {
@@ -17,11 +18,22 @@ namespace aaf::timeline::ops
 /// Filler is not split (it would be merged straight back).
 [[nodiscard]] auto split(edit::Transaction& tx, ObjectId slot, std::int64_t position) -> Result<ObjectId>;
 
-/// Replaces a segment with Filler of the same length (a transition is replaced by a cut at its midpoint).
-[[nodiscard]] auto lift(edit::Transaction& tx, ObjectId item) -> Result<void>;
+/// Rendered audio in Pro Tools files (`Rendered`): fades and sample-accurate edit frames that touch a clip being
+/// lifted, deleted, moved or trimmed are first replaced with cuts (see `removeFade`), and a message for each is
+/// appended to `warnings` when it is given. Splitting inside rendered audio, placing a clip next to it, and any edit
+/// touching a rendered `region` are refused.
+
+/// Replaces a rendered fade, crossfade or sample-accurate edit frame with a cut. Its length goes to the clips around
+/// it from their media handles: half each for a crossfade (the earlier clip gets an odd unit), all of a fade to its
+/// clip, and a seam frame to the clip before it, else after it. Fails if a handle is too short.
+[[nodiscard]] auto removeFade(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings = nullptr) -> Result<void>;
+
+/// Replaces a segment with Filler of the same length (a transition is replaced by a cut at its midpoint, and a
+/// rendered fade as `removeFade` does).
+[[nodiscard]] auto lift(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings = nullptr) -> Result<void>;
 
 /// Removes a segment and closes the gap; transitions next to it become cuts.
-[[nodiscard]] auto rippleDelete(edit::Transaction& tx, ObjectId item) -> Result<void>;
+[[nodiscard]] auto rippleDelete(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings = nullptr) -> Result<void>;
 
 enum class Edge : std::uint8_t {
     head,
@@ -30,7 +42,8 @@ enum class Edge : std::uint8_t {
 
 /// Moves an edge of a segment by `delta` edit units. A roll trim moves the edit point with the neighbour;
 /// a ripple trim changes only this segment and shifts everything after it.
-[[nodiscard]] auto trim(edit::Transaction& tx, ObjectId item, Edge edge, std::int64_t delta, bool ripple) -> Result<void>;
+/// The edge ends up `delta` units from where it was, even when a rendered fade at that edge is first replaced with a cut.
+[[nodiscard]] auto trim(edit::Transaction& tx, ObjectId item, Edge edge, std::int64_t delta, bool ripple, std::vector<std::string>* warnings = nullptr) -> Result<void>;
 
 /// Places a detached segment at `position`, replacing whatever it overlaps (overwrite) or pushing it later (insert).
 [[nodiscard]] auto place(edit::Transaction& tx, ObjectId slot, std::int64_t position, ObjectId segment, bool insert) -> Result<void>;
@@ -39,7 +52,7 @@ enum class Edge : std::uint8_t {
 [[nodiscard]] auto placeClip(edit::Transaction& tx, ObjectId slot, std::int64_t position, ObjectId sourceMob, std::uint32_t sourceSlot, std::int64_t sourceIn, std::int64_t length, bool insert) -> Result<ObjectId>;
 
 /// Moves a segment to `position` on `toSlot` (which may be its own slot), leaving Filler behind (or closing the gap with `ripple`).
-[[nodiscard]] auto move(edit::Transaction& tx, ObjectId item, ObjectId toSlot, std::int64_t position, bool ripple) -> Result<void>;
+[[nodiscard]] auto move(edit::Transaction& tx, ObjectId item, ObjectId toSlot, std::int64_t position, bool ripple, std::vector<std::string>* warnings = nullptr) -> Result<void>;
 
 /// Adds an empty picture or sound track to a mob and returns the new slot.
 [[nodiscard]] auto addTrack(edit::Transaction& tx, ObjectId mob, TrackKind kind, const std::string& name) -> Result<ObjectId>;
