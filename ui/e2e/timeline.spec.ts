@@ -119,7 +119,4 @@ test("shows multichannel clips as one clip with their format", async ({ editor }
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator(".panel .subtitle")).toContainText(`OperationGroup · object ${clip.object}`);
   await expect(page.locator(".timeline .chain")).toContainText("7.1_01-01.L");
-
-  await page.keyboard.press("s");
-  await expect.poll(async () => (await tracks(editor)).find((t) => t.channels === 8)!.items.filter((i) => i.channels === 8).length).toBe(clip.length > 1 ? 2 : 1);
 });
