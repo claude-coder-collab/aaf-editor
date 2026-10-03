@@ -168,7 +168,10 @@ auto run(std::span<char*> argv) -> int
                 {
                     response = Json{ { "jsonrpc", "2.0" }, { "id", nullptr }, { "error", { { "code", -32603 }, { "message", e.what() } } } }.dump();
                 }
-                view.resolve(id, response);
+                if (!closing)
+                {
+                    view.resolve(id, response);
+                }
             });
         }
     );
@@ -185,6 +188,7 @@ auto run(std::span<char*> argv) -> int
                 if (command == "quit")
                 {
                     smokeFinished = true;
+                    closing = true;
                 }
                 result = hostCommand(view, command, commandOptions, exitCode, !options->smokeFile.empty());
             } catch (const std::exception& e)

@@ -106,17 +106,11 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Configure
-        run: cmake --preset msvc -DAAF_WARNINGS_AS_ERRORS=ON "-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /Zi" "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=/DEBUG /OPT:REF /OPT:ICF"
+        run: cmake --preset msvc -DAAF_WARNINGS_AS_ERRORS=ON
       - name: Build
         run: cmake --build build/msvc --config Release
       - name: Test
         run: ctest --test-dir build/msvc -C Release --output-on-failure
-      - name: Editor smoke test (debugger, temporary)
-        shell: bash
-        run: |
-          CDB="/c/Program Files (x86)/Windows Kits/10/Debuggers/x64/cdb.exe"
-          ls "$CDB"
-          "$CDB" -G -lines -y "build/msvc/apps/editor/Release;srv*c:\symbols*https://msdl.microsoft.com/download/symbols" -c "g; .ecxr; kp 40; ~*kp 25; q" build/msvc/apps/editor/Release/aafedit.exe --smoke-test tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf | tail -250 || true
       - name: Editor smoke test
         shell: bash
         run: build/msvc/apps/editor/Release/aafedit.exe --smoke-test tests/fixtures/aafsdk/test/com/MemoryLeakTest/RealWorldSample1.aaf
