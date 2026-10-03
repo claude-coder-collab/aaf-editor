@@ -19,7 +19,7 @@ struct DropState
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Wcast-function-type"
-#if defined(__clang__)
+#ifdef __clang__
     #pragma GCC diagnostic ignored "-Wcast-function-type-strict"
 #endif
 
@@ -42,7 +42,7 @@ void onDragDataReceived(GtkWidget* /*widget*/, GdkDragContext* /*context*/, gint
         return;
     }
     state->dropping = false;
-    for (gchar** uri = uris; *uri != nullptr; ++uri)
+    for (const gchar* const* uri = uris; *uri != nullptr; ++uri)
     {
         if (gchar* path = g_filename_from_uri(*uri, nullptr, nullptr); path != nullptr)
         {
