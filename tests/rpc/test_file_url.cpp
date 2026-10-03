@@ -19,7 +19,9 @@ TEST_CASE("Local paths become file URLs", "[rpc][url]")
     CHECK(pathToFileUrl("/Users/me/My Edit.aaf") == "file:///Users/me/My%20Edit.aaf");
     CHECK(pathToFileUrl(u8("/tmp/caf\xC3\xA9 #1.aaf")) == "file:///tmp/caf%C3%A9%20%231.aaf");
     CHECK(pathToFileUrl("C:/Edits/a b.aaf") == "file:///C:/Edits/a%20b.aaf");
+#ifdef _WIN32
     CHECK(pathToFileUrl("//server/share/x.aaf") == "file://server/share/x.aaf");
+#endif
 }
 
 TEST_CASE("File URLs become local paths", "[rpc][url]")
@@ -37,9 +39,13 @@ TEST_CASE("File URLs become local paths", "[rpc][url]")
 
 TEST_CASE("Paths round-trip through file URLs", "[rpc][url]")
 {
-    for (const auto* text : { "/a/b c/d.aaf", "/x%y/z.aaf", "C:/a/b.aaf", "//host/share/f.aaf", "/\xE6\x97\xA5\xE6\x9C\xAC/f.aaf" })
+    for (const auto* text : { "/a/b c/d.aaf", "/x%y/z.aaf", "C:/a/b.aaf", "/\xE6\x97\xA5\xE6\x9C\xAC/f.aaf" })
     {
         const auto path = u8(text);
         CHECK(fileUrlToPath(pathToFileUrl(path)) == path);
     }
+#ifdef _WIN32
+    // UNC paths only exist on Windows: POSIX treats a leading "//" as "/".
+    CHECK(fileUrlToPath(pathToFileUrl(u8("//host/share/f.aaf"))) == u8("//host/share/f.aaf"));
+#endif
 }

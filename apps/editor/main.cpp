@@ -141,9 +141,14 @@ auto run(std::span<char*> argv) -> int
     int exitCode = 0;
     std::atomic<bool> smokeFinished = false;
 
-    server.setEventSink([&view](const std::string& method, const Json& params) -> void {
+    server.setEventSink([&view, &closing](const std::string& method, const Json& params) -> void {
         const auto js = "window.__aafEvent && window.__aafEvent(" + Json{ { "method", method }, { "params", params } }.dump() + ")";
-        view.dispatch([&view, js] -> void { view.eval(js); });
+        view.dispatch([&view, &closing, js] -> void {
+            if (!closing)
+            {
+                view.eval(js);
+            }
+        });
     });
 
     view.bind(
