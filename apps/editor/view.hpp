@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drop.hpp"
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -31,6 +33,10 @@ public:
     /// Evaluates `js`; must be called on the UI thread (use `dispatch` from other threads).
     void eval(const std::string& js);
     void bind(const std::string& name, Binding binding);
+    /// Delivers `path` as if it had been dropped on the window (for the smoke test).
+    void drop(const std::string& path) const;
+    /// Reports files dropped on the window to `handler` (see `drop.hpp`).
+    void onFileDrop(FileDropHandler handler);
     /// Completes a bound call; safe from any thread. `json` is the result value as JSON text.
     void resolve(const std::string& id, const std::string& json);
     /// Runs `task` on the UI thread; safe from any thread.
@@ -39,6 +45,7 @@ public:
     void terminate();
 
 private:
+    std::unique_ptr<FileDropHandler> dropHandler_;
     void* handle_;
     std::vector<std::unique_ptr<Binding>> bindings_;
 };

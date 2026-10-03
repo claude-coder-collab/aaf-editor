@@ -80,7 +80,7 @@ auto parse(std::span<char*> argv) -> std::optional<Options>
     return options;
 }
 
-auto hostCommand(aafedit::View& view, const std::string& command, const Json& options, int& exitCode) -> Json
+auto hostCommand(aafedit::View& view, const std::string& command, const Json& options, int& exitCode, bool smoke) -> Json
 {
     const bool data = options.value("data", false);
     if (command == "openDialog")
@@ -93,6 +93,12 @@ auto hostCommand(aafedit::View& view, const std::string& command, const Json& op
         const auto suggested = options.value("suggested", std::string{});
         const auto chosen = pfd::save_file(data ? "Save file" : "Save AAF file", suggested, fileFilter(data), pfd::opt::none).result();
         return chosen.empty() ? Json(nullptr) : Json(chosen);
+    }
+    if (command == "simulateDrop" && smoke)
+    {
+        const auto path = std::filesystem::absolute(std::filesystem::path(options.value("path", std::string{}))).u8string();
+        view.drop(std::string(path.begin(), path.end()));
+        return nullptr;
     }
     if (command == "setTitle")
     {
@@ -125,6 +131,7 @@ auto run(std::span<char*> argv) -> int
         printLine(stdout, std::string("aafedit ") + AAF_VERSION);
         return 0;
     }
+    std::atomic<bool> closing = false;
     aafedit::View view(options->debug);
     view.setTitle("AAF Editor");
     view.setSize(1400, 900);
@@ -134,14 +141,23 @@ auto run(std::span<char*> argv) -> int
     int exitCode = 0;
     std::atomic<bool> smokeFinished = false;
 
-    server.setEventSink([&view](const std::string& method, const Json& params) -> void {
+    server.setEventSink([&view, &closing](const std::string& method, const Json& params) -> void {
         const auto js = "window.__aafEvent && window.__aafEvent(" + Json{ { "method", method }, { "params", params } }.dump() + ")";
-        view.dispatch([&view, js] -> void { view.eval(js); });
+        view.dispatch([&view, &closing, js] -> void {
+            if (!closing)
+            {
+                view.eval(js);
+            }
+        });
     });
 
     view.bind(
         "aafRpc",
         [&](const std::string& id, const std::string& request) -> void {
+            if (closing)
+            {
+                return;
+            }
             worker.post([&, id, request] -> void {
                 std::string response;
                 try
@@ -152,7 +168,10 @@ auto run(std::span<char*> argv) -> int
                 {
                     response = Json{ { "jsonrpc", "2.0" }, { "id", nullptr }, { "error", { { "code", -32603 }, { "message", e.what() } } } }.dump();
                 }
-                view.resolve(id, response);
+                if (!closing)
+                {
+                    view.resolve(id, response);
+                }
             });
         }
     );
@@ -169,8 +188,9 @@ auto run(std::span<char*> argv) -> int
                 if (command == "quit")
                 {
                     smokeFinished = true;
+                    closing = true;
                 }
-                result = hostCommand(view, command, commandOptions, exitCode);
+                result = hostCommand(view, command, commandOptions, exitCode, !options->smokeFile.empty());
             } catch (const std::exception& e)
             {
                 result = { { "error", e.what() } };
@@ -178,6 +198,16 @@ auto run(std::span<char*> argv) -> int
             view.resolve(id, result.dump());
         }
     );
+
+    view.onFileDrop([&view](const std::string& path) -> void {
+        try
+        {
+            view.eval("window.__aafOpenFile && window.__aafOpenFile(" + Json(path).dump() + ")");
+        } catch (const std::exception& e)
+        {
+            printLine(stderr, std::string("aafedit: cannot open the dropped file: ") + e.what());
+        }
+    });
 
     if (!options->file.empty())
     {
@@ -215,6 +245,15 @@ auto run(std::span<char*> argv) -> int
 
     view.setHtml(std::string(aaf::embedded::indexHtml()));
     view.run();
+    // Calls can still arrive while the window is torn down; ignore them, and finish the worker while the server and
+    // the view it reports to are both alive.
+    closing = true;
+    worker.stop();
+    if (watchdog.joinable())
+    {
+        watchdog.request_stop();
+        watchdog.join();
+    }
     return exitCode;
 }
 

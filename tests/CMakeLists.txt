@@ -24,6 +24,7 @@ add_executable(aaf_tests
     edit/test_references.cpp
     edit/test_session.cpp
     preview/test_preview.cpp
+    rpc/test_file_url.cpp
     rpc/test_server.cpp
     timeline/test_edit_ops.cpp
     timeline/test_multichannel.cpp

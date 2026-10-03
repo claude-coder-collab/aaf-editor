@@ -10,14 +10,27 @@ Worker::Worker() :
 
 Worker::~Worker()
 {
+    stop();
+}
+
+void Worker::stop()
+{
     thread_.request_stop();
     ready_.notify_all();
+    if (thread_.joinable())
+    {
+        thread_.join();
+    }
 }
 
 void Worker::post(std::function<void()> task)
 {
     {
         const std::scoped_lock lock(mutex_);
+        if (thread_.get_stop_token().stop_requested())
+        {
+            return;
+        }
         tasks_.push_back(std::move(task));
     }
     ready_.notify_one();

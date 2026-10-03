@@ -116,7 +116,37 @@
   async function open(path?: string) {
     if (!client) return;
     const target = path ?? (await hostCommand<string | null>("openDialog"));
-    if (target) await guard(async () => reloadDocument(await client.open(target)));
+    if (!target) return;
+    if (info.open && info.dirty && !confirm(`${info.name} has unsaved changes. Discard them and open ${fileName(target)}?`)) return;
+    await guard(async () => reloadDocument(await client.open(target)));
+  }
+
+  const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+
+  let dragging = $state(false);
+  let dragTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /// WebView2 (Windows) opens a dropped file by navigating to it, which the host intercepts, so the page must leave
+  /// the drop alone there. WebKit (macOS, Linux) only lets the host see the drop if the page accepts it.
+  const nativeNavigationDrop = typeof (window as { chrome?: { webview?: unknown } }).chrome?.webview !== "undefined";
+
+  /// Shows the drop hint while files are dragged over the window; the host reads the dropped file natively and calls
+  /// window.__aafOpenFile.
+  function dragOver(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes("Files")) return;
+    if (!nativeNavigationDrop) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    }
+    dragging = true;
+    clearTimeout(dragTimer);
+    dragTimer = setTimeout(() => (dragging = false), 600);
+  }
+
+  function dropped(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes("Files")) return;
+    if (!nativeNavigationDrop) event.preventDefault();
+    dragging = false;
   }
 
   async function save(as = false) {
@@ -200,11 +230,15 @@
       }
     });
     window.__aafEvent = (event) => client.dispatch(event.method, event.params);
+    window.__aafOpenFile = (path) => {
+      dragging = false;
+      void open(path);
+    };
     void (async () => {
       const current = await client.docInfo();
       if (current.open) await reloadDocument(current);
       if (window.__aafSmoke) {
-        const result = await runSmokeTest(client, window.__aafSmoke.file);
+        const result = await runSmokeTest(client, window.__aafSmoke.file, (file) => hostCommand("simulateDrop", { path: file }));
         await hostCommand("quit", result);
       }
     })();
@@ -212,7 +246,11 @@
   });
 </script>
 
-<svelte:window onkeydown={keydown} />
+<svelte:window onkeydown={keydown} ondragenter={dragOver} ondragover={dragOver} ondrop={dropped} />
+
+{#if dragging}
+  <div class="drop-hint" aria-hidden="true"><span>Drop an AAF file to open it</span></div>
+{/if}
 
 <div class="app">
   <header class="toolbar">
@@ -536,5 +574,24 @@
       border-right: none;
       border-bottom: 1px solid var(--border);
     }
+  }
+  .drop-hint {
+    position: fixed;
+    inset: 8px;
+    border: 2px dashed var(--accent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .drop-hint span {
+    font-size: 18px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
   }
 </style>

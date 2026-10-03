@@ -29,7 +29,7 @@ Builds are not code-signed. The release notes explain how to open them on macOS 
 
 ## Using the editor
 
-`aafedit [file.aaf]` opens the editor, optionally with a file.
+`aafedit [file.aaf]` opens the editor, optionally with a file. You can also drag an AAF file onto the window to open it.
 
 - **Object tree (left):** every object in the file. Large collections load on demand. Search (Ctrl+F) finds objects by name, AUID or MobID.
 - **Properties (right):** a type-aware editor for every property:

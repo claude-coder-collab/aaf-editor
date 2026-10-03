@@ -21,6 +21,8 @@ public:
     auto operator=(Worker&&) -> Worker& = delete;
 
     void post(std::function<void()> task);
+    /// Stops after the task in progress, drops the rest, and joins the thread. Later posts are ignored.
+    void stop();
 
 private:
     void run(const std::stop_token& stop);

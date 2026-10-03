@@ -11,6 +11,10 @@
     #include <gtk/gtk.h>
 #endif
 
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
 namespace aafedit
 {
 
@@ -49,7 +53,34 @@ View::View(bool debug) :
 
 View::~View()
 {
+#ifdef _WIN32
+    // webview's Windows destructor dispatches messages still queued after WebView2 has closed, and a queued
+    // eval (such as a late call result) then crashes. Deliver them now, while WebView2 is still alive.
+    MSG message{};
+    for (int i = 0; i < 10000 && PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) != 0; ++i)
+    {
+        if (message.message != WM_QUIT)
+        {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+#endif
     webview_destroy(handleOf(handle_));
+}
+
+void View::onFileDrop(FileDropHandler handler)
+{
+    dropHandler_ = std::make_unique<FileDropHandler>(std::move(handler));
+    installDropHandler(webview_get_native_handle(handleOf(handle_), WEBVIEW_NATIVE_HANDLE_KIND_BROWSER_CONTROLLER), dropHandler_.get());
+}
+
+void View::drop(const std::string& path) const
+{
+    if (dropHandler_)
+    {
+        (*dropHandler_)(path);
+    }
 }
 
 void View::setTitle(const std::string& title)
