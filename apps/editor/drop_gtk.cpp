@@ -8,6 +8,14 @@ namespace aafedit
 namespace
 {
 
+/// WebKit asks for the drag data both while the pointer moves and after the drop, so only data that arrives after
+/// `drag-drop` is a drop. (GTK emits `drag-leave` before `drag-drop`, so leaving does not reset the flag.)
+struct DropState
+{
+    const FileDropHandler* handler = nullptr;
+    bool dropping = false;
+};
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Wcast-function-type"
@@ -15,33 +23,51 @@ namespace
     #pragma GCC diagnostic ignored "-Wcast-function-type-strict"
 #endif
 
-auto onDecidePolicy(WebKitWebView* /*view*/, WebKitPolicyDecision* decision, WebKitPolicyDecisionType type, gpointer data) -> gboolean
+auto onDragDrop(GtkWidget* /*widget*/, GdkDragContext* /*context*/, gint /*x*/, gint /*y*/, guint /*time*/, gpointer data) -> gboolean
 {
-    if (type != WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION)
+    static_cast<DropState*>(data)->dropping = true;
+    return FALSE;
+}
+
+void onDragDataReceived(GtkWidget* /*widget*/, GdkDragContext* /*context*/, gint /*x*/, gint /*y*/, GtkSelectionData* selection, guint /*info*/, guint /*time*/, gpointer data)
+{
+    auto* state = static_cast<DropState*>(data);
+    if (!state->dropping)
     {
-        return FALSE;
+        return;
     }
-    auto* action = webkit_navigation_policy_decision_get_navigation_action(WEBKIT_NAVIGATION_POLICY_DECISION(decision));
-    const auto* uri = webkit_uri_request_get_uri(webkit_navigation_action_get_request(action));
-    if (uri == nullptr || g_ascii_strncasecmp(uri, "file:", 5) != 0)
+    gchar** uris = gtk_selection_data_get_uris(selection);
+    if (uris == nullptr)
     {
-        return FALSE;
+        return;
     }
-    gchar* path = g_filename_from_uri(uri, nullptr, nullptr);
-    webkit_policy_decision_ignore(decision);
-    if (path != nullptr)
+    state->dropping = false;
+    for (gchar** uri = uris; *uri != nullptr; ++uri)
     {
-        (*static_cast<const FileNavigationHandler*>(data))(path);
-        g_free(path);
+        if (gchar* path = g_filename_from_uri(*uri, nullptr, nullptr); path != nullptr)
+        {
+            (*state->handler)(path);
+            g_free(path);
+            break;
+        }
     }
-    return TRUE;
+    g_strfreev(uris);
+}
+
+void freeState(gpointer data)
+{
+    delete static_cast<DropState*>(data);
 }
 
 }
 
-void interceptFileNavigation(void* browser, const FileNavigationHandler* handler)
+void installDropHandler(void* browser, const FileDropHandler* handler)
 {
-    g_signal_connect(WEBKIT_WEB_VIEW(browser), "decide-policy", G_CALLBACK(onDecidePolicy), const_cast<FileNavigationHandler*>(handler));
+    auto* widget = GTK_WIDGET(browser);
+    auto* state = new DropState{ handler, false };
+    g_object_set_data_full(G_OBJECT(widget), "aafedit-drop", state, freeState);
+    g_signal_connect(widget, "drag-drop", G_CALLBACK(onDragDrop), state);
+    g_signal_connect(widget, "drag-data-received", G_CALLBACK(onDragDataReceived), state);
 }
 
 #pragma GCC diagnostic pop

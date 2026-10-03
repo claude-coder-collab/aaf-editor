@@ -1,7 +1,6 @@
 #include "view.hpp"
 #include "worker.hpp"
 
-#include <aaf/rpc/file_url.hpp>
 #include <aaf/rpc/server.hpp>
 
 #include <portable-file-dialogs.h>
@@ -97,8 +96,8 @@ auto hostCommand(aafedit::View& view, const std::string& command, const Json& op
     }
     if (command == "simulateDrop" && smoke)
     {
-        const auto path = std::filesystem::absolute(std::filesystem::path(options.value("path", std::string{})));
-        view.navigate(aaf::rpc::pathToFileUrl(path));
+        const auto path = std::filesystem::absolute(std::filesystem::path(options.value("path", std::string{}))).u8string();
+        view.drop(std::string(path.begin(), path.end()));
         return nullptr;
     }
     if (command == "setTitle")
@@ -191,7 +190,7 @@ auto run(std::span<char*> argv) -> int
         }
     );
 
-    view.onFileNavigation([&view](const std::string& path) -> void {
+    view.onFileDrop([&view](const std::string& path) -> void {
         try
         {
             view.eval("window.__aafOpenFile && window.__aafOpenFile(" + Json(path).dump() + ")");

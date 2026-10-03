@@ -126,13 +126,27 @@
   let dragging = $state(false);
   let dragTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /// Shows the drop hint while files are dragged over the window. The drop itself is left to the webview, which
-  /// navigates to the file; the host cancels that navigation and calls window.__aafOpenFile instead.
+  /// WebView2 (Windows) opens a dropped file by navigating to it, which the host intercepts, so the page must leave
+  /// the drop alone there. WebKit (macOS, Linux) only lets the host see the drop if the page accepts it.
+  const nativeNavigationDrop = typeof (window as { chrome?: { webview?: unknown } }).chrome?.webview !== "undefined";
+
+  /// Shows the drop hint while files are dragged over the window; the host reads the dropped file natively and calls
+  /// window.__aafOpenFile.
   function dragOver(event: DragEvent) {
     if (!event.dataTransfer?.types.includes("Files")) return;
+    if (!nativeNavigationDrop) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    }
     dragging = true;
     clearTimeout(dragTimer);
-    dragTimer = setTimeout(() => (dragging = false), 300);
+    dragTimer = setTimeout(() => (dragging = false), 600);
+  }
+
+  function dropped(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes("Files")) return;
+    if (!nativeNavigationDrop) event.preventDefault();
+    dragging = false;
   }
 
   async function save(as = false) {
@@ -232,7 +246,7 @@
   });
 </script>
 
-<svelte:window onkeydown={keydown} ondragenter={dragOver} ondragover={dragOver} />
+<svelte:window onkeydown={keydown} ondragenter={dragOver} ondragover={dragOver} ondrop={dropped} />
 
 {#if dragging}
   <div class="drop-hint" aria-hidden="true"><span>Drop an AAF file to open it</span></div>

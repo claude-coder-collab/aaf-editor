@@ -30,7 +30,7 @@ auto toUtf8(const wchar_t* text) -> std::string
 class NavigationStarting final : public ICoreWebView2NavigationStartingEventHandler
 {
 public:
-    explicit NavigationStarting(const FileNavigationHandler* handler) :
+    explicit NavigationStarting(const FileDropHandler* handler) :
         handler_(handler)
     {
     }
@@ -84,13 +84,13 @@ public:
 private:
     ~NavigationStarting() = default;
 
-    const FileNavigationHandler* handler_;
+    const FileDropHandler* handler_;
     std::atomic<ULONG> references_ = 1;
 };
 
 }
 
-void interceptFileNavigation(void* browser, const FileNavigationHandler* handler)
+void installDropHandler(void* browser, const FileDropHandler* handler)
 {
     auto* controller = static_cast<ICoreWebView2Controller*>(browser);
     ICoreWebView2* webview = nullptr;

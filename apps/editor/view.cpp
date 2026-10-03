@@ -52,15 +52,18 @@ View::~View()
     webview_destroy(handleOf(handle_));
 }
 
-void View::navigate(const std::string& url)
+void View::onFileDrop(FileDropHandler handler)
 {
-    webview_navigate(handleOf(handle_), url.c_str());
+    dropHandler_ = std::make_unique<FileDropHandler>(std::move(handler));
+    installDropHandler(webview_get_native_handle(handleOf(handle_), WEBVIEW_NATIVE_HANDLE_KIND_BROWSER_CONTROLLER), dropHandler_.get());
 }
 
-void View::onFileNavigation(FileNavigationHandler handler)
+void View::drop(const std::string& path) const
 {
-    fileHandler_ = std::make_unique<FileNavigationHandler>(std::move(handler));
-    interceptFileNavigation(webview_get_native_handle(handleOf(handle_), WEBVIEW_NATIVE_HANDLE_KIND_BROWSER_CONTROLLER), fileHandler_.get());
+    if (dropHandler_)
+    {
+        (*dropHandler_)(path);
+    }
 }
 
 void View::setTitle(const std::string& title)
