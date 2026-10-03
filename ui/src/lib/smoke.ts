@@ -1,10 +1,17 @@
 import type { RpcClient } from "./rpc";
 
-/// Exercises the host bridge end to end: open, browse, edit, undo, validate. Returns a process exit code.
-export async function runSmokeTest(client: RpcClient, file: string): Promise<{ code: number; message: string }> {
+/// Exercises the host bridge end to end: open by a (simulated) drop, browse, edit, undo, validate. Returns a process exit code.
+export async function runSmokeTest(client: RpcClient, file: string, drop: (file: string) => Promise<unknown>): Promise<{ code: number; message: string }> {
   try {
-    const info = await client.open(file);
-    if (!info.open || info.header === null || info.header === undefined) throw new Error("document did not open");
+    await drop(file);
+    const fileName = file.split(/[\\/]/).pop();
+    let info = await client.docInfo();
+    for (let i = 0; i < 100 && !(info.open && info.name === fileName); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      info = await client.docInfo();
+    }
+    if (!info.open || info.name !== fileName) throw new Error("dropping the file did not open it");
+    if (info.header === null || info.header === undefined) throw new Error("document did not open");
     const children = await client.children(0);
     if (children.total < 1) throw new Error("root has no children");
     const mobs = await client.search("", "Mob", 50);

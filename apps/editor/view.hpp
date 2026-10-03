@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drop.hpp"
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -31,6 +33,10 @@ public:
     /// Evaluates `js`; must be called on the UI thread (use `dispatch` from other threads).
     void eval(const std::string& js);
     void bind(const std::string& name, Binding binding);
+    /// Opens `url` in the webview.
+    void navigate(const std::string& url);
+    /// Reports navigations to local files (dropped files) to `handler` instead of opening them (see `drop.hpp`).
+    void onFileNavigation(FileNavigationHandler handler);
     /// Completes a bound call; safe from any thread. `json` is the result value as JSON text.
     void resolve(const std::string& id, const std::string& json);
     /// Runs `task` on the UI thread; safe from any thread.
@@ -39,6 +45,7 @@ public:
     void terminate();
 
 private:
+    std::unique_ptr<FileNavigationHandler> fileHandler_;
     void* handle_;
     std::vector<std::unique_ptr<Binding>> bindings_;
 };

@@ -595,10 +595,16 @@ Status: **implemented (M5)**.
   - There are no native menus: the UI toolbar and keyboard shortcuts cover every action.
 - **Smoke test** (`--smoke-test file`):
   - The host injects `window.__aafSmoke = {file}` with `init`.
-  - The UI then runs `ui/src/lib/smoke.ts` over the real bridge: open, list the root's children, search for mobs, rename a named mob and check the rename, undo, and validate with 0 errors.
+  - The UI then runs `ui/src/lib/smoke.ts` over the real bridge: open **by a simulated drop** (the host command `simulateDrop {path}`, available only in smoke mode, navigates the webview to the file's URL, which exercises the native hook and `__aafOpenFile`; the test waits up to 10 s for the document to open), list the root's children, search for mobs, rename a named mob and check the rename, undo, and validate with 0 errors.
   - It reports through `quit`, and the process exit code is the result.
   - A 60-second watchdog exits with code 3 if the page never reports.
   - CI runs it on Linux (under `xvfb-run`), Windows and macOS.
+- **Drag and drop** (`drop.hpp`): a page cannot learn the path of a file dropped on it, but when it does not handle the drop itself, every engine navigates to the file's `file:` URL. `View::onFileNavigation(handler)` hooks that navigation natively, cancels it, and passes the UTF-8 path to `handler`, which calls `window.__aafOpenFile(path)` in the page:
+  - macOS (`drop_mac.mm`, ARC): a `WKNavigationDelegate` on the WKWebView (retained as an associated object) cancels navigation actions whose URL `isFileURL` and reports `URL.path`;
+  - Windows (`drop_win.cpp`): an `ICoreWebView2NavigationStartingEventHandler` on the WebView2 controller's `CoreWebView2` cancels `file:` URIs, converted with `aaf::rpc::fileUrlToPath`;
+  - Linux (`drop_gtk.cpp`): a `decide-policy` handler on the WebKitWebView ignores navigation actions to `file:` URIs, converted with `g_filename_from_uri`.
+  `aaf/rpc/file_url.hpp` provides `pathToFileUrl` and `fileUrlToPath` (UTF-8, percent-encoding, `file:///C:/…` drive paths, `file://host/…` UNC paths, `localhost`), unit-tested on every platform. Navigation to the embedded page itself (`setHtml`) is not a `file:` URL, so it is unaffected.
+- **Shutdown**: when the event loop ends, bindings stop accepting calls and the worker is stopped and joined (`Worker::stop`, which drops queued tasks) before anything is destroyed, so calls still arriving while the window is torn down cannot reach a destroyed worker or server.
 - **Icon** (`packaging/icons/`, §8.6): `aafedit.icns` is the macOS bundle icon (`MACOSX_BUNDLE_ICON_FILE`). On Windows, `aafedit.rc` (configured from `aafedit.rc.in` with the absolute path of `aafedit.ico`) embeds it as resource **32512** (`IDI_APPLICATION`), the ID webview loads for its window class, so the executable and the window both show it. On Linux, the hicolor PNGs are installed under `share/icons/hicolor`, the desktop entry has `Icon=aafedit` and `StartupWMClass=aafedit`, and the window calls `gtk_window_set_icon_name("aafedit")`.
 - **Not yet handled**: a prompt for unsaved changes when the window is closed (webview has no close hook), and native menus.
 
@@ -770,6 +776,8 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
     - `TimelineView` listens for `doc.changed` itself and accumulates the changed objects (`timelineMerge.ts`: `addPending`).
     - While no fetch is running, it asks `timeline.get` with `changed` and merges the reply into the timeline it shows (`mergeTimeline`: changed tracks replaced, the others kept, order from `slots`).
     - Changes arriving during a fetch are fetched next. A reply that cannot be merged (a slot the view never saw, or a different mob) triggers a full fetch, as do switching mob and `doc.opened`.
+- **Opening by drag and drop**: while files are dragged over the window (`dragenter`/`dragover` with a `Files` type) a dashed "Drop an AAF file to open it" overlay is shown; it hides 300 ms after the last `dragover`. The page does not cancel the drop, so the engine's navigation reaches the host (§8.2), which calls `window.__aafOpenFile(path)`.
+- **Opening** (Open… or a drop) asks "*name* has unsaved changes. Discard them and open *file*?" when the document is dirty.
 - **Keyboard**:
   - Ctrl/Cmd+O, S, Shift+S;
   - Z and Shift+Z or Y (except inside text fields);
@@ -960,6 +968,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 
 | 2026-09-28 | UI end-to-end tests run the real page in Playwright against `aaftool serve` rather than in the native webviews, which cannot be automated on all three platforms. The engines are matched per platform (§10) |
 | 2026-10-02 | Identifiers that point at other objects (SourceID, SourceMobSlotID, Parameter.Definition and others, §7) are resolved for display and editing but stay data properties on save; turning them into weak references would break interchange. A target missing from the file is shown neutrally, not as an error, because references to other files are legitimate |
+| 2026-10-03 | Dropped files are opened by intercepting the webview's own navigation to the file in native code (one small file per platform), because a page cannot get a dropped file's path and reading its bytes through the bridge would leave nowhere to save. The smoke test simulates the drop with the same navigation on every CI platform; the engine's navigate-on-drop behaviour itself was checked by hand on macOS |
 | 2026-10-02 | Pro Tools' rendered fades and sample-accurate edit frames cannot be re-rendered (there is no audio engine), so edits that would invalidate one first replace it with a cut taken from the clips' media handles and say so, and edits that cannot do that safely (rendered regions, short handles, placing clips against rendered audio) are refused |
 | 2026-10-02 | Multichannel audio follows the representation Pro Tools writes for Media Composer compatibility (channel combiners and `_TRACK_FORMAT`, §6.2). A multichannel clip is edited as one clip across all its channels; the combiner is presented as the clip, not as an effect |
 | 2026-10-02 | The Quick Look extension is a thin Objective-C++ `.appex` built by CMake and embedded in `aafedit.app`, not a separate Xcode/Swift project as in edl-quicklook: it reuses the C++ library directly, and full Xcode is not needed. Its HTML comes from `aaf::preview`, which `aaftool preview` also exposes, so the preview is tested on every platform |

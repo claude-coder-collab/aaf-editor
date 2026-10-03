@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- **Drag and drop.** Drag an AAF file onto the editor window to open it. If the current file has unsaved changes, you're asked first (as you now are with Open… too).
+
+### Fixes
+
+- The editor could crash on exit when requests were still in flight as the window closed.
+
 ## 0.4.0
 
 ### New

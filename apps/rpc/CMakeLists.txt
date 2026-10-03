@@ -1,4 +1,5 @@
 add_library(aaf_rpc
+    src/file_url.cpp
     src/json_value.cpp
     src/json_writer.cpp
     src/server.cpp

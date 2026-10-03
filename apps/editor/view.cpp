@@ -52,6 +52,17 @@ View::~View()
     webview_destroy(handleOf(handle_));
 }
 
+void View::navigate(const std::string& url)
+{
+    webview_navigate(handleOf(handle_), url.c_str());
+}
+
+void View::onFileNavigation(FileNavigationHandler handler)
+{
+    fileHandler_ = std::make_unique<FileNavigationHandler>(std::move(handler));
+    interceptFileNavigation(webview_get_native_handle(handleOf(handle_), WEBVIEW_NATIVE_HANDLE_KIND_BROWSER_CONTROLLER), fileHandler_.get());
+}
+
 void View::setTitle(const std::string& title)
 {
     webview_set_title(handleOf(handle_), title.c_str());

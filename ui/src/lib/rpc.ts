@@ -250,6 +250,8 @@ declare global {
     aafHost?: (command: string, args: unknown) => Promise<unknown>;
     __aafEvent?: (event: { method: string; params: unknown }) => void;
     __aafSmoke?: { file: string };
+    /// Called by the host with the path of a file dropped on the window.
+    __aafOpenFile?: (path: string) => void;
     __aafTest?: boolean;
     __aafTimeline?: {
       tracks: () => { slot: number; label: string; kind: string; items: { object: number; kind: string; start: number; length: number; clip?: number; effects?: string[]; channels?: number; rendered?: string }[]; channels?: number }[];
