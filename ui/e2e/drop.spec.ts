@@ -5,13 +5,16 @@ const OTHER = "protools/multichannel_frame_aligned.aaf";
 
 test("shows a hint while files are dragged over the window", async ({ editor }) => {
   const { page } = editor;
+  // Keep dragging (as a real drag does, with a dragover every few tens of milliseconds) while checking.
   await page.evaluate(() => {
     const data = new DataTransfer();
     data.items.add(new File(["x"], "edit.aaf"));
-    window.dispatchEvent(new DragEvent("dragover", { dataTransfer: data, bubbles: true }));
+    const timer = setInterval(() => window.dispatchEvent(new DragEvent("dragover", { dataTransfer: data, bubbles: true })), 50);
+    (window as { stopDrag?: () => void }).stopDrag = () => clearInterval(timer);
   });
   await expect(page.locator(".drop-hint")).toContainText("Drop an AAF file to open it");
-  await expect(page.locator(".drop-hint")).toHaveCount(0, { timeout: 2000 });
+  await page.evaluate(() => (window as { stopDrag?: () => void }).stopDrag?.());
+  await expect(page.locator(".drop-hint")).toHaveCount(0, { timeout: 3000 });
 });
 
 test("opens a dropped file, asking before discarding unsaved changes", async ({ editor }) => {
