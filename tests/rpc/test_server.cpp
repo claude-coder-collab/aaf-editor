@@ -573,7 +573,7 @@ TEST_CASE("doc.changed says when the mob list may have changed", "[rpc][timeline
     auto lastFlag = [&]() -> bool {
         const auto it = std::ranges::find_if(c.events | std::views::reverse, [](const auto& e) -> bool { return e.first == "doc.changed"; });
         REQUIRE(it != (c.events | std::views::reverse).end());
-        return it->second["mobsChanged"].get<bool>();
+        return it->second["mobsChanged"].template get<bool>();
     };
     const auto mobs = c.result("timeline.mobs");
     auto byName = [&](std::string_view name) -> Json { return *std::ranges::find_if(mobs, [&](const Json& m) -> bool { return m["name"].get<std::string>() == name; }); };
