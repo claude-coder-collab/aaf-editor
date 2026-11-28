@@ -67,6 +67,24 @@ enum class Edge : std::uint8_t {
 /// Replaces `find` with `replace` in every NetworkLocator URL; returns the number of URLs that changed.
 [[nodiscard]] auto relink(edit::Transaction& tx, const std::string& find, const std::string& replace) -> Result<std::size_t>;
 
+struct SampleAccurateEditReport
+{
+    /// Frames replaced with a cut, their length going to the clip next to them (see `removeFade`).
+    std::size_t cuts = 0;
+    /// Frames replaced with filler: rendered regions, and frames whose neighbouring clip has too little media.
+    std::size_t silenced = 0;
+    /// Mobs deleted because nothing used them any more: the "Sample accurate edit" master mobs and the source mobs
+    /// only they referenced.
+    std::size_t mobsDeleted = 0;
+    std::size_t essenceDeleted = 0;
+};
+
+/// Removes every clip whose source mob is named "Sample accurate edit" from every composition's tracks, whoever wrote
+/// the file. Seams become cuts as `removeFade` makes them, and the rest (regions, and seams without enough media
+/// handle) become filler. Then deletes the "Sample accurate edit" mobs nothing references any more, the mobs only
+/// they reference, and those mobs' EssenceData.
+[[nodiscard]] auto removeSampleAccurateEdits(edit::Transaction& tx) -> Result<SampleAccurateEditReport>;
+
 /// Copies an object and everything it strongly references. Copied set elements keep their keys, which stay unique
 /// because keys only need to be unique within their set.
 [[nodiscard]] auto deepCopy(edit::Transaction& tx, ObjectId id) -> Result<ObjectId>;

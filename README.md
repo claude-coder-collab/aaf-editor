@@ -41,6 +41,8 @@ Builds are not code-signed. The release notes explain how to open them on macOS 
   - Drag clips to move them, and drag edges to trim (hold Alt to ripple).
   - Keys: S splits, Delete lifts, Shift+Delete ripple-deletes, M adds a marker.
   - Clicking a clip shows its source chain; clips with missing sources are red.
+- **Batch menu (toolbar):** processes that change the whole file in one undoable step.
+  - **Remove sample-accurate edits** removes every one-frame "Sample accurate edit" clip that Pro Tools writes when exporting for Media Composer. A frame next to a clip becomes a cut, using that clip's media handle. Frames that can't become a cut are replaced with silence. That covers runs of these frames with no clip beside them, which can hide very short clips, and frames beside a clip with too little media or keyframed clip gain. The master clips and media that nothing uses any more are deleted too.
 - **Diagnostics and History (bottom):** Validate checks the whole file, and clicking a history entry undoes or redoes to that point.
 - **File shortcuts:** Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+Z, Ctrl+Shift+Z.
 

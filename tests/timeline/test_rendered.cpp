@@ -57,6 +57,13 @@ auto rendered(const Track& t, Rendered role) -> Item
     return *it;
 }
 
+auto clips(const Track& t) -> std::vector<Item>
+{
+    std::vector<Item> out;
+    std::ranges::copy_if(t.items, std::back_inserter(out), [](const Item& i) { return i.kind != ItemKind::filler; });
+    return out;
+}
+
 auto errorCount(const Document& doc) -> std::size_t
 {
     return static_cast<std::size_t>(std::ranges::count(validate(doc), Diagnostic::Severity::error, &Diagnostic::severity));
@@ -216,4 +223,86 @@ TEST_CASE("Edits that would break rendered audio are refused", "[timeline][rende
         CHECK(trimmed.error().message.contains("cannot be replaced by a cut"));
         CHECK(errorCount(doc) == 0);
     }
+}
+
+namespace
+{
+
+auto sampleAccurateMobs(const Document& doc) -> std::size_t
+{
+    const auto mobs = Projector(doc).mobs();
+    return static_cast<std::size_t>(std::ranges::count(mobs, std::string{ "Sample accurate edit" }, &MobSummary::name));
+}
+
+auto removeAll(edit::Session& session) -> ops::SampleAccurateEditReport
+{
+    ops::SampleAccurateEditReport report;
+    REQUIRE(session.execute("remove sample-accurate edits", [&](edit::Transaction& tx) -> Result<void> {
+        auto r = ops::removeSampleAccurateEdits(tx);
+        if (!r)
+        {
+            return std::unexpected(r.error());
+        }
+        report = *r;
+        return {};
+    }));
+    return report;
+}
+
+}
+
+TEST_CASE("Removing every sample-accurate edit cuts seams, silences the rest and deletes their mobs", "[timeline][rendered][edit][batch]")
+{
+    auto session = openSession(kSampleAccurate);
+    const auto& doc = session.document();
+    const auto before = composition(doc);
+    REQUIRE(sampleAccurateMobs(doc) == 60);
+    const auto report = removeAll(session);
+    CHECK(report.cuts == 10);
+    CHECK(report.silenced == 7);
+    CHECK(report.mobsDeleted == 180);
+    CHECK(report.essenceDeleted == 0);
+    CHECK(errorCount(doc) == 0);
+    CHECK(sampleAccurateMobs(doc) == 0);
+    const auto after = composition(doc);
+    for (const auto& t : after.tracks)
+    {
+        CHECK(std::ranges::none_of(t.items, [](const Item& i) { return i.label == "Sample accurate edit"; }));
+        CHECK(t.length == track(before, t.name).length);
+    }
+    const auto mono = track(after, "mono");
+    CHECK(named(mono, "mono_01-01").start == 8);
+    CHECK(named(mono, "mono_01-01").length == 7);
+    CHECK(named(mono, "mono_02").start == 18);
+    CHECK(named(mono, "mono_02").length == 4);
+    CHECK(named(mono, "mono_03-01 (clip gain)").length == 1);
+    CHECK(named(track(after, "5.1"), "5.1_01-02").start == 7);
+    CHECK(named(track(after, "5.1"), "5.1_01-02").length == 3);
+    CHECK(clips(track(after, "stereo")).size() == 1);
+
+    REQUIRE(session.undo());
+    CHECK(composition(doc).tracks == before.tracks);
+    CHECK(sampleAccurateMobs(doc) == 60);
+}
+
+TEST_CASE("Removing sample-accurate edits deletes their embedded essence and is idempotent", "[timeline][rendered][edit][batch]")
+{
+    auto session = openSession("protools/multichannel_embedded.aaf");
+    const auto report = removeAll(session);
+    CHECK(report.cuts + report.silenced == 17);
+    CHECK(report.mobsDeleted == 180);
+    CHECK(report.essenceDeleted == 60);
+    CHECK(errorCount(session.document()) == 0);
+    const auto steps = session.history().size();
+    const auto again = removeAll(session);
+    CHECK(again.cuts + again.silenced + again.mobsDeleted + again.essenceDeleted == 0);
+    CHECK(session.history().size() == steps);
+}
+
+TEST_CASE("Removing sample-accurate edits from a file without any changes nothing", "[timeline][rendered][edit][batch]")
+{
+    auto session = openSession(kFrameAligned);
+    const auto report = removeAll(session);
+    CHECK(report.cuts + report.silenced + report.mobsDeleted + report.essenceDeleted == 0);
+    CHECK(session.history().empty());
 }

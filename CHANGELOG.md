@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- **Batch menu** in the toolbar, for processes that change the whole file in one undoable step.
+- **Remove sample-accurate edits** (Batch menu) removes every "Sample accurate edit" clip that Pro Tools writes when an edit isn't frame-aligned. A frame next to a clip becomes a cut, using that clip's media handle, so timing is unchanged. Frames that can't become a cut are replaced with silence: runs of these frames with no clip beside them (which can contain very short clips), and frames beside a clip with too little media or keyframed clip gain. The "Sample accurate edit" master clips, their sources and any embedded media are then deleted, which halves the size of the Pro Tools test exports. A summary says how many frames were cut, silenced and deleted.
+
 ## 0.5.0
 
 ### New

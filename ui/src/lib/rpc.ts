@@ -263,6 +263,14 @@ declare global {
   }
 }
 
+export interface SampleAccurateEditReport {
+  changes: ChangeSet;
+  cuts: number;
+  silenced: number;
+  mobsDeleted: number;
+  essenceDeleted: number;
+}
+
 export class RpcClient {
   private nextId = 0;
   private readonly handlers = new Set<EventHandler>();
@@ -316,6 +324,7 @@ export class RpcClient {
   search = (text: string, cls = "", limit = 200) => this.call<SearchHit[]>("search.query", { text, class: cls, limit });
   mobs = () => this.call<MobSummary[]>("timeline.mobs");
   timelineOp = (params: Record<string, unknown>) => this.call<{ changes: ChangeSet; id?: number; count?: number; warnings?: string[] }>("timeline.op", params);
+  removeSampleAccurateEdits = () => this.call<SampleAccurateEditReport>("timeline.op", { op: "removeSampleAccurateEdits" });
   timeline = async (mob: number, changed?: number[]) => expandTimeline(await this.call<WireTimeline>("timeline.get", changed ? { mob, changed } : { mob }));
   resolve = (clip: number) => this.call<SourceChain>("timeline.resolve", { clip });
   extractEssence = (id: number, path: string) => this.call<{ size: number }>("essence.extract", { id, path });

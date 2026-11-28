@@ -383,6 +383,20 @@ TEST_CASE("Rendered fades are reported and removed through the RPC API", "[rpc][
     CHECK(c.request("timeline.op", { { "op", "removeFade" }, { "item", fade["object"] } }).contains("error"));
 }
 
+TEST_CASE("Sample-accurate edits are removed in one step through the RPC API", "[rpc][timeline][rendered][batch]")
+{
+    Client c;
+    c.result("doc.open", { { "path", (fixturesDir() / "protools/split_mono_wav.aaf").string() } });
+    const auto result = c.result("timeline.op", { { "op", "removeSampleAccurateEdits" } });
+    CHECK(result["cuts"].get<int>() + result["silenced"].get<int>() == 60);
+    CHECK(result["mobsDeleted"] == 180);
+    CHECK_FALSE(result["changes"]["objects"].empty());
+    CHECK(c.result("search.query", { { "text", "Sample accurate edit" } }).empty());
+    CHECK(c.result("edit.history")["items"].back() == "Remove sample-accurate edits");
+    const auto diagnostics = c.result("doc.validate");
+    CHECK(std::ranges::none_of(diagnostics, [](const Json& d) -> bool { return d["severity"] == "error"; }));
+}
+
 TEST_CASE("Embedded essence can be extracted and replaced through the RPC API", "[rpc][server]")
 {
     Client c;
