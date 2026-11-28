@@ -1473,6 +1473,22 @@ auto Server::call(const std::string& method, const Json& params) -> Result<Json>
                 return {};
             };
         }
+        else if (*op == "removeSampleAccurateEdits")
+        {
+            description = "Remove sample-accurate edits";
+            command = [&](edit::Transaction& tx) -> Result<void> {
+                auto report = timeline::ops::removeSampleAccurateEdits(tx);
+                if (!report)
+                {
+                    return std::unexpected(report.error());
+                }
+                extra["cuts"] = report->cuts;
+                extra["silenced"] = report->silenced;
+                extra["mobsDeleted"] = report->mobsDeleted;
+                extra["essenceDeleted"] = report->essenceDeleted;
+                return {};
+            };
+        }
         else
         {
             return invalid(std::format("unknown timeline operation '{}'", *op));

@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <iterator>
 #include <limits>
+#include <map>
+#include <set>
 
 namespace aaf::timeline::ops
 {
@@ -15,6 +18,7 @@ namespace
 {
 
 using detail::Access;
+using detail::ClassFilter;
 using detail::classifyRenderedRoles;
 using detail::RenderedName;
 using detail::renderedName;
@@ -611,50 +615,97 @@ auto describe(Rendered role) -> std::string_view
 
 constexpr std::string_view kRegionRefusal = "Pro Tools rendered this audio across several frames (it may contain whole short clips), so it cannot be edited";
 
-/// Replaces the rendered fade or seam at `index` with a cut, giving its length to the clips around it from their
-/// media handles: half to each side of a crossfade (the earlier clip gets the odd unit), all of a fade to its
-/// clip, and a seam frame to the clip before it (else after it). The timing of everything else is unchanged.
-auto renderedToCut(edit::Transaction& tx, const TrackRef& track, std::size_t index, std::vector<std::string>* warnings) -> Result<void>
+struct CutPlan
 {
-    const Access a(tx.document());
-    const auto list = entries(a, track.sequence);
-    const auto roles = renderedRoles(tx.document(), list);
-    const auto role = roles.at(index);
-    if (role == Rendered::none)
+    Rendered role = Rendered::none;
+    /// Units given to the clip before (its tail) and after (its head).
+    std::int64_t before = 0;
+    std::int64_t after = 0;
+};
+
+/// How the rendered fade or seam at `index` becomes a cut: half to each side of a crossfade (the earlier clip gets
+/// the odd unit), all of a fade to its clip, and a seam frame to the clip before it (else after it).
+auto planCut(const std::vector<Entry>& list, const std::vector<Rendered>& roles, std::size_t index) -> Result<CutPlan>
+{
+    CutPlan plan{ roles.at(index) };
+    if (plan.role == Rendered::none)
     {
         return fail(Errc::invalid_argument, "the segment is not a rendered fade");
     }
-    if (role == Rendered::region)
+    if (plan.role == Rendered::region)
     {
         return fail(Errc::unsupported, std::string(kRegionRefusal));
     }
     const auto length = list[index].length;
     const bool hasBefore = index > 0 && list[index - 1].clip && roles[index - 1] == Rendered::none;
-    std::int64_t before = 0;
-    std::int64_t after = 0;
-    switch (role)
+    switch (plan.role)
     {
         case Rendered::crossfade:
-            after = length / 2;
-            before = length - after;
+            plan.after = length / 2;
+            plan.before = length - plan.after;
             break;
         case Rendered::fadeOut:
-            before = length;
+            plan.before = length;
             break;
         case Rendered::fadeIn:
-            after = length;
+            plan.after = length;
             break;
         default:
-            (hasBefore ? before : after) = length;
+            (hasBefore ? plan.before : plan.after) = length;
             break;
     }
-    const auto failure = [&](const Error& e) -> std::unexpected<Error> {
-        return fail(e.code, std::format("the {} cannot be replaced by a cut: {}", describe(role), e.message));
-    };
-    if (before > 0)
+    return plan;
+}
+
+/// Why `plan` cannot be applied to the entry at `index` without changing anything, or empty if it can.
+auto cutProblem(const Access& a, const std::vector<Entry>& list, std::size_t index, const CutPlan& plan) -> std::string
+{
+    if (plan.before > 0)
     {
         const auto& previous = list[index - 1];
-        if (auto r = setSegmentLength(tx, previous.id, previous.length + before); !r)
+        if (!previous.locked.empty())
+        {
+            return previous.locked;
+        }
+        for (const auto clip : sourceClipsOf(a, previous.id))
+        {
+            const auto available = a.isA(clip, "SourceClip") ? sourceLength(a, clip) : std::nullopt;
+            if (available && a.integer(clip, "SourceClip", "StartTime").value_or(0) + lengthOf(a, clip) + plan.before > *available)
+            {
+                return "the clip before it has too little media after its end";
+            }
+        }
+    }
+    if (plan.after > 0)
+    {
+        const auto& next = list[index + 1];
+        if (!next.locked.empty())
+        {
+            return next.locked;
+        }
+        for (const auto clip : sourceClipsOf(a, next.id))
+        {
+            if (a.integer(clip, "SourceClip", "StartTime").value_or(0) < plan.after)
+            {
+                return "the clip after it has too little media before its start";
+            }
+        }
+    }
+    return {};
+}
+
+/// Replaces the rendered fade or seam at `index` with a cut, as `plan` says. `list` must be current. The timing of
+/// everything else is unchanged.
+auto applyCut(edit::Transaction& tx, const TrackRef& track, const std::vector<Entry>& list, std::size_t index, const CutPlan& plan, std::vector<std::string>* warnings) -> Result<void>
+{
+    const Access a(tx.document());
+    const auto failure = [&](const Error& e) -> std::unexpected<Error> {
+        return fail(e.code, std::format("the {} cannot be replaced by a cut: {}", describe(plan.role), e.message));
+    };
+    if (plan.before > 0)
+    {
+        const auto& previous = list[index - 1];
+        if (auto r = setSegmentLength(tx, previous.id, previous.length + plan.before); !r)
         {
             return failure(r.error());
         }
@@ -663,14 +714,14 @@ auto renderedToCut(edit::Transaction& tx, const TrackRef& track, std::size_t ind
             return failure(r.error());
         }
     }
-    if (after > 0)
+    if (plan.after > 0)
     {
         const auto& next = list[index + 1];
-        if (auto r = setSegmentLength(tx, next.id, next.length + after); !r)
+        if (auto r = setSegmentLength(tx, next.id, next.length + plan.after); !r)
         {
             return failure(r.error());
         }
-        if (auto r = adjustStart(tx, next.id, -after); !r)
+        if (auto r = adjustStart(tx, next.id, -plan.after); !r)
         {
             return failure(r.error());
         }
@@ -681,9 +732,22 @@ auto renderedToCut(edit::Transaction& tx, const TrackRef& track, std::size_t ind
     }
     if (warnings != nullptr)
     {
-        warnings->push_back(std::format("Replaced a rendered {} with a cut.", describe(role)));
+        warnings->push_back(std::format("Replaced a rendered {} with a cut.", describe(plan.role)));
     }
     return {};
+}
+
+/// Replaces the rendered fade or seam at `index` with a cut (see `planCut`).
+auto renderedToCut(edit::Transaction& tx, const TrackRef& track, std::size_t index, std::vector<std::string>* warnings) -> Result<void>
+{
+    const Access a(tx.document());
+    const auto list = entries(a, track.sequence);
+    auto plan = planCut(list, renderedRoles(tx.document(), list), index);
+    if (!plan)
+    {
+        return propagate(plan);
+    }
+    return applyCut(tx, track, list, index, *plan, warnings);
 }
 
 /// Replaces rendered fades or seams at the head and/or tail of the clip at `index` with cuts (see `renderedToCut`),
@@ -980,6 +1044,258 @@ auto removeFade(edit::Transaction& tx, ObjectId item, std::vector<std::string>* 
         return r;
     }
     return normalize(tx, track);
+}
+
+namespace
+{
+
+/// The sequence an operation on `slot` would edit, if the slot already holds one (see `openTrack`).
+auto existingSequence(const Access& a, ObjectId slot) -> std::optional<ObjectId>
+{
+    if (a.isA(slot, "EventMobSlot"))
+    {
+        return std::nullopt;
+    }
+    auto segment = a.child(slot, "MobSlot", "Segment");
+    for (int depth = 0; segment && depth < kMaxDepth && a.isA(*segment, "OperationGroup"); ++depth)
+    {
+        const auto inputs = a.children(*segment, "OperationGroup", "InputSegments");
+        if (inputs.empty())
+        {
+            return std::nullopt;
+        }
+        segment = inputs.front();
+    }
+    return segment && a.isA(*segment, "Sequence") ? segment : std::nullopt;
+}
+
+auto replaceWithFiller(edit::Transaction& tx, const TrackRef& track, std::size_t index, std::int64_t length) -> Result<void>
+{
+    if (auto removed = removeAt(tx, track, index); !removed)
+    {
+        return propagate(removed);
+    }
+    auto filler = makeFiller(tx, track, length);
+    if (!filler)
+    {
+        return propagate(filler);
+    }
+    return insertAt(tx, track, index, *filler);
+}
+
+auto removeSampleAccurateEditsFrom(edit::Transaction& tx, const TrackRef& track, const Projector& projector, SampleAccurateEditReport& report) -> Result<void>
+{
+    const Access a(tx.document());
+    const auto initial = entries(a, track.sequence);
+    std::vector<RenderedProbe> probes;
+    probes.reserve(initial.size());
+    for (const auto& e : initial)
+    {
+        probes.push_back({ e.clip ? renderedNameOf(a, projector, e.id) : RenderedName::none, e.clip, e.start, e.length });
+    }
+    const auto roles = classifyRenderedRoles(probes);
+    bool changed = false;
+    for (std::size_t i = 0; i < initial.size(); ++i)
+    {
+        if (probes[i].name == RenderedName::seam && roles[i] == Rendered::region)
+        {
+            if (auto r = replaceWithFiller(tx, track, i, initial[i].length); !r)
+            {
+                return r;
+            }
+            ++report.silenced;
+            changed = true;
+        }
+    }
+    for (std::size_t i = initial.size(); i-- > 0;)
+    {
+        if (probes[i].name != RenderedName::seam || roles[i] != Rendered::seam)
+        {
+            continue;
+        }
+        const auto list = entries(a, track.sequence);
+        auto plan = planCut(list, roles, i);
+        if (!plan)
+        {
+            return propagate(plan);
+        }
+        if (cutProblem(a, list, i, *plan).empty())
+        {
+            if (auto r = applyCut(tx, track, list, i, *plan, nullptr); !r)
+            {
+                return r;
+            }
+            ++report.cuts;
+        }
+        else
+        {
+            if (auto r = replaceWithFiller(tx, track, i, list[i].length); !r)
+            {
+                return r;
+            }
+            ++report.silenced;
+        }
+        changed = true;
+    }
+    return changed ? normalize(tx, track) : Result<void>{};
+}
+
+auto owningMob(const Access& a, ObjectId id) -> std::optional<ObjectId>
+{
+    for (int depth = 0; id != kNoObject && depth < 256; ++depth)
+    {
+        if (a.isA(id, "Mob"))
+        {
+            return id;
+        }
+        id = a.doc_.object(id).parent;
+    }
+    return std::nullopt;
+}
+
+/// Deletes the "Sample accurate edit" mobs (other than compositions) that nothing outside the deleted set
+/// references, the mobs that only deleted mobs reference, and their EssenceData.
+auto deleteUnusedSampleAccurateEditMobs(edit::Transaction& tx, SampleAccurateEditReport& report) -> Result<void>
+{
+    const auto& doc = tx.document();
+    const Access a(doc);
+    const ClassFilter isMob(doc, "Mob");
+    const ClassFilter isReference(doc, "SourceReference");
+    const ClassFilter isComposition(doc, "CompositionMob");
+    const ClassFilter isEssence(doc, "EssenceData");
+    std::map<MobId, ObjectId> mobs;
+    for (ObjectId i = 0; i < doc.objectCount(); ++i)
+    {
+        if (isMob(i) && doc.isAttached(i))
+        {
+            if (const auto id = a.value(i, "Mob", "MobID"); id && id->is<MobId>())
+            {
+                mobs.emplace(id->as<MobId>(), i);
+            }
+        }
+    }
+    std::map<ObjectId, std::set<std::optional<ObjectId>>> referrers;
+    const auto addReferrer = [&](ObjectId from, const std::optional<Value>& target) -> void {
+        if (!target || !target->is<MobId>())
+        {
+            return;
+        }
+        if (const auto it = mobs.find(target->as<MobId>()); it != mobs.end())
+        {
+            referrers[it->second].insert(owningMob(a, from));
+        }
+    };
+    for (ObjectId i = 0; i < doc.objectCount(); ++i)
+    {
+        if (!doc.isAttached(i))
+        {
+            continue;
+        }
+        if (isReference(i))
+        {
+            addReferrer(i, a.value(i, "SourceReference", "SourceID"));
+        }
+        else if (isComposition(i))
+        {
+            addReferrer(i, a.value(i, "CompositionMob", "Rendering"));
+        }
+    }
+    std::set<ObjectId> doomed;
+    const auto unused = [&](ObjectId mob) -> bool {
+        const auto it = referrers.find(mob);
+        return it == referrers.end() || std::ranges::all_of(it->second, [&](const std::optional<ObjectId>& from) -> bool { return from && (*from == mob || doomed.contains(*from)); });
+    };
+    for (const auto& [id, mob] : mobs)
+    {
+        if (!isComposition(mob) && renderedName(a.string(mob, "Mob", "Name")) == RenderedName::seam && unused(mob))
+        {
+            doomed.insert(mob);
+        }
+    }
+    for (bool grew = !doomed.empty(); grew;)
+    {
+        grew = false;
+        for (const auto& [mob, from] : referrers)
+        {
+            const bool fromDoomed = std::ranges::any_of(from, [&](const std::optional<ObjectId>& f) -> bool { return f && doomed.contains(*f); });
+            if (!doomed.contains(mob) && fromDoomed && unused(mob))
+            {
+                doomed.insert(mob);
+                grew = true;
+            }
+        }
+    }
+    std::set<MobId> doomedIds;
+    for (const auto& [id, mob] : mobs)
+    {
+        if (doomed.contains(mob))
+        {
+            doomedIds.insert(id);
+        }
+    }
+    for (ObjectId i = 0; i < doc.objectCount(); ++i)
+    {
+        if (!isEssence(i) || !doc.isAttached(i))
+        {
+            continue;
+        }
+        if (const auto id = a.value(i, "EssenceData", "MobID"); id && id->is<MobId>() && doomedIds.contains(id->as<MobId>()))
+        {
+            if (auto r = edit::deleteObject(tx, i); !r)
+            {
+                return r;
+            }
+            ++report.essenceDeleted;
+        }
+    }
+    for (const auto mob : doomed)
+    {
+        if (auto r = edit::deleteObject(tx, mob); !r)
+        {
+            return r;
+        }
+        ++report.mobsDeleted;
+    }
+    return {};
+}
+
+}
+
+auto removeSampleAccurateEdits(edit::Transaction& tx) -> Result<SampleAccurateEditReport>
+{
+    SampleAccurateEditReport report;
+    const Access a(tx.document());
+    const Projector projector(tx.document());
+    const ClassFilter isComposition(tx.document(), "CompositionMob");
+    std::vector<ObjectId> slots;
+    for (ObjectId i = 0; i < tx.document().objectCount(); ++i)
+    {
+        if (isComposition(i) && tx.document().isAttached(i))
+        {
+            std::ranges::copy(a.children(i, "Mob", "Slots"), std::back_inserter(slots));
+        }
+    }
+    for (const auto slot : slots)
+    {
+        if (!existingSequence(a, slot))
+        {
+            continue;
+        }
+        auto track = openTrack(tx, slot);
+        if (!track)
+        {
+            return propagate(track);
+        }
+        if (auto r = removeSampleAccurateEditsFrom(tx, *track, projector, report); !r)
+        {
+            return propagate(r);
+        }
+    }
+    if (auto r = deleteUnusedSampleAccurateEditMobs(tx, report); !r)
+    {
+        return propagate(r);
+    }
+    return report;
 }
 
 auto lift(edit::Transaction& tx, ObjectId item, std::vector<std::string>* warnings) -> Result<void>

@@ -420,7 +420,7 @@ Status: **implemented (M7)** in `aaf/timeline/edit.hpp` (namespace `aaf::timelin
 **Multichannel clips**: a channel combiner (§6.2) whose every input is a clip chain is part of the `ClipChain` too, so a multichannel clip is edited as one clip. `ClipChain` then holds every group (outer effects, the combiner, each channel's effects) and one source clip per channel. Length changes apply to all of them, `StartTime` changes to every channel's clip, and every channel must stay within its source. Only one combiner is allowed per chain, and a channel that is not a clip chain makes the whole item an ordinary multi-input effect.
 
 - **Not yet supported**: moving or trimming transitions, editing inside nested scopes and multi-input effects other than channel combiners, and trimming or splitting clips with speed changes or keyframed effects.
-- **Tests** (`tests/timeline/test_edit_ops.cpp`, on the SDK sample so they run on every PR; multichannel in `test_multichannel.cpp`, on the Pro Tools fixtures):
+- **Tests** (`tests/timeline/test_edit_ops.cpp`, on the SDK sample so they run on every PR; multichannel in `test_multichannel.cpp` and rendered audio, including removing every sample-accurate edit, in `test_rendered.cpp`, on the Pro Tools fixtures):
   - every operation, including refusals;
   - the stored Length always equal to the projected total;
   - no adjacent fillers;
@@ -453,6 +453,20 @@ Status: **projection and editing implemented**; grouping split-to-mono tracks an
   - `lift`, `rippleDelete` and `move` of a clip first replace the rendered fades and seams at **both** its edges with cuts (so a fade-in or fade-out goes with its clip as unfaded audio, and a crossfade is split between the two clips); `trim` does so at the trimmed edge, then trims so that the edge ends up `delta` from where it started. Moving or trimming a rendered clip itself is refused.
   - Splitting inside rendered audio, and placing a clip (insert, overwrite, or a move's target) next to rendered audio, are refused, as is any edit that would need to convert a region.
   - Each conversion appends "Replaced a rendered crossfade with a cut." (or fade-in, fade-out, sample-accurate edit frame) to the operation's `warnings`, which `timeline.op` returns.
+- **Removing every sample-accurate edit** (`removeSampleAccurateEdits(tx) -> SampleAccurateEditReport{cuts, silenced, mobsDeleted, essenceDeleted}`, the Batch menu's first process):
+  - It edits every slot of every attached CompositionMob that already holds a Sequence (directly or inside track-level effects). It acts on clips whose (first channel's) source mob is named "Sample accurate edit", **whoever wrote the file**: it does not check for a Pro Tools Identification, unlike `Item.rendered`. Fades are left alone.
+  - Each track is classified once, before anything changes, with the same classifier as the projection. Frames are then replaced as follows:
+    1. Every **region** frame becomes Filler of the same length.
+    2. Seams are taken **from last to first**. Each becomes a cut exactly as `removeFade` makes it, with its side chosen by that first classification: two adjacent seam frames between two clips go one to each clip.
+    3. A seam whose cut would fail becomes Filler instead. A cut fails when the clip would run past its source or before its start, or the clip's chain is locked (keyframed clip gain). This is checked read-only before anything changes, so a failure leaves nothing half-done.
+    This order matters: converting seams one at a time on a reclassified track would turn neighbouring region frames into seams, extending clips over audio that was never theirs.
+  - Then mobs are deleted:
+    - Candidates are mobs that are not compositions and are named "Sample accurate edit".
+    - A candidate is deleted when no attached SourceReference or `CompositionMob.Rendering` outside the deleted set refers to its MobID.
+    - Mobs referenced only by deleted mobs are deleted too, repeating until nothing changes. In Pro Tools exports that is each frame's file source mob and its import source.
+    - The EssenceData of every deleted mob is deleted.
+  - The whole process is one command ("Remove sample-accurate edits"): validated, atomic and undoable. A file with nothing to remove records no step.
+  - On the fixtures: `multichannel_wav.aaf` gives 10 cuts and 7 silenced frames (5 region frames, and 2 seams beside the keyframed "mono_03-01 (clip gain)"), and deletes 180 mobs (60 master and 120 source). `multichannel_embedded.aaf` also deletes 60 EssenceData. `split_mono_wav.aaf` gives 36 cuts and 24 silenced frames. Every result validates with 0 errors and reads back in pyaaf2 and OTIO with no "Sample accurate edit" clips or mobs.
 - **Validation**: each input of an Audio Channel Combiner must have the group's length (an **error**: the channels are one clip). The session validates the parents of touched objects as well, so an edit to one channel that breaks this is refused.
 
 ## 7. Layer 4: Edit session (`libaafedit`)
@@ -592,7 +606,7 @@ Status: **implemented (M5)**.
   - `openDialog({data?})` and `saveDialog({suggested?, data?})` use [portable-file-dialogs](https://github.com/samhocevar/portable-file-dialogs), pinned by commit, which is native on Windows and macOS and uses zenity or kdialog on Linux. They return a path or `null`.
   - `setTitle({title})`.
   - `quit({code, message?})`.
-  - There are no native menus: the UI toolbar and keyboard shortcuts cover every action.
+  - There are no native menus: the UI toolbar (including its in-page Batch menu) and keyboard shortcuts cover every action.
 - **Smoke test** (`--smoke-test file`):
   - The host injects `window.__aafSmoke = {file}` with `init`.
   - The UI then runs `ui/src/lib/smoke.ts` over the real bridge: open **by a simulated drop** (the host command `simulateDrop {path}`, available only in smoke mode, calls the drop handler with the path, which exercises the host-to-page path and `__aafOpenFile` but not the native drag handling; the test waits up to 10 s for the document to open), list the root's children, search for mobs, rename a named mob and check the rename, undo, and validate with 0 errors.
@@ -675,7 +689,8 @@ Status: **implemented (M5)**. The bridge is a standalone library (`Server`), tes
       - `removeTrack {slot}`;
       - `addMarker {mob, position, comment?}` → `id`;
       - `relink {find, replace}` → `count`;
-      - `removeFade {item}` (§6.2).
+      - `removeFade {item}` (§6.2);
+      - `removeSampleAccurateEdits` → `{cuts, silenced, mobsDeleted, essenceDeleted}` (§6.2).
       Any operation may also return `warnings` (strings), for example when rendered fades were replaced with cuts.
 - **Events**: `doc.opened` (info), `doc.changed` (`{changes, info, mobsChanged}`, from the session listener) and `doc.state` (info, after a save).
   - `mobsChanged` is true when `timeline.mobs` may return something different:
@@ -707,7 +722,9 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - `lib/smoke.ts`.
   - `lib/components/`: `TreeView`, `PropertyPanel`, `ValueEditor` and `BottomPanel`.
 - **Layout**:
-  - A toolbar: Open, Save, Save As, Undo and Redo (whose tooltips name the step), search, and the file name with a dirty marker, object count and version.
+  - A toolbar: Open, Save, Save As, Undo and Redo (whose tooltips name the step), the Timelines dropdown, the **Batch** menu, search, and the file name with a dirty marker, object count and version.
+  - **Batch menu** (`components/Menu.svelte`, a generic in-page drop-down: button with `aria-haspopup`, items with `role="menuitem"` whose tooltip is the description; it closes on a pick, Escape or a click outside). Its items come from `lib/batch.ts`, where each `BatchProcess` is `{id, label, description, run(client) → summary}`. The menu is disabled while no file is open or a request is running. A run's summary goes to the message bar as information, and errors as errors. Processes:
+    - **Remove sample-accurate edits** (`timeline.op removeSampleAccurateEdits`). The summary (`sampleAccurateEditSummary`, unit-tested) reads "Removed 17 sample-accurate edits (10 cuts, 7 silenced); deleted 180 unused mobs.", or "No sample-accurate edits found.".
   - The object tree on the left, virtualised (24 px rows, only visible rows rendered), with search results above it.
   - The property panel on the right.
   - A bottom panel with tabs for Diagnostics (Validate, with each entry linking to its object) and History (click an entry to undo or redo to that point).
@@ -871,6 +888,7 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
   - Covered flows:
     - Inspector: open through the Open button (the window title is set); search and select a mob; rename it (panel, dirty marker, history and timeline name update); Ctrl+Z undo and Redo; inline rejection of an invalid integer; Validate reports 0 errors; Save As a copy, which `aaftool validate` accepts and which contains the edit.
     - Timeline: click-select a clip (the source chain shows); Lift and Undo; split at a playhead set on the ruler with the S key; trim a tail by dragging its edge; add a sound track; on an Audio Gain clip away from transitions, clicking the body selects the SourceClip (with its source chain) and clicking the badge selects the OperationGroup, labelled "Audio Gain".
+    - Batch (`batch.spec.ts`): on `multichannel_wav.aaf`, Batch → Remove sample-accurate edits leaves no seams or regions, shows the summary and closes the menu; Undo brings back all 17.
   - Browsers: the engines behind each platform's webview. Chromium and WebKit on Linux, WebKit on macOS (as in WKWebView), and Edge on Windows (as in WebView2). The projects are `chromium`, `webkit` and `msedge`.
 
 ## 11. CI/CD (GitHub Actions, frugal)
@@ -974,6 +992,9 @@ Status: **tree and inspector (M5), read-only timeline (M6)**; timeline editing i
 | 2026-10-02 | The Quick Look extension is a thin Objective-C++ `.appex` built by CMake and embedded in `aafedit.app`, not a separate Xcode/Swift project as in edl-quicklook: it reuses the C++ library directly, and full Xcode is not needed. Its HTML comes from `aaf::preview`, which `aaftool preview` also exposes, so the preview is tested on every platform |
 | 2026-10-02 | The application icon is drawn by a Pillow script and its outputs are committed, like the generated model, so builds need no image tools |
 | 2026-10-02 | SMPTE label names come from the published SMPTE Labels register, generated into a committed table like the baseline model. Names are added to AUID values in the RPC rather than stored or written; the version byte is ignored when matching. The change picker offers the label's family (first four item bytes), since the nearest register node is often only a set of qualifiers (OP1a's eight variants) |
+
+| 2026-11-27 | Whole-file processes live in a toolbar Batch menu, each one undoable command |
+| 2026-11-27 | Removing sample-accurate edits removes every one: frames that cannot become a cut (rendered regions, short handles, keyframed clip gain) become silence, at the owner's request, even though regions can hold short clips that exist nowhere else. The unused "Sample accurate edit" mobs, and what only they reference, are deleted with them |
 
 **Licensing note:** AAF SDK material is used only as test data. No SDK code is used or consulted.
 

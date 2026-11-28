@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  import { batchProcesses } from "./lib/batch";
   import BottomPanel from "./lib/components/BottomPanel.svelte";
+  import Menu from "./lib/components/Menu.svelte";
   import PropertyPanel from "./lib/components/PropertyPanel.svelte";
   import TimelineView from "./lib/components/TimelineView.svelte";
   import TreeView from "./lib/components/TreeView.svelte";
@@ -182,6 +184,12 @@
     });
   }
 
+  async function runBatch(id: string) {
+    const process = batchProcesses.find((p) => p.id === id);
+    if (!client || !info.open || !process) return;
+    await guard(async () => notify(await process.run(client), "info"));
+  }
+
   async function search() {
     if (!client || !info.open) return;
     await guard(async () => {
@@ -267,6 +275,8 @@
         <option value={String(m.id)}>{m.topLevel ? "★ " : ""}{m.name || "(unnamed)"} — {m.kind}</option>
       {/each}
     </select>
+    <span class="sep"></span>
+    <Menu label="Batch" items={batchProcesses} disabled={!info.open || busy} onpick={runBatch} />
     <form class="search" onsubmit={(e) => (e.preventDefault(), search())}>
       <input id="search" type="search" placeholder="Search names and IDs (Ctrl+F)" bind:value={query} disabled={!info.open} />
     </form>
